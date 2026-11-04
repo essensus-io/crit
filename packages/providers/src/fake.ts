@@ -93,10 +93,12 @@ export class FakeAdapter implements ProviderAdapter {
   readonly calls: FakeCall[] = [];
   private readonly consumed = new Set<number>();
 
-  constructor(
-    private readonly script: FakeScript,
-    readonly profile: Pick<ProviderProfile, "model">,
-  ) {}
+  private readonly script: FakeScript;
+  readonly profile: Pick<ProviderProfile, "model">;
+  constructor(script: FakeScript, profile: Pick<ProviderProfile, "model">) {
+    this.script = script;
+    this.profile = profile;
+  }
 
   static fromFile(path: string, profile: Pick<ProviderProfile, "model">): FakeAdapter {
     const script = existsSync(path)

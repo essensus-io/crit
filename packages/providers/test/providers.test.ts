@@ -71,7 +71,7 @@ describe("AdapterRegistry", () => {
         { name: "o", type: "opencode", command: "opencode", model: null, enabled: true },
         { env: {}, tmpDir: dir },
       ),
-    ).toThrow(/no adapter for provider type "opencode" \(known: fake\)/);
+    ).toThrow(/no adapter for provider type "opencode" \(known: claude-code, fake\)/);
   });
 });
 

@@ -1,15 +1,17 @@
 import { x } from "tinyexec";
 
 export class GitError extends Error {
-  constructor(
-    readonly args: string[],
-    readonly exitCode: number | undefined,
-    readonly stderr: string,
-  ) {
+  readonly args: string[];
+  readonly exitCode: number | undefined;
+  readonly stderr: string;
+  constructor(args: string[], exitCode: number | undefined, stderr: string) {
     super(
       `git ${args.join(" ")} failed${exitCode === undefined ? "" : ` (${exitCode})`}: ${stderr.trim()}`,
     );
     this.name = "GitError";
+    this.args = args;
+    this.exitCode = exitCode;
+    this.stderr = stderr;
   }
 }
 

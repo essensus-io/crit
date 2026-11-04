@@ -1,0 +1,21 @@
+[
+  {
+    "file": "src/refund.ts",
+    "range": {
+      "start": 1,
+      "end": 4
+    },
+    "anchor": "return { refunded: amount };",
+    "severity": "critical",
+    "category": "correctness",
+    "title": "Refund amount is never validated against captured amount",
+    "explanation": "refund() accepts any amount and returns it as refunded without checking it against order.captured. A caller can refund more than was captured, including negative or non-finite values, which can lead to over-refunding customers and inconsistent ledger state. The function also performs no bounds checks at all, so the bug is not limited to a single edge case.",
+    "failureScenario": "An order with captured = 50 is refunded with amount = 500. The function returns { refunded: 500 } and the caller pays out 500 against 50 captured. Passing a negative amount would similarly produce a negative refund.",
+    "confidence": 0.9,
+    "ruleIds": [],
+    "fix": {
+      "summary": "Validate amount is finite, positive, and not greater than order.captured before returning the refund.",
+      "patch": "--- a/src/refund.ts\n+++ b/src/refund.ts\n@@ -1,4 +1,8 @@\n export function refund(order: { captured: number }, amount: number) {\n-  // BUG: amount is never checked against the captured amount\n-  return { refunded: amount };\n+  if (!Number.isFinite(amount) || amount <= 0) {\n+    throw new RangeError('refund amount must be a positive finite number');\n+  }\n+  if (amount > order.captured) {\n+    throw new RangeError('refund amount exceeds captured amount');\n+  }\n+  return { refunded: amount };\n }\n"
+    }
+  }
+]

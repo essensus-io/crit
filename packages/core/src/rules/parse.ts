@@ -145,11 +145,10 @@ function parseCritRule(file: RuleFile): ParsedRule[] {
 }
 
 export class RuleParseError extends Error {
-  constructor(
-    readonly path: string,
-    message: string,
-  ) {
+  readonly path: string;
+  constructor(path: string, message: string) {
     super(`${path}: ${message}`);
+    this.path = path;
     this.name = "RuleParseError";
   }
 }

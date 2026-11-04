@@ -1,5 +1,9 @@
 import { defineProject } from "vitest/config";
 
 export default defineProject({
-  test: { name: "store", include: ["src/**/*.test.ts", "test/**/*.test.ts"] },
+  test: {
+    name: "store",
+    include: ["src/**/*.test.ts", "test/**/*.test.ts"],
+    exclude: ["**/*.live.test.ts"],
+  },
 });

@@ -4,7 +4,17 @@ const strict = { lines: 85, branches: 85, functions: 85, statements: 85 };
 
 export default defineConfig({
   test: {
-    projects: ["packages/*", "apps/*"],
+    projects: [
+      "packages/*",
+      "apps/*",
+      {
+        test: {
+          name: "live",
+          include: ["packages/*/test/live/**/*.live.test.ts", "apps/*/test/live/**/*.live.test.ts"],
+          testTimeout: 300_000,
+        },
+      },
+    ],
     coverage: {
       provider: "v8",
       include: ["packages/*/src/**/*.{ts,tsx}", "apps/*/src/**/*.{ts,tsx}"],

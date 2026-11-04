@@ -42,11 +42,10 @@ export const userConfigPath = (paths: CritPaths) => join(paths.config, "config.j
 export const projectConfigPath = (root: string) => join(root, ".crit", "config.json");
 
 export class SettingsError extends Error {
-  constructor(
-    readonly file: string,
-    message: string,
-  ) {
+  readonly file: string;
+  constructor(file: string, message: string) {
     super(`${file}: ${message}`);
+    this.file = file;
     this.name = "SettingsError";
   }
 }
