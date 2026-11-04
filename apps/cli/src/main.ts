@@ -1,5 +1,6 @@
 import { type CommandDef, defineCommand, renderUsage, runCommand } from "citty";
 import pkg from "../package.json" with { type: "json" };
+import { applyDef, openDef, undoDef } from "./commands/apply.ts";
 import { doctorCommand } from "./commands/doctor.ts";
 import { initCommand, mcpCommand } from "./commands/misc.ts";
 import { providersCommand } from "./commands/providers.ts";
@@ -17,6 +18,9 @@ export function createMain(ctx: CliContext): CommandDef {
     meta: { name: "crit", version: VERSION, description: pkg.description },
     subCommands: {
       review: reviewCommand(ctx),
+      open: openDef(ctx),
+      apply: applyDef(ctx),
+      undo: undoDef(ctx),
       providers: providersCommand(ctx),
       rules: rulesCommand(ctx),
       doctor: doctorCommand(ctx),

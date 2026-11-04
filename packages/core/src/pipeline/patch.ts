@@ -22,6 +22,17 @@ export function normalizePatch(patch: string): string {
 }
 
 /**
+ * Agents sometimes write hunks without context lines; git only applies those
+ * with --unidiff-zero. Positions are still safe: intake checked the anchor.
+ */
+function applyFlags(patch: string): string[] {
+  const flags = ["--recount", "--whitespace=nowarn"];
+  const hunks = parseUnifiedDiff(patch).flatMap((f) => f.hunks);
+  if (hunks.some((h) => !h.body.some((l) => l.startsWith(" ")))) flags.push("--unidiff-zero");
+  return flags;
+}
+
+/**
  * `git apply --check` against the working tree. Returns the normalized patch
  * and the files it touches, or git's error.
  */
@@ -31,7 +42,7 @@ export async function checkPatch(root: string, patch: string): Promise<PatchChec
   if (files.every((f) => f.hunks.length === 0)) {
     return { ok: false, error: "not a unified diff (expected ---/+++ headers and @@ hunks)" };
   }
-  const r = await gitRaw(root, ["apply", "--check", "--recount", "--whitespace=nowarn", "-"], p);
+  const r = await gitRaw(root, ["apply", "--check", ...applyFlags(p), "-"], p);
   if (r.exitCode !== 0)
     return { ok: false, error: r.stderr.trim() || `git apply exited ${r.exitCode}` };
   return { ok: true, patch: p, files: files.map(diffPath) };
@@ -43,9 +54,10 @@ export async function applyPatch(
   patch: string,
   opts: { reverse?: boolean; check?: boolean } = {},
 ) {
-  const args = ["apply", "--recount", "--whitespace=nowarn"];
+  const p = normalizePatch(patch);
+  const args = ["apply", ...applyFlags(p)];
   if (opts.reverse) args.push("--reverse");
   if (opts.check) args.push("--check");
   args.push("-");
-  return gitRaw(root, args, normalizePatch(patch));
+  return gitRaw(root, args, p);
 }

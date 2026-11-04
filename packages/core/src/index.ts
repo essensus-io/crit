@@ -10,3 +10,6 @@ export * from "./pipeline/patch.ts";
 export * from "./pipeline/prompts.ts";
 export * from "./pipeline/run.ts";
 export * from "./pipeline/shards.ts";
+export * from "./apply.ts";
+export * from "./verify.ts";
+export * from "./rebase.ts";
