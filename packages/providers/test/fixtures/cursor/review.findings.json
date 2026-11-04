@@ -1,0 +1,23 @@
+[
+  {
+    "file": "src/refund.ts",
+    "range": {
+      "start": 1,
+      "end": 4
+    },
+    "anchor": "export function refund(order: { captured: number }, amount: number) {\n  // BUG: amount is never checked against the captured amount\n  return { refunded: amount };\n}",
+    "severity": "critical",
+    "category": "correctness",
+    "title": "Refund amount not validated against captured total",
+    "explanation": "refund() returns { refunded: amount } for any amount without comparing it to order.captured. That lets callers credit more than was captured (or any unchecked value), corrupting money state.",
+    "failureScenario": "order = { captured: 100 }, amount = 500 → returns { refunded: 500 } and over-refunds by 400.",
+    "confidence": 0.98,
+    "ruleIds": [
+      "R4"
+    ],
+    "fix": {
+      "summary": "Reject refunds that exceed the captured amount before returning.",
+      "patch": "--- a/src/refund.ts\n+++ b/src/refund.ts\n@@ -1,4 +1,7 @@\n export function refund(order: { captured: number }, amount: number) {\n-  // BUG: amount is never checked against the captured amount\n+  if (amount > order.captured) {\n+    throw new Error(\"Refund amount exceeds captured amount\");\n+  }\n   return { refunded: amount };\n }\n"
+    }
+  }
+]

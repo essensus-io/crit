@@ -26,6 +26,8 @@ const BUGGY = `export function refund(order: { captured: number }, amount: numbe
 type Recorder = {
   type: string;
   model: string;
+  /** false: the agent replies with JSON instead of calling crit's MCP tools. */
+  mcp?: boolean;
   invoke(
     task: AgentTask,
     tmp: string,
@@ -54,6 +56,20 @@ const recorders: Record<string, Recorder> = {
       mkdirSync(inv.cleanupDir, { recursive: true });
       for (const f of inv.files) writeFileSync(f.path, f.content);
       return { command: inv.command, args: inv.args, stdin: inv.stdin, cleanup: inv.cleanupDir };
+    },
+  },
+  cursor: {
+    type: "cursor",
+    model: "",
+    mcp: false,
+    async invoke(task) {
+      const { buildCursorInvocation } =
+        await import("../packages/providers/src/adapters/cursor.ts");
+      const { reviewSystemPrompt } = await import("../packages/core/src/pipeline/prompts.ts");
+      return buildCursorInvocation(
+        { command: "cursor-agent", model: null },
+        { ...task, systemPrompt: reviewSystemPrompt({ mcp: false }) },
+      );
     },
   },
 };
@@ -94,7 +110,15 @@ async function record(name: string): Promise<void> {
     timeoutMs: 180_000,
   };
   const { streamProcess } = await import("../packages/providers/src/process.ts");
-  const inv = await rec.invoke(task, sessions);
+  const inv = await rec.invoke(
+    rec.mcp === false
+      ? {
+          ...task,
+          prompt: "Review src/refund.ts. Report the most important bug, with a fix patch.",
+        }
+      : task,
+    sessions,
+  );
   const lines: string[] = [];
   let exit = 0;
   for await (const e of streamProcess({
@@ -109,6 +133,22 @@ async function record(name: string): Promise<void> {
     else exit = e.code;
   }
   await host.close();
+  if (rec.mcp === false) {
+    const { parseJsonReply } = await import("../packages/core/src/pipeline/prompts.ts");
+    const result = lines
+      .map((l) => {
+        try {
+          return JSON.parse(l);
+        } catch {
+          return {};
+        }
+      })
+      .find((d) => d.type === "result");
+    const parsed = parseJsonReply(result?.result ?? "", {
+      safeParse: (d: unknown) => ({ success: true, data: d }),
+    } as never) as { ok: boolean; data: { findings: FindingInput[] } };
+    if (parsed.ok) findings.push(...parsed.data.findings);
+  }
   const dir = join(FIXTURES, name);
   mkdirSync(dir, { recursive: true });
   const scrubbed = scrubTranscript(lines, {
