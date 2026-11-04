@@ -47,7 +47,12 @@ export function processContext(version: string): CliContext {
     err: (t) => process.stderr.write(t),
     prompter: new ClackPrompter(),
     registry: createDefaultRegistry(),
-    mcpCommand: { command: process.execPath, args: [process.argv[1]!, "mcp"] },
+    // Agents may start MCP servers with a reduced environment (Codex drops
+    // CRIT_HOME), so the sessions folder is passed explicitly.
+    mcpCommand: {
+      command: process.execPath,
+      args: [process.argv[1]!, "mcp", "--sessions-dir", join(paths.cache, "sessions")],
+    },
     version,
     openStore: () => (store ??= openStore(dbPath(paths))),
     now: Date.now,

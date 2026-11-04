@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@crit/testkit": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@types/react": "^19.3.0",
     "ink-testing-library": "^4.0.0"
   },
