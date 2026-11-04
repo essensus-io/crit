@@ -197,6 +197,9 @@ describe("shards and findings", () => {
     expect(await store.findings.listByReview(r.id)).toEqual([a1, a2, b]);
     const updated = await store.findings.update(a1.id, { selected: false, status: "dismissed" });
     expect(await store.findings.get(a1.id)).toEqual(updated);
+    const other = await store.reviews.create(review(repoId));
+    await store.findings.reassign(b.id, other.id);
+    expect((await store.findings.get(b.id))!.reviewId).toBe(other.id);
     await store.findings.delete(b.id);
     expect(await store.findings.get(b.id)).toBeUndefined();
     await expect(store.findings.update("missing", {})).rejects.toThrow(/finding missing/);

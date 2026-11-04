@@ -73,6 +73,8 @@ export interface Repositories {
     get(id: string): Promise<Finding | undefined>;
     listByReview(reviewId: string): Promise<Finding[]>;
     update(id: string, patch: FindingPatch): Promise<Finding>;
+    /** Move a finding (with its fixes and thread) to another review. */
+    reassign(id: string, reviewId: string): Promise<void>;
     delete(id: string): Promise<void>;
   };
   fixes: {
@@ -247,6 +249,9 @@ export function createRepositories(db: Db): Repositories {
       const next: Finding = { ...current, ...patch };
       await db.update(t.findings).set(findingToRow(next)).where(eq(t.findings.id, id));
       return next;
+    },
+    async reassign(id, reviewId) {
+      await db.update(t.findings).set({ reviewId }).where(eq(t.findings.id, id));
     },
     async delete(id) {
       await db.delete(t.findings).where(eq(t.findings.id, id));

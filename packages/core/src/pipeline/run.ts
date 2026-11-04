@@ -170,6 +170,13 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     provider: review.provider,
     model: review.model,
   });
+  // Rule titles and paths, so a reopened review can show where each cited rule comes from.
+  await store.events.append(review.id, "rules", {
+    rules: [...rules.attached, ...rules.listed, ...rules.native, ...rules.skills].map(
+      ({ id, title, path, section }) => ({ id, title, path, ...(section ? { section } : {}) }),
+    ),
+    conflicts: rules.conflicts,
+  });
   emit({
     type: "rules",
     attached: rules.attached.map(({ id, title, path, section }) => ({

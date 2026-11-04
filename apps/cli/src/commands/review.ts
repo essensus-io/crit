@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { runReview } from "@crit/core";
+import { estimateDurationMs, lensGroups, planShards, resolveScope, runReview } from "@crit/core";
 import { resolveProvider } from "@crit/providers";
 import {
   Lens,
@@ -124,8 +124,8 @@ function progressPrinter(ctx: CliContext) {
 
 export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promise<number> {
   const spec = scopeFromArgs(args);
-  // The interactive review screen arrives with T16; until then every run prints a report.
   const format = args.format ?? "text";
+  const useTui = ctx.interactive && args.tui !== false && !args.format && !args.output;
   if (!["text", "json", "md", "sarif"].includes(format))
     throw new CliError(`crit: unknown format ${format} (use json, md or sarif)`, {
       exitCode: EXIT.usage,
@@ -163,36 +163,61 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
   }
 
   const store = ctx.openStore();
+  const confirm = async ({ shards, estimateMs }: { shards: unknown[]; estimateMs: number }) => {
+    if (spec.kind !== "project" || args.yes) return true;
+    if (!ctx.interactive)
+      throw new CliError(
+        `crit: a whole-project review runs ${plural(shards.length, "shard")} (est. ${duration(estimateMs)}). Pass --yes to start it.`,
+      );
+    return ctx.prompter.confirm({
+      message: `Review the whole project: ${plural(shards.length, "shard")}, est. ${duration(estimateMs)} on ${resolved.profile.name}. Start?`,
+      initialValue: true,
+    });
+  };
+  const base = {
+    cwd: ctx.cwd,
+    spec,
+    config,
+    store,
+    provider: reviewer,
+    skeptic,
+    sessionsDir: sessionsDir(ctx),
+    mcpCommand: ctx.mcpCommand,
+    home: ctx.home,
+    configDir: ctx.paths.config,
+    useCache: args.cache !== false,
+  };
+  if (useTui) {
+    // Whole-project reviews confirm here, before the screen takes over the terminal.
+    if (spec.kind === "project" && !args.yes) {
+      const scope = await resolveScope({ cwd: ctx.cwd, spec, ignore: config.ignore });
+      const runs = planShards(scope, config.shardTokens).flatMap((p) =>
+        lensGroups(config.lenses, config.shardTokens, p.estimatedTokens),
+      );
+      if (
+        !(await confirm({
+          shards: runs,
+          estimateMs: estimateDurationMs(runs.length, config.concurrency),
+        }))
+      )
+        return EXIT.cancelled;
+    }
+    const { runTui } = await import("../tui/start.tsx");
+    await runTui(ctx, store, root, config, (onEvent, signal) =>
+      runReview({ ...base, onEvent, signal }),
+    );
+    return EXIT.ok;
+  }
   const ac = new AbortController();
   const onSigint = () => ac.abort();
   process.once("SIGINT", onSigint);
   const t0 = ctx.now();
   try {
     const result = await runReview({
-      cwd: ctx.cwd,
-      spec,
-      config,
-      store,
-      provider: reviewer,
-      skeptic,
-      sessionsDir: sessionsDir(ctx),
-      mcpCommand: ctx.mcpCommand,
-      home: ctx.home,
-      configDir: ctx.paths.config,
-      useCache: args.cache !== false,
+      ...base,
       signal: ac.signal,
       onEvent: progressPrinter(ctx),
-      confirm: async ({ shards, estimateMs }) => {
-        if (spec.kind !== "project" || args.yes) return true;
-        if (!ctx.interactive)
-          throw new CliError(
-            `crit: a whole-project review runs ${plural(shards.length, "shard")} (est. ${duration(estimateMs)}). Pass --yes to start it.`,
-          );
-        return ctx.prompter.confirm({
-          message: `Review the whole project: ${plural(shards.length, "shard")}, est. ${duration(estimateMs)} on ${resolved.profile.name}. Start?`,
-          initialValue: true,
-        });
-      },
+      confirm,
     });
     const doc = await exportReview(store, result.review.id);
     let output: string;

@@ -128,10 +128,24 @@ export async function undoCommand(ctx: CliContext, args: { force?: boolean }): P
   }
 }
 
-export async function openCommand(ctx: CliContext, args: { review?: string }): Promise<number> {
+export async function openCommand(
+  ctx: CliContext,
+  args: { review?: string; tui?: boolean },
+): Promise<number> {
   const root = await repoRootOrThrow(ctx.cwd);
   const store = ctx.openStore();
   const review = await resolveReview(ctx, store, root, args.review);
+  if (ctx.interactive && args.tui !== false) {
+    const { openTui } = await import("../tui/start.tsx");
+    await openTui(
+      ctx,
+      store,
+      root,
+      review.id,
+      resolveConfig(loadUserConfig(ctx.paths), loadProjectConfig(root)),
+    );
+    return EXIT.ok;
+  }
   ctx.out(textReport(await exportReview(store, review.id), { color: ctx.color }));
   return EXIT.ok;
 }
@@ -175,7 +189,14 @@ export const undoDef = (ctx: CliContext) =>
 export const openDef = (ctx: CliContext) =>
   defineCommand({
     meta: { name: "open", description: "Reopen a saved review (latest by default)" },
-    args: { review: { type: "positional", required: false } },
+    args: {
+      review: { type: "positional", required: false },
+      tui: {
+        type: "boolean",
+        default: true,
+        description: "Open the review screen (--no-tui prints the report)",
+      },
+    },
     run: async ({ args }) => {
       process.exitCode = await openCommand(ctx, args);
     },
