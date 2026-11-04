@@ -287,5 +287,6 @@ export const claudeCodeFactory: AdapterFactory = {
   defaultCommand: "claude",
   defaultName: "claude",
   loginHint: "run `claude` once to log in",
+  models: ["opus", "sonnet", "haiku"],
   create: (profile, env) => new ClaudeCodeAdapter(profile, env),
 };

@@ -39,6 +39,8 @@ export type AdapterFactory = {
   defaultName: string;
   /** What to tell the user when the CLI is not logged in. */
   loginHint: string;
+  /** Models offered during setup (any name is accepted). */
+  models: string[];
   /** Hidden from first-run detection (the fake provider). */
   hidden?: boolean;
   create(profile: ProviderProfile, env: AdapterEnv): ProviderAdapter;

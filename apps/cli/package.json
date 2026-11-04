@@ -14,7 +14,17 @@
     "check-types": "tsc -p ."
   },
   "dependencies": {
-    "citty": "^0.2.2"
+    "@clack/prompts": "^1.8.1",
+    "@crit/core": "workspace:*",
+    "@crit/mcp": "workspace:*",
+    "@crit/providers": "workspace:*",
+    "@crit/schema": "workspace:*",
+    "@crit/store": "workspace:*",
+    "citty": "^0.2.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@crit/testkit": "workspace:*"
   },
   "engines": {
     "node": ">=24"

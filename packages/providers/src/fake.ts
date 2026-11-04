@@ -193,6 +193,7 @@ export const fakeFactory: AdapterFactory = {
   defaultCommand: "fake",
   defaultName: "fake",
   loginHint: "write a fake script",
+  models: ["fake-small", "fake-large"],
   hidden: true,
   create(profile: ProviderProfile, env: AdapterEnv) {
     const path = env.env.CRIT_FAKE_SCRIPT ?? profile.command;

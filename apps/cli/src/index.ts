@@ -1,4 +1,6 @@
-import { runMain } from "citty";
-import { main } from "./main.ts";
+import { processContext } from "./context.ts";
+import { runCli, VERSION } from "./main.ts";
 
-await runMain(main);
+const code = await runCli(process.argv.slice(2), processContext(VERSION));
+// `crit mcp` keeps serving on stdio until the agent closes it.
+if (process.argv[2] !== "mcp") process.exitCode = code;
