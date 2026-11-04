@@ -4,9 +4,14 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./json/*": "./json/*"
   },
   "scripts": {
-    "check-types": "tsc -p ."
+    "check-types": "tsc -p .",
+    "generate": "node scripts/generate.ts"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
   }
 }

@@ -1,4 +1,10 @@
 {
   "printWidth": 100,
-  "ignorePatterns": ["**/fixtures/**", "**/drizzle/**", "**/*.snap", "pnpm-lock.yaml"]
+  "ignorePatterns": [
+    "packages/schema/json/**",
+    "**/fixtures/**",
+    "**/drizzle/**",
+    "**/*.snap",
+    "pnpm-lock.yaml"
+  ]
 }

@@ -1,0 +1,82 @@
+{
+  "title": "crit provider profiles (~/.config/crit/providers.json)",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "default": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "providers": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[a-z0-9][a-z0-9._-]*$"
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "command": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "command"
+        ]
+      }
+    },
+    "roles": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "enum": [
+          "review",
+          "skeptic",
+          "evaluate",
+          "map"
+        ]
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      }
+    }
+  }
+}
