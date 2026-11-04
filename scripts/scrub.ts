@@ -18,7 +18,7 @@ const DROP_KEYS = new Set([
  */
 export function scrubTranscript(
   lines: string[],
-  opts: { repo: string; home: string; extra?: string[] },
+  opts: { repo: string; home: string; extra?: string[]; user?: string },
 ): string[] {
   const replacements: [string, string][] = [
     [opts.repo, "/repo"],
@@ -29,7 +29,13 @@ export function scrubTranscript(
     ]),
     [opts.home, "~"],
   ];
-  const fix = (s: string) => replacements.reduce((acc, [from, to]) => acc.split(from).join(to), s);
+  const userRe = opts.user
+    ? new RegExp(`\\b${opts.user.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g")
+    : undefined;
+  const fix = (s: string) => {
+    const r = replacements.reduce((acc, [from, to]) => acc.split(from).join(to), s);
+    return userRe ? r.replace(userRe, "user") : r;
+  };
   return lines.map((line) => {
     let d: unknown;
     try {

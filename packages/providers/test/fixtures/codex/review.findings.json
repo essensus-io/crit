@@ -1,0 +1,21 @@
+[
+  {
+    "file": "src/refund.ts",
+    "range": {
+      "start": 3,
+      "end": 3
+    },
+    "anchor": "  return { refunded: amount };",
+    "severity": "major",
+    "category": "correctness",
+    "title": "Reject refunds exceeding the captured payment",
+    "explanation": "The refund amount is returned without checking the captured amount, allowing a refund greater than the payment collected. Validate the amount before accepting the refund.",
+    "failureScenario": "refund({ captured: 100 }, 150) returns { refunded: 150 }, approving a refund 50 greater than the captured payment.",
+    "confidence": 1,
+    "ruleIds": [],
+    "fix": {
+      "summary": "Validate that the refund is finite, nonnegative, and no greater than the captured amount.",
+      "patch": "--- a/src/refund.ts\n+++ b/src/refund.ts\n@@ -1,4 +1,6 @@\n export function refund(order: { captured: number }, amount: number) {\n-  // BUG: amount is never checked against the captured amount\n+  if (!Number.isFinite(amount) || amount < 0 || amount > order.captured) {\n+    throw new RangeError('Refund amount must be between zero and the captured amount');\n+  }\n   return { refunded: amount };\n }\n"
+    }
+  }
+]

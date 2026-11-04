@@ -8,7 +8,7 @@
  * the agent reported. Uses your own CLI login; costs a few cents at most.
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { homedir, tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 import { type SessionHandler, startSessionHost } from "../packages/mcp/src/index.ts";
 import type { AgentTask, FindingInput } from "../packages/schema/src/index.ts";
@@ -40,6 +40,17 @@ const recorders: Record<string, Recorder> = {
       const { buildClaudeInvocation } =
         await import("../packages/providers/src/adapters/claude-code.ts");
       const inv = buildClaudeInvocation({ command: "claude", model: this.model }, task, tmp);
+      mkdirSync(inv.cleanupDir, { recursive: true });
+      for (const f of inv.files) writeFileSync(f.path, f.content);
+      return { command: inv.command, args: inv.args, stdin: inv.stdin, cleanup: inv.cleanupDir };
+    },
+  },
+  codex: {
+    type: "codex",
+    model: "",
+    async invoke(task, tmp) {
+      const { buildCodexInvocation } = await import("../packages/providers/src/adapters/codex.ts");
+      const inv = buildCodexInvocation({ command: "codex", model: null }, task, tmp);
       mkdirSync(inv.cleanupDir, { recursive: true });
       for (const f of inv.files) writeFileSync(f.path, f.content);
       return { command: inv.command, args: inv.args, stdin: inv.stdin, cleanup: inv.cleanupDir };
@@ -100,7 +111,12 @@ async function record(name: string): Promise<void> {
   await host.close();
   const dir = join(FIXTURES, name);
   mkdirSync(dir, { recursive: true });
-  const scrubbed = scrubTranscript(lines, { repo: repo.root, home: homedir(), extra: [sessions] });
+  const scrubbed = scrubTranscript(lines, {
+    repo: repo.root,
+    home: homedir(),
+    extra: [sessions],
+    user: userInfo().username,
+  });
   writeFileSync(join(dir, "review.jsonl"), `${scrubbed.join("\n")}\n`);
   writeFileSync(join(dir, "review.findings.json"), `${JSON.stringify(findings, null, 2)}\n`);
   console.log(`${name}: exit ${exit}, ${lines.length} lines, ${findings.length} findings → ${dir}`);

@@ -5,3 +5,4 @@ export * from "./process.ts";
 export * from "./profiles.ts";
 export * from "./registry.ts";
 export * from "./adapters/claude-code.ts";
+export * from "./adapters/codex.ts";
