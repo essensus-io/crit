@@ -1,1 +1,3 @@
-export const packageName = "@crit/core";
+export * from "./diff.ts";
+export * from "./git.ts";
+export * from "./scope.ts";
