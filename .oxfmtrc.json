@@ -4,6 +4,7 @@
     "packages/schema/json/**",
     "**/fixtures/**",
     "**/drizzle/**",
+    "**/*.gen.ts",
     "**/*.snap",
     "pnpm-lock.yaml"
   ]

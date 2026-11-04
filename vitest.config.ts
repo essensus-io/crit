@@ -8,7 +8,14 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["packages/*/src/**/*.{ts,tsx}", "apps/*/src/**/*.{ts,tsx}"],
-      exclude: ["**/*.test.{ts,tsx}", "**/index.ts", "**/test/**", "**/drizzle/**"],
+      exclude: [
+        "**/*.test.{ts,tsx}",
+        "**/index.ts",
+        "**/test/**",
+        "**/drizzle/**",
+        "**/*.gen.ts",
+        "packages/store/src/db/schema.ts",
+      ],
       reporter: ["text-summary", "text", "html"],
       thresholds: {
         "packages/core/src/**": strict,
