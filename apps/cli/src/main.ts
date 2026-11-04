@@ -2,6 +2,7 @@ import { type CommandDef, defineCommand, renderUsage, runCommand } from "citty";
 import pkg from "../package.json" with { type: "json" };
 import { applyDef, openDef, undoDef } from "./commands/apply.ts";
 import { doctorCommand } from "./commands/doctor.ts";
+import { historyDef } from "./commands/history.ts";
 import { initCommand, mcpCommand } from "./commands/misc.ts";
 import { providersCommand } from "./commands/providers.ts";
 import { reviewCommand } from "./commands/review.ts";
@@ -21,6 +22,7 @@ export function createMain(ctx: CliContext): CommandDef {
       open: openDef(ctx),
       apply: applyDef(ctx),
       undo: undoDef(ctx),
+      history: historyDef(ctx),
       providers: providersCommand(ctx),
       rules: rulesCommand(ctx),
       doctor: doctorCommand(ctx),

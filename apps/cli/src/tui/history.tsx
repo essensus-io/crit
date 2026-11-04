@@ -1,0 +1,187 @@
+import { resolveConfig, shortId } from "@crit/schema";
+import { type HistoryRow, loadProjectConfig, loadUserConfig, type SqliteStore } from "@crit/store";
+import { Box, render, Text, useApp, useInput } from "ink";
+import { useState } from "react";
+import {
+  compareReviews,
+  type HistoryArgs,
+  historyRows,
+  outcomeOf,
+  severitySummary,
+} from "../commands/history.ts";
+import { repoRootOrThrow } from "../commands/shared.ts";
+import type { CliContext } from "../context.ts";
+import { truncate, when } from "../ui.ts";
+import { ReviewApp } from "./App.tsx";
+import { Choice, Footer, HRule, TextInput } from "./components.tsx";
+import type { ReviewSession } from "./session.ts";
+
+type Comparison = Awaited<ReturnType<typeof compareReviews>>;
+
+export type HistoryActions = {
+  reload(filter: string): Promise<HistoryRow[]>;
+  compare(row: HistoryRow, rows: HistoryRow[]): Promise<Comparison | undefined>;
+  remove(row: HistoryRow): Promise<void>;
+  open(row: HistoryRow): Promise<ReviewSession>;
+};
+
+/** Review history (mockup 7): newest first; enter opens, c compares with the previous run on the same scope. */
+export function HistoryApp({
+  initial,
+  actions,
+  now,
+  width = 110,
+}: {
+  initial: HistoryRow[];
+  actions: HistoryActions;
+  now: number;
+  width?: number;
+}) {
+  const app = useApp();
+  const [rows, setRows] = useState(initial);
+  const [cursor, setCursor] = useState(0);
+  const [mode, setMode] = useState<"none" | "filter" | "delete">("none");
+  const [filter, setFilter] = useState("");
+  const [cmp, setCmp] = useState<Comparison | undefined>();
+  const [session, setSession] = useState<ReviewSession>();
+  const [message, setMessage] = useState<string>();
+  const row = rows[cursor];
+
+  useInput(
+    (input, key) => {
+      if (input === "q" || key.escape) {
+        if (cmp) return setCmp(undefined);
+        return app.exit();
+      }
+      if (input === "j" || key.downArrow) return setCursor((c) => Math.min(c + 1, rows.length - 1));
+      if (input === "k" || key.upArrow) return setCursor((c) => Math.max(c - 1, 0));
+      if (input === "/") return setMode("filter");
+      if (!row) return;
+      if (key.return) return void actions.open(row).then(setSession);
+      if (input === "c") {
+        void actions
+          .compare(row, rows)
+          .then((c) =>
+            c ? setCmp(c) : setMessage("No earlier review of this scope to compare with."),
+          );
+        return;
+      }
+      if (input === "d") return setMode("delete");
+    },
+    { isActive: mode === "none" && !session },
+  );
+
+  if (session) return <ReviewApp session={session} onExit={() => setSession(undefined)} />;
+
+  const cols = (r: HistoryRow, i: number) => (
+    <Text key={r.review.id} {...(i === cursor ? { inverse: true } : {})}>
+      {`${i === cursor ? "›" : " "} ${shortId(r.review.id).padEnd(6)} ${when(r.review.startedAt, now).padEnd(17)} ${truncate(r.review.scopeLabel, 28).padEnd(28)} ${r.review.provider.padEnd(10)} ${severitySummary(r).padEnd(17)} ${outcomeOf(r)}`}
+    </Text>
+  );
+  return (
+    <Box flexDirection="column" width={width}>
+      <Text
+        dimColor
+      >{`  ${"ID".padEnd(6)} ${"WHEN".padEnd(17)} ${"SCOPE".padEnd(28)} ${"PROVIDER".padEnd(10)} ${"FINDINGS".padEnd(17)} OUTCOME`}</Text>
+      {rows.map(cols)}
+      {rows.length === 0 ? <Text dimColor> No reviews match.</Text> : null}
+      <Text> </Text>
+      <Text dimColor>
+        {"  C critical · M major · m minor · n nit"}
+        {filter ? `   filter: ${filter}` : ""}
+      </Text>
+      {cmp ? (
+        <Box flexDirection="column">
+          <HRule width={width} />
+          <Text
+            dimColor
+          >{`  ${shortId(cmp.older.id)} → ${shortId(cmp.newer.id)} · ${cmp.newer.scopeLabel}`}</Text>
+          <Text color="green">{`  ${"fixed".padEnd(11)} ${String(cmp.fixed.length).padStart(3)}   ${truncate(cmp.fixed.map((f) => f.title).join(" · "), width - 22)}`}</Text>
+          <Text color="yellow">{`  ${"new".padEnd(11)} ${String(cmp.new.length).padStart(3)}   ${truncate(cmp.new.map((f) => f.title).join(" · "), width - 22)}`}</Text>
+          <Text>{`  ${"still open".padEnd(11)} ${String(cmp.stillOpen.length).padStart(3)}   ${truncate(cmp.stillOpen.map((f) => f.title).join(" · "), width - 22)}`}</Text>
+        </Box>
+      ) : null}
+      {message ? <Text color="yellow"> {message}</Text> : null}
+      {mode === "filter" ? (
+        <TextInput
+          label="/"
+          initial={filter}
+          onCancel={() => setMode("none")}
+          onSubmit={(v) => {
+            setMode("none");
+            setFilter(v);
+            void actions.reload(v).then((r) => {
+              setRows(r);
+              setCursor(0);
+            });
+          }}
+        />
+      ) : null}
+      {mode === "delete" && row ? (
+        <Choice
+          label={`Delete review ${shortId(row.review.id)}?`}
+          options={[["y", "yes, delete it"]]}
+          onCancel={() => setMode("none")}
+          onPick={() => {
+            setMode("none");
+            void actions.remove(row).then(() => {
+              setRows((rs) => rs.filter((r) => r.review.id !== row.review.id));
+              setCursor((c) => Math.max(0, c - 1));
+              setMessage(`Deleted review ${shortId(row.review.id)}`);
+            });
+          }}
+        />
+      ) : null}
+      <Footer
+        width={width}
+        keys={[
+          ["enter", "open"],
+          ["c", "compare with previous"],
+          ["/", "filter"],
+          ["d", "delete"],
+          ["q", "quit"],
+        ]}
+      />
+    </Box>
+  );
+}
+
+/** Previous review of the same scope (and branch) before `row`. */
+export function previousOf(row: HistoryRow, rows: HistoryRow[]): HistoryRow | undefined {
+  return rows.find(
+    (r) =>
+      r.review.startedAt < row.review.startedAt &&
+      r.review.scopeLabel === row.review.scopeLabel &&
+      r.review.branch === row.review.branch &&
+      r.review.repoId === row.review.repoId,
+  );
+}
+
+export async function historyTui(
+  ctx: CliContext,
+  store: SqliteStore,
+  rows: HistoryRow[],
+  args: HistoryArgs,
+): Promise<void> {
+  const { makeSession } = await import("./start.tsx");
+  const root = await repoRootOrThrow(ctx.cwd);
+  const config = resolveConfig(loadUserConfig(ctx.paths), loadProjectConfig(root));
+  const actions: HistoryActions = {
+    reload: (q) => historyRows(ctx, store, { ...args, ...(q ? { scope: q } : {}) }),
+    compare: async (row, all) => {
+      const prev = previousOf(row, all);
+      return prev ? compareReviews(store, prev.review, row.review) : undefined;
+    },
+    remove: (row) => store.reviews.delete(row.review.id),
+    open: (row) => makeSession(ctx, store, root, row.review.id, config),
+  };
+  const app = render(
+    <HistoryApp
+      initial={rows}
+      actions={actions}
+      now={ctx.now()}
+      width={process.stdout.columns || 110}
+    />,
+  );
+  await app.waitUntilExit();
+}

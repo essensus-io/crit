@@ -85,3 +85,6 @@ export function table(rows: string[][], indent = "  "): string {
 
 export const plural = (n: number, word: string, many = `${word}s`) =>
   `${n} ${n === 1 ? word : many}`;
+
+export const truncate = (s: string, n: number) =>
+  s.length > n ? `${s.slice(0, Math.max(0, n - 1))}…` : s;

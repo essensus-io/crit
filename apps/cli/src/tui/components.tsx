@@ -1,6 +1,6 @@
 import type { Severity } from "@crit/schema";
 import { Box, Text, useInput } from "ink";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { parseUnifiedDiff } from "@crit/core";
 
 export const SEV_LABEL: Record<Severity, string> = {
@@ -103,12 +103,18 @@ export function TextInput({
   initial?: string;
 }) {
   const [value, setValue] = useState(initial);
+  // Keys can arrive faster than renders (pastes); keep the latest value in a ref.
+  const ref = useRef(initial);
+  const update = (v: string) => {
+    ref.current = v;
+    setValue(v);
+  };
   useInput((input, key) => {
     if (key.escape) return onCancel();
-    if (key.return) return onSubmit(value);
-    if (key.backspace || key.delete) return setValue((v) => v.slice(0, -1));
+    if (key.return) return onSubmit(ref.current);
+    if (key.backspace || key.delete) return update(ref.current.slice(0, -1));
     if (key.ctrl || key.meta || key.tab || key.upArrow || key.downArrow) return;
-    if (input) setValue((v) => v + input);
+    if (input) update(ref.current + input);
   });
   return (
     <Text>
