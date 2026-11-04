@@ -18,8 +18,11 @@ export type AgentTask = {
   prompt: string;
   /** crit MCP session id; the adapter registers `crit mcp --session <id>` for this run only. */
   mcpSession?: string;
-  /** Command that starts the crit MCP server (defaults to the running crit binary). */
-  mcpCommand?: { command: string; args: string[] };
+  /**
+   * How to start the crit MCP server for this run: the adapter registers
+   * `command args` (i.e. `crit mcp --session <id>`) with the agent CLI.
+   */
+  mcp?: { command: string; args: string[]; sessionsDir: string };
   model?: string;
   timeoutMs: number;
   /** Extra shell commands the agent may run (review.allowedCommands). */
