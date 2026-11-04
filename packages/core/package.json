@@ -13,6 +13,7 @@
     "@crit/mcp": "workspace:*",
     "@crit/schema": "workspace:*",
     "@crit/store": "workspace:*",
+    "diff": "^9.0.0",
     "gray-matter": "^4.0.3",
     "mdast-util-from-markdown": "^2.1.0",
     "picomatch": "^4.0.7",

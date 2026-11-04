@@ -13,3 +13,4 @@ export * from "./pipeline/shards.ts";
 export * from "./apply.ts";
 export * from "./verify.ts";
 export * from "./rebase.ts";
+export * from "./fixes.ts";
