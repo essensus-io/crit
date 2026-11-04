@@ -49,9 +49,15 @@ importers:
 
   packages/core:
     dependencies:
+      '@crit/mcp':
+        specifier: workspace:*
+        version: link:../mcp
       '@crit/schema':
         specifier: workspace:*
         version: link:../schema
+      '@crit/store':
+        specifier: workspace:*
+        version: link:../store
       gray-matter:
         specifier: ^4.0.3
         version: 4.0.3
@@ -67,7 +73,13 @@ importers:
       tinyglobby:
         specifier: ^0.2.17
         version: 0.2.17
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
+      '@crit/providers':
+        specifier: workspace:*
+        version: link:../providers
       '@crit/testkit':
         specifier: workspace:*
         version: link:../testkit
