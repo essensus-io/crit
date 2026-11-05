@@ -66,25 +66,50 @@ export async function refExists(cwd: string, ref: string): Promise<boolean> {
 }
 
 /**
- * Base branch for branch reviews: the upstream when it tracks a different
- * branch (e.g. a feature branch created from origin/main), else origin/HEAD,
- * else a local main/master/trunk/develop.
+ * Base branch for branch reviews. An upstream that tracks a different branch
+ * wins (a feature branch created from origin/main). Otherwise the nearest of
+ * origin/HEAD and the usual integration branches: the one the current branch
+ * is fewest commits ahead of. Taking origin/HEAD blindly reviewed a branch off
+ * `develop` against a `main` five weeks behind, 1,576 files instead of 27.
+ * Refs that HEAD is not ahead of (the branch itself, its ancestors) are skipped.
  */
 export async function detectBase(cwd: string): Promise<string | undefined> {
   const branch = await currentBranch(cwd);
   const upstream = await tryGit(cwd, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]);
   if (upstream && branch && upstream.split("/").slice(1).join("/") !== branch) return upstream;
+  const names: string[] = [];
   const originHead = await tryGit(cwd, [
     "symbolic-ref",
     "--short",
     "-q",
     "refs/remotes/origin/HEAD",
   ]);
-  if (originHead) return originHead;
-  for (const candidate of ["main", "master", "trunk", "develop", "origin/main", "origin/master"]) {
-    if (candidate !== branch && (await refExists(cwd, candidate))) return candidate;
+  if (originHead) names.push(originHead);
+  // Remote refs first: a local develop can be stale, and ties keep this order.
+  for (const c of [
+    "origin/main",
+    "origin/master",
+    "origin/trunk",
+    "origin/develop",
+    "main",
+    "master",
+    "trunk",
+    "develop",
+  ])
+    if (!names.includes(c)) names.push(c);
+  const scored: { ref: string; ahead: number }[] = [];
+  let anyExisting: string | undefined;
+  for (const ref of names) {
+    if (ref === branch || ref === `origin/${branch}`) continue;
+    if (!(await refExists(cwd, ref))) continue;
+    anyExisting ??= ref;
+    const ahead = Number(await tryGit(cwd, ["rev-list", "--count", `${ref}..HEAD`]));
+    if (Number.isFinite(ahead) && ahead > 0) scored.push({ ref, ahead });
   }
-  return undefined;
+  // A branch with no commits of its own still gets a base (and an empty review).
+  if (scored.length === 0) return anyExisting;
+  // Fewest commits ahead wins; ties keep the order above (origin/HEAD first).
+  return scored.reduce((best, c) => (c.ahead < best.ahead ? c : best)).ref;
 }
 
 /** NUL-separated output → list. */

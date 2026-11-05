@@ -85,6 +85,25 @@ describe("branch scope", () => {
     expect(s.files.map((f) => f.path)).not.toContain("assets/Font-Bold.otf");
   });
 
+  it("picks the nearest integration branch: a branch off develop is reviewed against develop, not a stale main", async () => {
+    repo.git("checkout", "-q", "-b", "develop");
+    repo.commit("develop 1", { "src/dev1.ts": "export const d1 = 1;\n" });
+    repo.commit("develop 2", { "src/dev2.ts": "export const d2 = 1;\n" });
+    repo.git("checkout", "-q", "-b", "feature/x");
+    repo.commit("feature", { "src/x.ts": "export const x = 1;\n" });
+    expect(await detectBase(repo.root)).toBe("develop");
+    const s = await resolveScope({ cwd: repo.root, spec: { kind: "branch" } });
+    expect(s.label).toBe("feature/x → develop");
+    expect(paths(s)).toEqual(["src/x.ts"]);
+    // on develop itself, main is the base (develop is not ahead of itself)
+    repo.git("checkout", "-q", "develop");
+    expect(await detectBase(repo.root)).toBe("main");
+    // a tie keeps the preferred order: main before develop
+    repo.git("checkout", "-q", "-b", "other", "main");
+    repo.commit("other", { "src/o.ts": "export const o = 1;\n" });
+    expect(await detectBase(repo.root)).toBe("main");
+  });
+
   it("detects the base from local main when there is no remote", async () => {
     const s = await resolveScope({ cwd: repo.root, spec: { kind: "branch" } });
     expect(s.baseRef).toBe("main");
@@ -112,7 +131,7 @@ describe("branch scope", () => {
 });
 
 describe("base detection", () => {
-  it("prefers an upstream that tracks another branch, then origin/HEAD, then local main", async () => {
+  it("prefers an upstream that tracks another branch, then the nearest remote branch", async () => {
     const remote = createFixtureRepo({ "a.txt": "a\n" });
     const clone = mkdtempSync(join(tmpdir(), "crit-clone-"));
     try {
@@ -123,7 +142,8 @@ describe("base detection", () => {
       await git(clone, ["remote", "set-head", "origin", "main"]);
       expect(await detectBase(clone)).toBe("origin/main");
       await git(clone, ["remote", "set-head", "origin", "-d"]);
-      expect(await detectBase(clone)).toBe("main");
+      // no origin/HEAD: the remote main is still preferred over the local one
+      expect(await detectBase(clone)).toBe("origin/main");
     } finally {
       remote.cleanup();
       rmSync(clone, { recursive: true, force: true });

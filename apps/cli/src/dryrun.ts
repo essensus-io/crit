@@ -14,6 +14,7 @@ export function dryRunJson(prep: Prepared, info: DryRunInfo) {
   for (const s of prep.scope.skipped) reasons.set(s.reason, (reasons.get(s.reason) ?? 0) + 1);
   return {
     scope: prep.scope.label,
+    base: prep.scope.baseRef ?? null,
     provider: info.provider,
     model: info.model,
     depth: info.config.depth,
@@ -55,6 +56,10 @@ export function renderDryRun(
     `${c.bold("crit review --dry-run")} · ${j.scope} · ${info.provider}${info.model ? ` (${info.model})` : ""} · depth ${j.depth}`,
   );
   out.push("");
+  if (prep.scope.baseRef)
+    out.push(
+      `  ${c.dim("Base".padEnd(9))}${prep.scope.baseRef} ${c.dim("(--base <branch> to change)")}`,
+    );
   out.push(
     `  ${c.dim("Files".padEnd(9))}${j.files.toReview} to review · ${j.files.cached} cached · ${j.skipped.total} skipped`,
   );
@@ -71,6 +76,11 @@ export function renderDryRun(
     );
     return `${out.join("\n")}\n`;
   }
+  if (prep.scope.spec.kind === "branch" && j.files.total > 300)
+    out.push(
+      `  ${" ".repeat(9)}${c.yellow(`${j.files.total} changed files is a lot for one branch: is ${prep.scope.baseRef} the right base? Try --base <branch>.`)}`,
+      "",
+    );
   const rows = prep.runs.map((r) => [
     "  ",
     truncate(r.label, 34),
