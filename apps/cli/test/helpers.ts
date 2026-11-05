@@ -121,6 +121,7 @@ export function normalize(s: string, env: TestEnv, extra: Record<string, string>
     .replace(/review [0-9a-f]{4}\b/g, "review <short>")
     .replace(/crit (open|apply) [0-9a-f]{4}\b/g, "crit $1 <short>")
     .replace(/\b\d+(\.\d+)?(ms|s)\b|\b\d+m\d{2}s\b/g, "<dur>")
+    .replace(/~\d+(\.\d+)?[kM]? tokens/g, "~<tok> tokens")
     .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/g, "<time>")
     .replace(/`[0-9a-f]{12}`/g, "`<sha>`");
 }

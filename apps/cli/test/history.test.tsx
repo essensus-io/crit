@@ -67,7 +67,7 @@ describe("crit history", () => {
       .split("\n")
       .filter((l) => /^\s+[0-9a-f]{4}\s/.test(l))
       .map((l) => l.trim().split(/\s{2,}/));
-    expect(rows.map((r) => [r[0], r[2], r[4], r[5]])).toEqual([
+    expect(rows.map((r) => [r[0], r[2], r[4], r[6]])).toEqual([
       [rows[0]![0], "src/x.ts", "0C 0M 1m 0n", "open"],
       [second, "feature → main", "0C 1M 0m 1n", "open"],
       [first, "feature → main", "1C 1M 0m 0n", "superseded"],

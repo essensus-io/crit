@@ -1,9 +1,10 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { estimateDurationMs, planRuns, resolveScope, runReview } from "@crit/core";
+import { estimateDurationMs, prepareReview, runReview } from "@crit/core";
 import { resolveProvider } from "@crit/providers";
 import {
   Depth,
+  formatTokens,
   Lens,
   resolveConfig,
   type ReviewEvent,
@@ -15,6 +16,7 @@ import { exportReview, loadProjectConfig, loadUserConfig } from "@crit/store";
 import { defineCommand } from "citty";
 import { type CliContext, sessionsDir } from "../context.ts";
 import { CliError, EXIT } from "../errors.ts";
+import { dryRunJson, renderDryRun } from "../dryrun.ts";
 import { markdownReport, sarifReport, textReport } from "../report.ts";
 import { adapterFor, ensureProviders } from "../setup.ts";
 import { colors, duration, plural } from "../ui.ts";
@@ -39,6 +41,8 @@ export type ReviewArgs = {
   "fail-on"?: string;
   "max-shards"?: string;
   depth?: string;
+  budget?: string;
+  "dry-run"?: boolean;
 };
 
 export function scopeFromArgs(args: ReviewArgs): ScopeSpec {
@@ -82,8 +86,26 @@ function progressPrinter(ctx: CliContext) {
   const c = colors(ctx.color);
   const labels = new Map<string, string>();
   let found = 0;
+  let spent = 0;
   return (e: ReviewEvent) => {
     switch (e.type) {
+      case "cache":
+        ctx.err(
+          c.dim(
+            `Cache  ${plural(e.files, "file")} unchanged since their last review (${plural(e.findings, "finding")} reused)\n`,
+          ),
+        );
+        break;
+      case "usage":
+        spent = e.spent;
+        break;
+      case "budget-stop":
+        ctx.err(
+          c.yellow(
+            `Stopped: token budget reached (${formatTokens(e.spent)} of ${formatTokens(e.limit)})\n`,
+          ),
+        );
+        break;
       case "rules":
         ctx.err(
           c.dim(
@@ -119,17 +141,35 @@ function progressPrinter(ctx: CliContext) {
         break;
       case "review-done":
         ctx.err(
-          c.dim(`Done in ${duration(e.durationMs)} · ${plural(found, "finding")} reported\n`),
+          c.dim(
+            `${e.partial ? "Stopped" : "Done"} in ${duration(e.durationMs)} · ${plural(found, "finding")} reported${spent ? ` · ~${formatTokens(spent)} effective tokens` : ""}\n`,
+          ),
         );
         break;
     }
   };
 }
 
+/** "500000", "500k", "2M", "1.5m" → tokens. */
+export function parseTokens(v: string): number {
+  const m = /^(\d+(?:\.\d+)?)\s*([km]?)$/i.exec(v.trim());
+  if (!m)
+    throw new CliError(`crit: cannot read "${v}" as a token count (try 500k or 2M)`, {
+      exitCode: EXIT.usage,
+    });
+  const n = Math.round(
+    Number(m[1]) * { "": 1, k: 1_000, m: 1_000_000 }[m[2]!.toLowerCase() as "" | "k" | "m"],
+  );
+  if (n < 1)
+    throw new CliError("crit: the token budget must be positive", { exitCode: EXIT.usage });
+  return n;
+}
+
 export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promise<number> {
   const maxShards = args["max-shards"] === undefined ? undefined : Number(args["max-shards"]);
   if (maxShards !== undefined && (!Number.isSafeInteger(maxShards) || maxShards < 1))
     throw new CliError("crit: --max-shards takes a positive integer", { exitCode: EXIT.usage });
+  const maxTokens = args.budget === undefined ? undefined : parseTokens(args.budget);
   const depth = args.depth === undefined ? undefined : Depth.safeParse(args.depth);
   if (depth && !depth.success)
     throw new CliError(`crit: --depth takes ${Depth.options.join(", ")}`, { exitCode: EXIT.usage });
@@ -157,7 +197,14 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
     ...(lenses ? { lenses } : {}),
     ...(args.base ? { base: args.base } : {}),
     ...(depth?.success ? { depth: depth.data } : {}),
-    ...(maxShards !== undefined ? { budget: { maxShards } } : {}),
+    ...(maxShards !== undefined || maxTokens !== undefined
+      ? {
+          budget: {
+            ...(maxShards !== undefined ? { maxShards } : {}),
+            ...(maxTokens !== undefined ? { maxTokens } : {}),
+          },
+        }
+      : {}),
   });
   if (spec.kind === "branch" && !spec.base && config.base) spec.base = config.base;
 
@@ -175,15 +222,24 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
   }
 
   const store = ctx.openStore();
-  const confirm = async ({ shards, estimateMs }: { shards: unknown[]; estimateMs: number }) => {
-    if (spec.kind !== "project" || args.yes) return true;
+  /** Ask before spending: every whole-project review, and any review estimated above budget.confirmTokens. */
+  const confirm = async (plan: {
+    shards: unknown[];
+    estimateMs: number;
+    estimatedTokens: number;
+    cachedFiles: number;
+  }) => {
+    if (plan.shards.length === 0 || args.yes) return true;
+    const big = plan.estimatedTokens > config.budget.confirmTokens;
+    if (spec.kind !== "project" && !big) return true;
+    const facts = `${plural(plan.shards.length, "agent run")}, ~${formatTokens(plan.estimatedTokens)} tokens, ~${duration(plan.estimateMs)} on ${resolved.profile.name}${plan.cachedFiles ? ` (${plural(plan.cachedFiles, "file")} cached)` : ""}`;
     if (!ctx.interactive)
-      throw new CliError(
-        `crit: a whole-project review runs ${plural(shards.length, "shard")} (est. ${duration(estimateMs)}). Pass --yes to start it.`,
-      );
+      throw new CliError(`crit: this review is ${facts}. Pass --yes to start it.`, {
+        hint: 'crit review --dry-run shows what it would do; --depth quick, paths, or .crit/config.json "ignore" narrow it.',
+      });
     return ctx.prompter.confirm({
-      message: `Review the whole project: ${plural(shards.length, "shard")}, est. ${duration(estimateMs)} on ${resolved.profile.name}. Start?`,
-      initialValue: true,
+      message: `This review is ${facts}. It stops at ${formatTokens(config.budget.maxTokens)}. Start?`,
+      initialValue: !big,
     });
   };
   const base = {
@@ -199,24 +255,29 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
     configDir: ctx.paths.config,
     useCache: args.cache !== false,
   };
+  if (args["dry-run"]) {
+    const prep = await prepareReview(base);
+    const info = { provider: resolved.profile.name, model: resolved.profile.model, config };
+    ctx.out(
+      format === "json"
+        ? `${JSON.stringify(dryRunJson(prep, info), null, 2)}\n`
+        : renderDryRun(prep, info, { color: ctx.color }),
+    );
+    return EXIT.ok;
+  }
   if (useTui) {
-    // Whole-project reviews confirm here, before the screen takes over the terminal.
-    if (spec.kind === "project" && !args.yes) {
-      const scope = await resolveScope({
-        cwd: ctx.cwd,
-        spec,
-        ignore: config.ignore,
-        maxFileTokens: config.maxFileTokens,
-      });
-      const runs = planRuns(scope, config);
-      if (
-        !(await confirm({
-          shards: runs,
-          estimateMs: estimateDurationMs(runs.length, config.concurrency),
-        }))
-      )
-        return EXIT.cancelled;
-    }
+    // Ask here, before the screen takes over the terminal.
+    const prep = await prepareReview(base);
+    const estimateMs = estimateDurationMs(prep.runs.length, config.concurrency);
+    if (
+      !(await confirm({
+        shards: prep.runs,
+        estimateMs,
+        estimatedTokens: prep.estimatedTokens,
+        cachedFiles: prep.cached.size,
+      }))
+    )
+      return EXIT.cancelled;
     const { runTui } = await import("../tui/start.tsx");
     const recovery = await runTui(ctx, store, root, config, (onEvent, signal) =>
       runReview({ ...base, onEvent, signal }),
@@ -259,6 +320,10 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
       );
       if (hit) return EXIT.findings;
     }
+    if (result.review.status === "partial") {
+      ctx.err(colors(ctx.color).yellow(`${result.review.summary}\n`));
+      return EXIT.partial;
+    }
     return EXIT.ok;
   } catch (err) {
     if (ac.signal.aborted)
@@ -288,6 +353,14 @@ export const reviewCommand = (ctx: CliContext) =>
       base: { type: "string", description: "Base branch for branch reviews" },
       diff: { type: "boolean", description: "With paths: only files changed versus the base" },
       provider: { type: "string", description: "Provider profile to use for this run" },
+      budget: {
+        type: "string",
+        description: "Stop after this many effective tokens, e.g. 500k or 2M (default 2M)",
+      },
+      "dry-run": {
+        type: "boolean",
+        description: "Show the files, skipped files, runs and token estimate; call no agent",
+      },
       "max-shards": {
         type: "string",
         description: "Maximum shards approved for this run (overrides the configured budget)",
@@ -308,7 +381,7 @@ export const reviewCommand = (ctx: CliContext) =>
       yes: {
         type: "boolean",
         alias: "y",
-        description: "Skip the confirmation for whole-project reviews",
+        description: "Skip the confirmation (whole-project and large reviews)",
       },
       verify: {
         type: "boolean",

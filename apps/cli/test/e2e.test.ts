@@ -152,7 +152,7 @@ describe("built CLI", () => {
 
     const history = crit(["history"]);
     expect(history.code).toBe(0);
-    expect(history.out).toMatch(/feature → main\s+fake\s+0C 1M 0m 0n\s+open/);
+    expect(history.out).toMatch(/feature → main\s+fake\s+0C 1M 0m 0n\s+(~\d+k?|-)\s+open/);
     expect(history.out).toContain("superseded");
     expect(crit(["open", "--no-tui"]).out).toContain("Amount not validated");
   });

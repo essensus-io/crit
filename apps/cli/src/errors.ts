@@ -16,5 +16,7 @@ export const EXIT = {
   usage: 2,
   /** --fail-on threshold met */
   findings: 3,
+  /** The review stopped early (budget or rate limit); findings so far were kept. */
+  partial: 4,
   cancelled: 130,
 } as const;

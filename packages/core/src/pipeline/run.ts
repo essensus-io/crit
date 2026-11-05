@@ -577,7 +577,8 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
             if (e.type === "usage") {
               live.set(shard.id, effectiveTokens(e));
               report_usage("review");
-              checkBudget();
+              // Only a running figure can stop a run; a final one means it is already done.
+              if (e.partial) checkBudget();
             }
           });
           if (!out.rateLimited || signal.aborted) break;
@@ -796,11 +797,13 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     for (const s of failedShards)
       emit({ type: "warning", message: `shard ${s.label} failed: ${s.error}` });
     const ran = done.filter((s) => s.status === "done").length;
-    const partial = stopReason
-      ? stopReason === "budget"
-        ? `Stopped at the ${config.budget.maxTokens.toLocaleString("en-US")}-token budget after ${ran} of ${shards.length} runs. Findings so far are kept; run again to resume (finished files are cached), or raise the budget with --budget.`
-        : `Stopped early because the provider is rate limited, after ${ran} of ${shards.length} runs. Findings so far are kept; run again later to resume (finished files are cached).`
-      : undefined;
+    // Hitting the budget on the very last run is not a partial review: everything ran.
+    const partial =
+      stopReason && ran < shards.length
+        ? stopReason === "budget"
+          ? `Stopped at the ${config.budget.maxTokens.toLocaleString("en-US")}-token budget after ${ran} of ${shards.length} runs. Findings so far are kept; run again to resume (finished files are cached), or raise the budget with --budget.`
+          : `Stopped early because the provider is rate limited, after ${ran} of ${shards.length} runs. Findings so far are kept; run again later to resume (finished files are cached).`
+        : undefined;
     const r = await finishReview(
       partial ? "partial" : "completed",
       partial ??

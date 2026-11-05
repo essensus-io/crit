@@ -7,6 +7,7 @@ import {
   type HistoryArgs,
   historyRows,
   outcomeOf,
+  tokensLabel,
   severitySummary,
 } from "../commands/history.ts";
 import { repoRootOrThrow } from "../commands/shared.ts";
@@ -75,14 +76,14 @@ export function HistoryApp({
 
   const cols = (r: HistoryRow, i: number) => (
     <Text key={r.review.id} {...(i === cursor ? { inverse: true } : {})}>
-      {`${i === cursor ? "›" : " "} ${shortId(r.review.id).padEnd(6)} ${when(r.review.startedAt, now).padEnd(17)} ${truncate(r.review.scopeLabel, 28).padEnd(28)} ${r.review.provider.padEnd(10)} ${severitySummary(r).padEnd(17)} ${outcomeOf(r)}`}
+      {`${i === cursor ? "›" : " "} ${shortId(r.review.id).padEnd(6)} ${when(r.review.startedAt, now).padEnd(17)} ${truncate(r.review.scopeLabel, 28).padEnd(28)} ${r.review.provider.padEnd(10)} ${severitySummary(r).padEnd(17)} ${tokensLabel(r).padEnd(8)} ${outcomeOf(r)}`}
     </Text>
   );
   return (
     <Box flexDirection="column" width={width}>
       <Text
         dimColor
-      >{`  ${"ID".padEnd(6)} ${"WHEN".padEnd(17)} ${"SCOPE".padEnd(28)} ${"PROVIDER".padEnd(10)} ${"FINDINGS".padEnd(17)} OUTCOME`}</Text>
+      >{`  ${"ID".padEnd(6)} ${"WHEN".padEnd(17)} ${"SCOPE".padEnd(28)} ${"PROVIDER".padEnd(10)} ${"FINDINGS".padEnd(17)} ${"TOKENS".padEnd(8)} OUTCOME`}</Text>
       {rows.map(cols)}
       {rows.length === 0 ? <Text dimColor> No reviews match.</Text> : null}
       <Text> </Text>

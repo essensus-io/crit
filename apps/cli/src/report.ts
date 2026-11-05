@@ -1,5 +1,9 @@
 import {
+  addUsage,
+  effectiveTokens,
+  emptyUsage,
   type Finding,
+  formatTokens,
   type Fix,
   type ReviewExport,
   SEVERITY_ORDER,
@@ -21,6 +25,20 @@ function sortFindings(list: Finding[]): Finding[] {
       SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity) ||
       a.range.start - b.range.start,
   );
+}
+
+/** Reviewer tokens from the export's shards (skeptic usage is kept in the events table, not the export). */
+function reviewerTokens(doc: ReviewExport) {
+  const u = doc.shards.reduce(
+    (a, s) =>
+      addUsage(a, {
+        inputTokens: s.inputTokens ?? 0,
+        cachedInputTokens: s.cachedTokens ?? 0,
+        outputTokens: s.outputTokens ?? 0,
+      }),
+    emptyUsage(),
+  );
+  return { ...u, effective: effectiveTokens(u) };
 }
 
 export function severityCounts(findings: Finding[]): Record<Severity, number> {
@@ -48,6 +66,11 @@ export function markdownReport(doc: ReviewExport): string {
   out.push(`- **Provider:** ${review.provider}${review.model ? ` (${review.model})` : ""}`);
   out.push(`- **Started:** ${new Date(review.startedAt).toISOString()}`);
   if (review.headSha) out.push(`- **Head:** \`${review.headSha.slice(0, 12)}\``);
+  const tk = reviewerTokens(doc);
+  if (tk.effective > 0)
+    out.push(
+      `- **Reviewer tokens:** ~${formatTokens(tk.effective)} effective (${formatTokens(tk.inputTokens)} fresh input, ${formatTokens(tk.cachedInputTokens)} cached, ${formatTokens(tk.outputTokens)} output)`,
+    );
   out.push(
     `- **Findings:** ${shown.length} (${SEVERITY_ORDER.map((s) => `${counts[s]} ${s}`).join(", ")})${filtered.length ? `, ${filtered.length} filtered by the skeptic` : ""}`,
   );
@@ -161,7 +184,7 @@ export function textReport(
   const out: string[] = [];
   out.push(
     `${c.bold(`crit · review ${shortId(review.id)}`)} · ${review.scopeLabel} · ${review.provider}${review.model ? ` (${review.model})` : ""}` +
-      ` · ${plural(shown.length, "finding")} · ${selected} selected${opts.durationMs !== undefined ? ` · ${duration(opts.durationMs)}` : ""}`,
+      ` · ${plural(shown.length, "finding")} · ${selected} selected${reviewerTokens(doc).effective > 0 ? ` · ~${formatTokens(reviewerTokens(doc).effective)} tokens` : ""}${opts.durationMs !== undefined ? ` · ${duration(opts.durationMs)}` : ""}`,
   );
   let file = "";
   for (const f of shown) {

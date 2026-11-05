@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createFixtureRepo, type FixtureRepo } from "@crit/testkit";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { scopeFromArgs } from "../src/commands/review.ts";
+import { parseTokens, scopeFromArgs } from "../src/commands/review.ts";
 import { fakeProvidersJson, normalize, type TestEnv, testContext } from "./helpers.ts";
 
 const FEATURE = `export async function refund(orders, provider, orderId, amount) {
@@ -89,7 +89,7 @@ describe("crit review --no-tui", () => {
   it("prints a text report with progress on stderr", async () => {
     expect(await t.run("review", "--no-tui")).toBe(0);
     expect(normalize(t.stdout(), t)).toMatchInlineSnapshot(`
-      "crit · review <short> · feature/payments → main · agent · 1 finding · 1 selected · <dur>
+      "crit · review <short> · feature/payments → main · agent · 1 finding · 1 selected · ~<tok> tokens · <dur>
 
       src/api/payments.ts
         [x] CRIT    4  Refund amount not validated  (fix)
@@ -165,6 +165,7 @@ describe("crit review --no-tui", () => {
   });
 
   it("allows an explicit shard budget override without changing project settings", async () => {
+    repo.commit("second file", { "src/api/b.ts": "export const b = 1;\n".repeat(30) });
     const config = { budget: { maxShards: 1 }, shardTokens: 100 };
     repo.write({ ".crit/config.json": JSON.stringify(config) });
     expect(await t.run("review", "--no-tui")).toBe(1);
@@ -175,7 +176,82 @@ describe("crit review --no-tui", () => {
 
   it("asks for --yes before a whole-project review when not interactive", async () => {
     expect(await t.run("review", "--all", "--no-tui")).toBe(1);
-    expect(t.stderr()).toMatch(/whole-project review runs 1 shard .* Pass --yes/);
+    expect(t.stderr()).toMatch(
+      /this review is 1 agent run, ~\d+k? tokens, ~1m30s on agent\. Pass --yes/,
+    );
+    expect(t.stderr()).toContain("crit review --dry-run shows what it would do");
+  });
+
+  it("asks before any review estimated above budget.confirmTokens, and --yes skips the ask", async () => {
+    repo.write({ ".crit/config.json": JSON.stringify({ budget: { confirmTokens: 1 } }) });
+    expect(await t.run("review", "--no-tui")).toBe(1);
+    expect(t.stderr()).toContain("Pass --yes to start it");
+    expect(await t.run("review", "--no-tui", "--yes")).toBe(0);
+  });
+
+  it("--dry-run shows files, skipped files with reasons, runs and the estimate, and calls no agent", async () => {
+    repo.commit("noise", {
+      "docs/guide.md": "# guide\n",
+      "assets/Font-Bold.otf": "x",
+      "src/api/b.ts": "export const b = 1;\n",
+    });
+    const calls = () => t.fakes.flatMap((f) => f.calls).length;
+    expect(await t.run("review", "--dry-run")).toBe(0);
+    const out = normalize(t.stdout(), t);
+    expect(out).toContain(
+      "crit review --dry-run · feature/payments → main · agent · depth standard",
+    );
+    expect(out).toMatch(/Files\s+2 to review · 0 cached · 2 skipped/);
+    expect(out).toMatch(/1\s+docs, assets or generated \(default ignore\)/);
+    expect(out).toMatch(/1\s+binary file/);
+    expect(out).toContain("e.g. docs/guide.md (docs, assets or generated (default ignore))");
+    expect(out).toMatch(/Runs \(1\)/);
+    expect(out).toMatch(/Estimate\s+~\d+k? effective tokens · ~<dur> · stops at 2M/);
+    expect(calls()).toBe(0);
+
+    expect(await t.run("review", "--dry-run", "--format", "json")).toBe(0);
+    const json = JSON.parse(t.stdout().slice(t.stdout().lastIndexOf('{\n  "scope"')));
+    expect(json).toMatchObject({
+      scope: "feature/payments → main",
+      depth: "standard",
+      files: { toReview: 2, cached: 0 },
+      estimate: { budgetTokens: 2_000_000, confirmAboveTokens: 500_000 },
+    });
+    expect(json.skipped.byReason).toEqual({
+      "docs, assets or generated (default ignore)": 1,
+      "binary file": 1,
+    });
+    expect(calls()).toBe(0);
+  });
+
+  it("a dry run after a review shows the cache answering every file", async () => {
+    expect(await t.run("review", "--no-tui")).toBe(0);
+    expect(await t.run("review", "--dry-run")).toBe(0);
+    const out = t.stdout().split("crit review --dry-run")[1]!;
+    expect(out).toMatch(/Files\s+0 to review · 1 cached/);
+    expect(out).toContain("Nothing to run: every file is answered by the cache.");
+  });
+
+  it("--budget stops the review: a partial review exits 4 and says how to resume", async () => {
+    repo.commit("more", { "src/api/b.ts": "export const b = 1;\n" });
+    repo.write({ ".crit/config.json": JSON.stringify({ shardTokens: 5, concurrency: 1 }) });
+    expect(await t.run("review", "--no-tui", "--no-verify", "--budget", "1", "--no-cache")).toBe(4);
+    expect(t.stderr()).toContain("Stopped: token budget reached");
+    expect(t.stderr()).toMatch(/Stopped at the 1-token budget after 1 of 2 runs/);
+    expect(t.stderr()).toMatch(/Stopped in .* · \d+ findings? reported · ~\d+k? effective tokens/);
+    expect(await t.run("history", "--json")).toBe(0);
+    expect(await t.run("review", "--budget", "lots")).toBe(2);
+    expect(t.stderr()).toContain('cannot read "lots" as a token count');
+    expect(await t.run("review", "--budget", "0")).toBe(2);
+  });
+
+  it("parses token counts", () => {
+    expect([
+      parseTokens("500000"),
+      parseTokens("500k"),
+      parseTokens("2M"),
+      parseTokens("1.5m"),
+    ]).toEqual([500_000, 500_000, 2_000_000, 1_500_000]);
   });
 
   it("uses --provider and warns about a missing project preference", async () => {

@@ -1,4 +1,4 @@
-import { type Finding, type Review, SEVERITY_ORDER, shortId } from "@crit/schema";
+import { type Finding, formatTokens, type Review, SEVERITY_ORDER, shortId } from "@crit/schema";
 import {
   compareFindings,
   type Comparison,
@@ -33,9 +33,14 @@ export function parseSince(s: string, now: number): number {
 export const severitySummary = (r: HistoryRow) =>
   SEVERITY_ORDER.map((s) => `${r.severity[s]}${SEVERITY_LETTER[s]}`).join(" ");
 
+/** Effective tokens (fresh + output + cached/10), or "-" when the review recorded none. */
+export const tokensLabel = (r: HistoryRow) =>
+  r.tokens.effective > 0 ? `~${formatTokens(r.tokens.effective)}` : "-";
+
 export function outcomeOf(r: HistoryRow): string {
   const st = r.review.status;
   if (st === "superseded") return "superseded";
+  if (st === "partial") return "partial (stopped early)";
   if (st === "running") return "running";
   if (st === "failed" || st === "cancelled") return st;
   const parts: string[] = [];
@@ -90,6 +95,7 @@ export function renderHistory(
     c.dim("SCOPE"),
     c.dim("PROVIDER"),
     c.dim("FINDINGS"),
+    c.dim("TOKENS"),
     c.dim("OUTCOME"),
   ];
   const body = rows.map((r, i) => {
@@ -102,6 +108,7 @@ export function renderHistory(
       truncate(scope, 30),
       r.review.provider,
       severitySummary(r),
+      tokensLabel(r),
       outcomeOf(r),
     ];
   });

@@ -1,4 +1,12 @@
-import type { Finding, Review, Severity } from "@crit/schema";
+import {
+  addUsage,
+  effectiveTokens,
+  emptyUsage,
+  type Finding,
+  type Review,
+  type Severity,
+  type TokenUsage,
+} from "@crit/schema";
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import type { Db } from "./db/connection.ts";
 import * as t from "./db/schema.ts";
@@ -21,6 +29,8 @@ export type HistoryRow = {
   /** Visible findings (skeptic-rejected excluded) by severity. */
   severity: Record<Severity, number>;
   outcome: { applied: number; dismissed: number; open: number; filtered: number };
+  /** Reviewer shards plus skeptic and map runs. `effective` counts cached input at a tenth. */
+  tokens: TokenUsage & { effective: number };
 };
 
 const emptySeverity = (): Record<Severity, number> => ({ critical: 0, major: 0, minor: 0, nit: 0 });
@@ -69,9 +79,38 @@ export async function listHistory(db: Db, filter: HistoryFilter = {}): Promise<H
         repoName: r.repoName,
         severity: emptySeverity(),
         outcome: { applied: 0, dismissed: 0, open: 0, filtered: 0 },
+        tokens: { ...emptyUsage(), effective: 0 },
       },
     ]),
   );
+  const shardTokens = await db
+    .select({
+      reviewId: t.shards.reviewId,
+      input: sql<number>`coalesce(sum(${t.shards.inputTokens}), 0)`,
+      cached: sql<number>`coalesce(sum(${t.shards.cachedTokens}), 0)`,
+      output: sql<number>`coalesce(sum(${t.shards.outputTokens}), 0)`,
+    })
+    .from(t.shards)
+    .where(inArray(t.shards.reviewId, ids))
+    .groupBy(t.shards.reviewId)
+    .all();
+  const usageEvents = await db
+    .select({ reviewId: t.events.reviewId, payload: t.events.payload })
+    .from(t.events)
+    .where(and(inArray(t.events.reviewId, ids), eq(t.events.type, "usage")))
+    .all();
+  const add = (reviewId: string, u: Partial<TokenUsage>) => {
+    const row = byReview.get(reviewId)!;
+    Object.assign(row.tokens, addUsage(row.tokens, u));
+    row.tokens.effective = effectiveTokens(row.tokens);
+  };
+  for (const s of shardTokens)
+    add(s.reviewId, {
+      inputTokens: Number(s.input),
+      cachedInputTokens: Number(s.cached),
+      outputTokens: Number(s.output),
+    });
+  for (const e of usageEvents) add(e.reviewId, JSON.parse(e.payload) as Partial<TokenUsage>);
   for (const c of counts) {
     const row = byReview.get(c.reviewId)!;
     const n = Number(c.n);

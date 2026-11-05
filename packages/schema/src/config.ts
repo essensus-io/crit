@@ -99,6 +99,7 @@ export const NOISE_IGNORES = [
   ".claude/**",
   ".agents/**",
   ".cursor/**",
+  ".crit/**",
   ".github/**",
   "**/*.snap",
   "**/__snapshots__/**",

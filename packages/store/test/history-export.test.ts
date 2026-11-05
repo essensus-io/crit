@@ -40,6 +40,38 @@ describe("listHistory", () => {
     expect(rows[1]!.outcome.applied).toBe(1);
   });
 
+  it("totals reviewer shard tokens and skeptic usage events per review", async () => {
+    const r = await store.reviews.create(review(repoId));
+    await store.shards.create(
+      shard(r.id, { inputTokens: 1000, cachedTokens: 9000, outputTokens: 100 }),
+    );
+    await store.shards.create(
+      shard(r.id, { inputTokens: 500, cachedTokens: null, outputTokens: 50 }),
+    );
+    await store.events.append(r.id, "usage", {
+      task: "skeptic",
+      inputTokens: 200,
+      cachedInputTokens: 1000,
+      outputTokens: 20,
+    });
+    await store.events.append(r.id, "rules", { rules: [] });
+    const empty = await store.reviews.create(review(repoId));
+    const rows = await listHistory(store.db, { repoId });
+    const byId = Object.fromEntries(rows.map((x) => [x.review.id, x.tokens]));
+    expect(byId[r.id]).toEqual({
+      inputTokens: 1700,
+      cachedInputTokens: 10_000,
+      outputTokens: 170,
+      effective: 1700 + 170 + 1000,
+    });
+    expect(byId[empty.id]).toEqual({
+      inputTokens: 0,
+      cachedInputTokens: 0,
+      outputTokens: 0,
+      effective: 0,
+    });
+  });
+
   it("filters by branch, scope, provider, date and limit", async () => {
     const a = await store.reviews.create(
       review(repoId, { branch: "main", scopeLabel: "src/db", provider: "codex" }),
