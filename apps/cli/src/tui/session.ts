@@ -23,6 +23,7 @@ import {
 import type { DismissReason, Finding, Fix, Message, Review } from "@crit/schema";
 import type { SqliteStore } from "@crit/store";
 import { copyToClipboard } from "../clipboard.ts";
+import type { Tok } from "./highlight.ts";
 import { findingPrompt } from "./prompt.ts";
 
 export type RuleRef = { id: string; title: string; path: string; section?: string };
@@ -38,7 +39,12 @@ export type FindingView = {
 };
 
 /** A file's text and which of its lines the reviewed change added. */
-export type CodeInfo = { lines: string[]; added: Set<number> };
+export type CodeInfo = {
+  lines: string[];
+  added: Set<number>;
+  /** Colored pieces per line, filled in when the stream is built. */
+  tokens?: Tok[][] | null;
+};
 
 export type SessionState = {
   review: Review;

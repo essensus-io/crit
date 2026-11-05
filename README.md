@@ -39,7 +39,7 @@ crit history                     # browse, compare (--compare a b), rm, prune --
 ### The screen
 
 The review is one scrolling stream: each file with findings shows the code around
-them (changed lines marked `+`), and every finding is a card right under the lines
+them (changed lines marked `+`, syntax highlighted for TypeScript/JavaScript, Python, Go, Rust, Java, Kotlin, Swift, Ruby, PHP, C/C++/C#, CSS, HTML, JSON, YAML, Markdown, SQL and shell), and every finding is a card right under the lines
 it is about. `○` is pending, `✓` accepted, `✗` dismissed. The bottom line says how
 far you are ("2 of 5 reviewed · 1 accepted") and lists only the keys that work
 right now; press `?` for all of them.

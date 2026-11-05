@@ -67,6 +67,32 @@ describe("buildStream", () => {
     expect(rows[card.to]).toMatch(/^ ╰─+╯$/);
   });
 
+  it("colors the code by syntax; lines outside the finding stay dim", () => {
+    const info: CodeInfo = {
+      lines: [
+        "const a = 1;",
+        "const b = 2;",
+        "const c = 3;",
+        "const d = 4;",
+        "const e = 5;",
+        "const f = 6;",
+      ],
+      added: new Set(),
+    };
+    const s = build([view("f1", 1)], new Map([["a.ts", info]]));
+    const rows = s.rows.filter((r) => r.kind === "code");
+    const keyword = (r: { line: Line }) => r.line.find((g) => g.t === "const");
+    expect(keyword(rows[0]!)).toMatchObject({ color: "#a5b4fc" }); // in the finding's range: full color
+    expect(keyword(rows[0]!)?.dim).toBeUndefined();
+    expect(keyword(rows[3]!)).toMatchObject({ color: "#a5b4fc", dim: true }); // context: dimmed
+    // an unknown language is plain text, not an error
+    const plain = build(
+      [view("p", 1, 1, { file: "notes.xyz" })],
+      new Map([["notes.xyz", code(3)]]),
+    );
+    expect(plain.rows.filter((r) => r.kind === "code")).toHaveLength(3);
+  });
+
   it("merges windows that touch and keeps cards in order; far findings get a fold between", () => {
     const items = [view("a", 10), view("b", 14), view("c", 60)];
     const s = build(items, new Map([["a.ts", code(100)]]));

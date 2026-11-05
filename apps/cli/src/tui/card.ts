@@ -1,6 +1,7 @@
 import { parseUnifiedDiff } from "@crit/core";
 import type { FindingView, SessionState } from "./session.ts";
 import { triage } from "./filter.ts";
+import { clipToks, highlightLine } from "./highlight.ts";
 import { SEV_COLOR, SEV_LABEL, T } from "./theme.ts";
 import { wrapText } from "./widgets.tsx";
 
@@ -35,28 +36,45 @@ function wrapped(text: string, w: number, style: Omit<Seg, "t"> = {}, indent = "
 
 /** The lines of a fix patch as colored rows (new-side line numbers). */
 export function patchLines(patch: string, w: number): Line[] {
-  const rows: { n: number; sign: string; text: string }[] = [];
+  const rows: { n: number; sign: string; text: string; path: string | undefined }[] = [];
   for (const file of parseUnifiedDiff(patch)) {
     for (const h of file.hunks) {
       let n = h.newStart;
       for (const l of h.body) {
         const sign = l[0] ?? " ";
         if (sign === "\\") continue;
-        rows.push({ n, sign, text: l.slice(1).replace(/\t/g, "  ") });
+        rows.push({
+          n,
+          sign,
+          text: l.slice(1).replace(/\t/g, "  "),
+          path: file.newPath ?? file.oldPath ?? undefined,
+        });
         if (sign !== "-") n++;
       }
     }
   }
   const nw = Math.max(3, ...rows.map((r) => String(r.n).length));
-  return rows.map((r) => [
-    {
-      t: clip(
-        `${String(r.n).padStart(nw)} ${r.sign === "+" || r.sign === "-" ? r.sign : " "} ${r.text}`,
-        w,
-      ),
-      ...(r.sign === "+" ? { color: T.mint } : r.sign === "-" ? { color: T.red } : { dim: true }),
-    },
-  ]);
+  return rows.map((r) => {
+    const mark = r.sign === "+" || r.sign === "-" ? r.sign : " ";
+    const gutter = `${String(r.n).padStart(nw)} ${mark} `;
+    const room = Math.max(8, w - gutter.length);
+    const head: Seg =
+      r.sign === "+"
+        ? { t: gutter, color: T.mint }
+        : r.sign === "-"
+          ? { t: gutter, color: T.red }
+          : { t: gutter, dim: true };
+    // Removed lines stay red; added and context lines are syntax colored.
+    const body: Seg[] =
+      r.sign === "-"
+        ? [{ t: clip(r.text, room), color: T.red }]
+        : clipToks(highlightLine(r.path, r.text), room).map((k) => ({
+            t: k.t,
+            ...(k.color ? { color: k.color } : {}),
+            ...(r.sign === " " ? { dim: true } : {}),
+          }));
+    return [head, ...body];
+  });
 }
 
 /** What the card says inside its border (without the border). */

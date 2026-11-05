@@ -1,4 +1,5 @@
 import { boxCard, type Line } from "./card.ts";
+import { clipToks, highlightFile } from "./highlight.ts";
 import type { CodeInfo, FindingView, SessionState } from "./session.ts";
 import { T } from "./theme.ts";
 
@@ -16,7 +17,6 @@ export type Stream = {
 };
 
 const CONTEXT = 3;
-const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, Math.max(0, n - 1))}…` : s);
 
 export type StreamInput = {
   items: FindingView[];
@@ -90,6 +90,8 @@ export function buildStream(input: StreamInput): Stream {
       return c ? range(c) : undefined;
     })();
     const nw = String(total).length;
+    if (info.tokens === undefined) info.tokens = highlightFile(file, info.lines);
+    const tokens = info.tokens ?? undefined;
     let prevEnd = 0;
     const gap = (from: number, to: number) => {
       if (to < from) return;
@@ -104,8 +106,8 @@ export function buildStream(input: StreamInput): Stream {
       for (let n = w.s; n <= w.e; n++) {
         const inFocus = focusedRange && n >= focusedRange.start && n <= focusedRange.end;
         const added = info.added.has(n);
-        const text = clip(
-          (info.lines[n - 1] ?? "").replace(/\t/g, "  "),
+        const toks = clipToks(
+          tokens?.[n - 1] ?? [{ t: (info.lines[n - 1] ?? "").replace(/\t/g, "  ") }],
           Math.max(10, width - nw - 8),
         );
         rows.push({
@@ -114,7 +116,11 @@ export function buildStream(input: StreamInput): Stream {
             { t: ` ${String(n).padStart(nw)} `, dim: true },
             inFocus ? { t: "▎", color: T.orange } : { t: " " },
             added ? { t: "+ ", color: T.mint } : { t: "  " },
-            added || inFocus ? { t: text } : { t: text, dim: true },
+            ...toks.map((k) => ({
+              t: k.t,
+              ...(k.color ? { color: k.color } : {}),
+              ...(added || inFocus ? {} : { dim: true }),
+            })),
           ],
         });
         for (const it of list) if (range(it).end === n) pushCard(it);
