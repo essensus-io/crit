@@ -18,6 +18,7 @@ import { markdownReport, sarifReport, textReport } from "../report.ts";
 import { adapterFor, ensureProviders } from "../setup.ts";
 import { colors, duration, plural } from "../ui.ts";
 import { repoRootOrThrow } from "./shared.ts";
+import { chooseReviewProvider } from "./providers.ts";
 
 export type ReviewArgs = {
   _: string[];
@@ -35,6 +36,7 @@ export type ReviewArgs = {
   verify?: boolean;
   cache?: boolean;
   "fail-on"?: string;
+  "max-shards"?: string;
 };
 
 export function scopeFromArgs(args: ReviewArgs): ScopeSpec {
@@ -123,6 +125,9 @@ function progressPrinter(ctx: CliContext) {
 }
 
 export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promise<number> {
+  const maxShards = args["max-shards"] === undefined ? undefined : Number(args["max-shards"]);
+  if (maxShards !== undefined && (!Number.isSafeInteger(maxShards) || maxShards < 1))
+    throw new CliError("crit: --max-shards takes a positive integer", { exitCode: EXIT.usage });
   const spec = scopeFromArgs(args);
   const format = args.format ?? "text";
   const useTui = ctx.interactive && args.tui !== false && !args.format && !args.output;
@@ -146,6 +151,7 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
   const config = resolveConfig(loadUserConfig(ctx.paths), project, {
     ...(lenses ? { lenses } : {}),
     ...(args.base ? { base: args.base } : {}),
+    ...(maxShards !== undefined ? { budget: { maxShards } } : {}),
   });
   if (spec.kind === "branch" && !spec.base && config.base) spec.base = config.base;
 
@@ -203,9 +209,15 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
         return EXIT.cancelled;
     }
     const { runTui } = await import("../tui/start.tsx");
-    await runTui(ctx, store, root, config, (onEvent, signal) =>
+    const recovery = await runTui(ctx, store, root, config, (onEvent, signal) =>
       runReview({ ...base, onEvent, signal }),
     );
+    if (recovery?.kind === "provider") {
+      const provider = await chooseReviewProvider(ctx);
+      return runReviewCommand(ctx, { ...args, provider });
+    }
+    if (recovery?.kind === "budget")
+      return runReviewCommand(ctx, { ...args, "max-shards": String(recovery.maxShards) });
     return EXIT.ok;
   }
   const ac = new AbortController();
@@ -267,6 +279,10 @@ export const reviewCommand = (ctx: CliContext) =>
       base: { type: "string", description: "Base branch for branch reviews" },
       diff: { type: "boolean", description: "With paths: only files changed versus the base" },
       provider: { type: "string", description: "Provider profile to use for this run" },
+      "max-shards": {
+        type: "string",
+        description: "Maximum shards approved for this run (overrides the configured budget)",
+      },
       lens: { type: "string", description: "Limit to lenses, e.g. security,performance" },
       tui: {
         type: "boolean",

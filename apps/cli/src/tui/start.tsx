@@ -10,6 +10,7 @@ import { render } from "ink";
 import { type CliContext, sessionsDir } from "../context.ts";
 import { adapterFor } from "../setup.ts";
 import { ReviewApp, RunApp } from "./App.tsx";
+import type { RunRecovery } from "./ProgressScreen.tsx";
 import { type Editor, ReviewSession } from "./session.ts";
 
 /** $VISUAL / $EDITOR on a temp copy of the file (same name, so editors pick the right syntax). */
@@ -111,8 +112,9 @@ export async function runTui(
   root: string,
   config: ResolvedConfig,
   start: (onEvent: (e: ReviewEvent) => void, signal: AbortSignal) => Promise<unknown>,
-): Promise<void> {
+): Promise<RunRecovery | undefined> {
   const listeners = new Set<(e: ReviewEvent) => void>();
+  let recovery: RunRecovery | undefined;
   const ac = new AbortController();
   const app = render(
     <RunApp
@@ -122,12 +124,22 @@ export async function runTui(
       }}
       makeSession={(id) => makeSession(ctx, store, root, id, config)}
       onStop={() => ac.abort()}
+      onRecover={(action) => {
+        recovery = action;
+        ac.abort();
+      }}
     />,
   );
   const running = start((e) => {
     for (const l of listeners) l(e);
   }, ac.signal).catch(() => undefined);
   await app.waitUntilExit();
+  app.unmount();
   ac.abort();
   await running;
+  // Ink unreferences stdin when it releases raw mode. Readline (used by the
+  // provider prompts) resumes that stream but does not reference it again,
+  // so Node can exit while the next prompt is still awaiting an answer.
+  if (recovery && process.stdin.isTTY) process.stdin.ref();
+  return recovery;
 }

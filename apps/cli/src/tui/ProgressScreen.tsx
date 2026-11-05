@@ -14,7 +14,11 @@ export type ProgressState = {
   warnings: string[];
   done?: boolean;
   failed?: string;
+  budget?: { required: number; limit: number };
+  rateLimited?: boolean;
 };
+
+export type RunRecovery = { kind: "provider" } | { kind: "budget"; maxShards: number };
 
 export const emptyProgress = (): ProgressState => ({
   shards: new Map(),
@@ -74,6 +78,10 @@ export function reduceProgress(p: ProgressState, e: ReviewEvent): ProgressState 
       return { ...p, verifying: e.count };
     case "warning":
       return { ...p, warnings: [...p.warnings, e.message] };
+    case "budget-exceeded":
+      return { ...p, budget: { required: e.required, limit: e.limit } };
+    case "rate-limited":
+      return { ...p, rateLimited: true };
     case "review-done":
       return { ...p, done: true };
     case "review-failed":
@@ -156,13 +164,28 @@ export function ProgressScreen({ progress, width }: { progress: ProgressState; w
         </Text>
       ))}
       {progress.failed ? <Text color="red"> ✗ {progress.failed}</Text> : null}
+      {progress.budget ? (
+        <Text color="yellow">
+          {` Local shard budget reached. b approves ${progress.budget.required} shards for this run; changing providers does not raise this budget.`}
+        </Text>
+      ) : null}
+      {progress.rateLimited ? (
+        <Text color="yellow">
+          {" "}
+          Provider rate limited. p connects or switches providers and retries the review.
+        </Text>
+      ) : null}
       <Text> </Text>
       <Text> {progress.findings} findings so far</Text>
       <Footer
         width={width}
         keys={[
-          ["q", "stop"],
+          ["q", progress.done ? "quit" : "stop"],
           ["enter", "open findings so far"],
+          ["p", "connect / switch provider and retry"],
+          ...(progress.budget
+            ? [["b", `approve ${progress.budget.required} shards and retry`] as [string, string]]
+            : []),
         ]}
       />
     </Box>

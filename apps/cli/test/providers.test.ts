@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { createFixtureRepo, type FixtureRepo } from "@crit/testkit";
 import { afterEach, describe, expect, it } from "vitest";
 import { fakeProvidersJson, normalize, type TestEnv, testContext } from "./helpers.ts";
+import { chooseReviewProvider } from "../src/commands/providers.ts";
 
 const posix = process.platform !== "win32";
 let t: TestEnv;
@@ -17,6 +18,27 @@ afterEach(() => {
 const saved = (env: TestEnv) =>
   JSON.parse(readFileSync(join(env.ctx.paths.config, "providers.json"), "utf8"));
 const okScript = { runs: [{ match: { kind: "answer" }, message: "ok", repeat: true }] };
+
+describe("review provider recovery", () => {
+  it("selects an existing provider", async () => {
+    t = testContext({ interactive: true, answers: ["agent"] });
+    fakeProvidersJson(t);
+    expect(await chooseReviewProvider(t.ctx)).toBe("agent");
+  });
+
+  it("connects and tests another provider without replacing the default", async () => {
+    t = testContext({
+      interactive: true,
+      answers: ["__add__", "test-agent", "backup", "__cli_default__"],
+    });
+    fakeProvidersJson(t);
+    t.script(okScript);
+    expect(await chooseReviewProvider(t.ctx)).toBe("backup");
+    expect(saved(t).default).toBe("agent");
+    expect(saved(t).providers.map((p: { name: string }) => p.name)).toEqual(["agent", "backup"]);
+    expect(t.stderr()).toContain("backup replied");
+  });
+});
 
 describe.skipIf(!posix)("first run", () => {
   it("detects agents, adds the chosen ones, tests them and continues the command", async () => {

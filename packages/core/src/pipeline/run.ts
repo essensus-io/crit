@@ -224,8 +224,9 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
       }
     }
     if (shards.length > config.budget.maxShards) {
+      emit({ type: "budget-exceeded", required: shards.length, limit: config.budget.maxShards });
       throw new Error(
-        `crit: ${shards.length} shards exceed budget.maxShards (${config.budget.maxShards}); narrow the scope or raise the budget`,
+        `crit: ${shards.length} shards exceed budget.maxShards (${config.budget.maxShards}); narrow the scope or retry with --max-shards ${shards.length}. This is a local budget, independent of your provider.`,
       );
     }
     const estimateMs = estimateDurationMs(shards.length, config.concurrency);

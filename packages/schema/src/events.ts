@@ -27,6 +27,7 @@ export type ReviewEvent =
   | { type: "finding-rejected"; shardId: string; errors: string[] }
   | { type: "shard-done"; shard: Shard }
   | { type: "rate-limited"; shardId: string; retryAfterMs?: number }
+  | { type: "budget-exceeded"; required: number; limit: number }
   | { type: "verify-started"; count: number }
   | { type: "verified"; result: SkepticResult }
   | { type: "warning"; message: string }

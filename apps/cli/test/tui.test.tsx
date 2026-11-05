@@ -427,6 +427,41 @@ describe("proposing a better fix", () => {
 });
 
 describe("run progress", () => {
+  it.each(["budget", "provider"])("offers %s recovery after a limit", async (kind) => {
+    let emit: (e: ReviewEvent) => void = () => {};
+    let recovery: unknown;
+    const app = render(
+      <RunApp
+        subscribe={(fn) => {
+          emit = fn;
+          return () => {};
+        }}
+        makeSession={async () => {
+          throw new Error("should stay on progress");
+        }}
+        onStop={() => {}}
+        onRecover={(action) => {
+          recovery = action;
+        }}
+      />,
+    );
+    await sleep();
+    if (kind === "budget") {
+      emit({ type: "budget-exceeded", required: 134, limit: 40 });
+      emit({ type: "review-failed", reviewId: "r", error: "budget exceeded" });
+      await until(app.lastFrame, "134 shards");
+      app.stdin.write("b");
+    } else {
+      emit({ type: "rate-limited", shardId: "a", retryAfterMs: 30000 });
+      emit({ type: "review-done", reviewId: "r", findings: [], durationMs: 1 });
+      await until(app.lastFrame, "Provider rate limited");
+      app.stdin.write("p");
+    }
+    await sleep();
+    expect(recovery).toEqual(kind === "budget" ? { kind, maxShards: 134 } : { kind });
+    app.unmount();
+  });
+
   const shard = (id: string, label: string): Shard => ({
     id,
     reviewId: "r",

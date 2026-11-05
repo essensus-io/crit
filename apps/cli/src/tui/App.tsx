@@ -10,6 +10,7 @@ import {
   ProgressScreen,
   type ProgressState,
   reduceProgress,
+  type RunRecovery,
 } from "./ProgressScreen.tsx";
 import { ProposalScreen } from "./ProposalScreen.tsx";
 import type { ReviewSession } from "./session.ts";
@@ -321,6 +322,7 @@ export function RunApp(props: {
   subscribe: (fn: (e: ReviewEvent) => void) => () => void;
   makeSession: (reviewId: string) => Promise<ReviewSession>;
   onStop: () => void;
+  onRecover?: (action: RunRecovery) => void;
   onExit?: () => void;
 }) {
   const app = useApp();
@@ -335,18 +337,36 @@ export function RunApp(props: {
       props.subscribe((e) => {
         setProgress((p) => reduceProgress(p, e));
         if (e.type === "review-started") setReviewId(e.reviewId);
-        if (e.type === "review-done") setOpen(true);
         if (e.type === "finding" || e.type === "verified" || e.type === "review-done")
           void session?.load();
       }),
     [props, session],
   );
   useEffect(() => {
+    if (
+      progress.done &&
+      !progress.failed &&
+      !progress.rateLimited &&
+      ![...progress.shards.values()].some((s) => s.status === "failed")
+    )
+      setOpen(true);
+  }, [progress]);
+  useEffect(() => {
     if (open && reviewId && !session) void props.makeSession(reviewId).then(setSession);
   }, [open, reviewId, session, props]);
 
   useInput(
     (input, key) => {
+      if (input === "p" && props.onRecover) {
+        props.onRecover({ kind: "provider" });
+        app.exit();
+        return;
+      }
+      if (input === "b" && progress.budget && props.onRecover) {
+        props.onRecover({ kind: "budget", maxShards: progress.budget.required });
+        app.exit();
+        return;
+      }
       if (input === "q" || (key.ctrl && input === "c")) {
         if (progress.done) {
           props.onExit?.();

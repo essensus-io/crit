@@ -253,6 +253,29 @@ const run = (fn: () => Promise<number>) => async () => {
   process.exitCode = await fn();
 };
 
+/** Called after the review screen releases the terminal, so setup can prompt safely. */
+export async function chooseReviewProvider(ctx: CliContext): Promise<string> {
+  const file = load(ctx);
+  const choice = await ctx.prompter.select({
+    message:
+      "Retry review with a provider (starts a new review; previous findings stay in history)",
+    options: [
+      ...file.providers
+        .filter((p) => p.enabled)
+        .map((p) => ({
+          value: p.name,
+          label: `${p.name} (${p.type}, ${p.model ?? "CLI default"})`,
+        })),
+      { value: "__add__", label: "Connect another provider…" },
+    ],
+  });
+  if (choice !== "__add__") return choice;
+  await addProvider(ctx, {});
+  const added = load(ctx).providers.find((p) => !file.providers.some((old) => old.name === p.name));
+  if (!added) throw new CliError("crit: no new provider was added");
+  return added.name;
+}
+
 export const providersCommand = (ctx: CliContext) =>
   defineCommand({
     meta: { name: "providers", description: "List and manage provider profiles" },

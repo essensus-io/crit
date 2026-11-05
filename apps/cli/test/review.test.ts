@@ -154,12 +154,23 @@ describe("crit review --no-tui", () => {
   });
 
   it("rejects bad usage", async () => {
+    for (const value of ["0", "-1", "1.5", "nope"])
+      expect(await t.run("review", "--max-shards", value)).toBe(2);
     expect(await t.run("review", "--all", "--staged")).toBe(2);
     expect(t.stderr()).toContain("choose one scope");
     expect(await t.run("review", "--lens", "vibes")).toBe(2);
     expect(t.stderr()).toContain("unknown lens vibes");
     expect(await t.run("review", "--format", "xml")).toBe(2);
     expect(await t.run("review", "--fail-on", "huge")).toBe(2);
+  });
+
+  it("allows an explicit shard budget override without changing project settings", async () => {
+    const config = { budget: { maxShards: 1 }, shardTokens: 100 };
+    repo.write({ ".crit/config.json": JSON.stringify(config) });
+    expect(await t.run("review", "--no-tui")).toBe(1);
+    expect(t.stderr()).toContain("--max-shards");
+    expect(await t.run("review", "--no-tui", "--max-shards", "100", "--no-verify")).toBe(0);
+    expect(JSON.parse(readFileSync(join(repo.root, ".crit/config.json"), "utf8"))).toEqual(config);
   });
 
   it("asks for --yes before a whole-project review when not interactive", async () => {
