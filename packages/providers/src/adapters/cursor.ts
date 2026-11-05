@@ -46,6 +46,7 @@ type Line = {
   session_id?: string;
   is_error?: boolean;
   result?: string;
+  usage?: { inputTokens?: number; outputTokens?: number; cacheReadTokens?: number };
   message?: { content?: { type: string; text?: string }[] };
   tool_call?: Record<string, { args?: { path?: string; pattern?: string; globPattern?: string } }>;
 };
@@ -101,6 +102,13 @@ export class CursorStreamParser {
       if (text) out.push({ type: "progress", text: text.split("\n")[0]!.slice(0, 80) });
     } else if (d.type === "result") {
       this.gotResult = true;
+      if (d.usage)
+        out.push({
+          type: "usage",
+          inputTokens: d.usage.inputTokens ?? 0,
+          outputTokens: d.usage.outputTokens ?? 0,
+          cachedInputTokens: d.usage.cacheReadTokens ?? 0,
+        });
       if (d.is_error || d.subtype !== "success")
         out.push(this.classify(d.result ?? d.subtype ?? "error"));
       else if (d.result !== undefined) out.push({ type: "message", text: d.result });

@@ -25,5 +25,11 @@ export const MIGRATIONS: { tag: string; statements: string[] }[] = [
       "CREATE TABLE `suppressions` (\n\t`id` text PRIMARY KEY NOT NULL,\n\t`repo_id` text NOT NULL,\n\t`fingerprint` text NOT NULL,\n\t`reason` text NOT NULL,\n\t`created_at` integer NOT NULL,\n\tFOREIGN KEY (`repo_id`) REFERENCES `repos`(`id`) ON UPDATE no action ON DELETE cascade\n);",
       "CREATE UNIQUE INDEX `suppressions_repo_fp_idx` ON `suppressions` (`repo_id`,`fingerprint`);"
     ]
+  },
+  {
+    "tag": "0001_tidy_whistler",
+    "statements": [
+      "ALTER TABLE `shards` ADD `cached_tokens` integer;"
+    ]
   }
 ];

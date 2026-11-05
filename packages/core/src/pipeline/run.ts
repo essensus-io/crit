@@ -2,13 +2,17 @@ import { createHash } from "node:crypto";
 import { basename } from "node:path";
 import { type RuleView, type SessionHandler, startSessionHost } from "@crit/mcp";
 import {
+  addUsage,
   type AgentTask,
+  effectiveTokens,
+  emptyUsage,
   type Finding,
   type FindingInput,
   FindingInput as FindingInputSchema,
   type Fix,
   newId,
   type ProviderProfile,
+  type Repo,
   type ResolvedConfig,
   type ResolvedScope,
   type Review,
@@ -16,6 +20,7 @@ import {
   type ScopeSpec,
   type Shard,
   SkepticResult,
+  type TokenUsage,
 } from "@crit/schema";
 import type { Repositories } from "@crit/store";
 import { z } from "zod";
@@ -36,7 +41,7 @@ import {
   SKEPTIC_SYSTEM,
   skepticPrompt,
 } from "./prompts.ts";
-import { depthProfile, estimateDurationMs, planRuns } from "./shards.ts";
+import { depthProfile, estimateDurationMs, type PlannedRun, planRuns } from "./shards.ts";
 
 export type ProviderRun = { profile: ProviderProfile; adapter: AgentRunner };
 
@@ -63,14 +68,21 @@ export type ReviewOptions = {
   signal?: AbortSignal;
   onEvent?: (e: ReviewEvent) => void;
   /** Called with the plan before running; return false to cancel. Core never prompts by itself. */
-  confirm?: (plan: {
-    shards: Shard[];
-    estimateMs: number;
-    scope: ResolvedScope;
-  }) => Promise<boolean>;
+  confirm?: (plan: ReviewPlan) => Promise<boolean>;
   /** Cap on waiting for a rate limit to reset before giving up on a shard. */
   maxRateLimitWaitMs?: number;
   now?: () => number;
+};
+
+/** What a review is about to do and cost, shown before it starts. */
+export type ReviewPlan = {
+  shards: Shard[];
+  estimateMs: number;
+  /** Effective tokens (fresh input + output + cached/10), from past runs' observed ratio. */
+  estimatedTokens: number;
+  /** Files answered from the cache, which cost nothing. */
+  cachedFiles: number;
+  scope: ResolvedScope;
 };
 
 export type ReviewResult = {
@@ -88,7 +100,13 @@ const sleep = (ms: number, signal: AbortSignal) =>
     signal.addEventListener("abort", () => (clearTimeout(t), resolve()), { once: true });
   });
 
-const CachedShard = z.object({ findings: z.array(z.any()), summary: z.string().nullable() });
+const CachedFile = z.object({ findings: z.array(z.any()) });
+
+/** A cached finding keeps its skeptic verdict, so a re-run does not pay for the skeptic again. */
+type CachedFinding = FindingInput & {
+  verdict?: Finding["verdict"];
+  verdictReason?: string;
+};
 const ReviewJson = z.object({ findings: z.array(z.unknown()), summary: z.string().default("") });
 const SkepticJson = z.object({ results: z.array(SkepticResult) });
 
@@ -96,19 +114,33 @@ class CancelledError extends Error {
   override name = "CancelledError";
 }
 
-/**
- * Run a full review: resolve scope → plan shards → build context → run
- * reviewers → collect findings → merge and dedupe → verify. Emits events as it
- * goes and persists everything through the store's repositories.
- */
-export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
-  const now = opts.now ?? Date.now;
-  const signal = opts.signal ?? new AbortController().signal;
-  const emit = (e: ReviewEvent) => opts.onEvent?.(e);
-  const { store, config } = opts;
-  const started = now();
+/** First guess at effective tokens per estimated file token, until real runs calibrate it. */
+export const DEFAULT_COST_RATIO = 3;
 
-  // 1. Resolve scope
+export type Prepared = {
+  scope: ResolvedScope;
+  repo: Repo;
+  rules: RuleSet;
+  ruleById: Map<string, RuleSet["all"][number]>;
+  rulesHash: string;
+  /** Findings of files whose review is still valid (same content, rules, provider, model, depth). */
+  cached: Map<string, CachedFinding[]>;
+  /** The scope minus cached files: what actually gets reviewed. */
+  toReview: ResolvedScope;
+  runs: PlannedRun[];
+  ratio: number;
+  estimatedTokens: number;
+};
+
+const fileCacheKey = (parts: unknown[]) => `file:${sha(JSON.stringify(["v1", ...parts]))}`;
+
+/**
+ * Everything a review decides before spending tokens: scope, rules, which files
+ * the cache already answers, the runs for the rest, and what they should cost.
+ * `crit review --dry-run` and the confirmation both use this.
+ */
+export async function prepareReview(opts: ReviewOptions): Promise<Prepared> {
+  const { store, config } = opts;
   const scope = await resolveScope({
     cwd: opts.cwd,
     spec: opts.spec,
@@ -120,8 +152,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     remoteUrl: await remoteUrl(scope.root),
     name: basename(scope.root),
   });
-
-  // Rules
   const files =
     opts.ruleFiles ??
     (await discoverRules({
@@ -147,8 +177,88 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
       set: (h, v) => store.kv.set(`rule-tag:${h}`, v ? "1" : "0"),
     },
   });
-  const rulesHash = sha(rules.all.map((r) => `${r.id}:${r.hash}`).join("\n"));
+  // Rule contents, not their per-run ids, so renumbering does not invalidate the cache.
+  const rulesHash = sha(
+    rules.all
+      .map((r) => r.hash)
+      .sort()
+      .join("\n"),
+  );
   const ruleById = new Map([...rules.all].map((r) => [r.id, r]));
+
+  const cached = new Map<string, CachedFinding[]>();
+  if (opts.useCache !== false) {
+    const profile = depthProfile(config);
+    for (const f of scope.files) {
+      if (f.status === "deleted") continue;
+      const key = fileCacheKey([
+        f.path,
+        sha((await readAtRevision(scope, f.path)) ?? ""),
+        f.hunks ?? null,
+        rulesHash,
+        profile.lenses,
+        opts.provider.profile.type,
+        opts.provider.profile.name,
+        opts.provider.profile.model,
+      ]);
+      const hit = await store.cache.get(key);
+      const parsed = hit ? CachedFile.safeParse(JSON.parse(hit.value)) : undefined;
+      if (parsed?.success) cached.set(f.path, parsed.data.findings as CachedFinding[]);
+    }
+  }
+  const toReview = { ...scope, files: scope.files.filter((f) => !cached.has(f.path)) };
+  const runs = planRuns(toReview, config);
+  const stored = Number(await store.kv.get(`cost-ratio:${opts.provider.profile.type}`));
+  const ratio = Number.isFinite(stored) && stored > 0 ? stored : DEFAULT_COST_RATIO;
+  const estimatedTokens = Math.round(runs.reduce((n, r) => n + r.estimatedTokens, 0) * ratio);
+  return {
+    scope,
+    repo,
+    rules,
+    ruleById,
+    rulesHash,
+    cached,
+    toReview,
+    runs,
+    ratio,
+    estimatedTokens,
+  };
+}
+
+/** Cache key for one file's review under this run's settings. */
+export async function cacheKeyFor(
+  prep: Prepared,
+  opts: ReviewOptions,
+  path: string,
+): Promise<string> {
+  const f = prep.scope.files.find((x) => x.path === path);
+  return fileCacheKey([
+    path,
+    sha((await readAtRevision(prep.scope, path)) ?? ""),
+    f?.hunks ?? null,
+    prep.rulesHash,
+    depthProfile(opts.config).lenses,
+    opts.provider.profile.type,
+    opts.provider.profile.name,
+    opts.provider.profile.model,
+  ]);
+}
+
+/**
+ * Run a full review: resolve scope → plan shards → build context → run
+ * reviewers → collect findings → merge and dedupe → verify. Emits events as it
+ * goes and persists everything through the store's repositories.
+ */
+export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
+  const now = opts.now ?? Date.now;
+  const userSignal = opts.signal ?? new AbortController().signal;
+  const emit = (e: ReviewEvent) => opts.onEvent?.(e);
+  const { store, config } = opts;
+  const started = now();
+
+  // 1. Scope, rules, cache and the plan
+  const prep = await prepareReview(opts);
+  const { scope, repo, rules, ruleById } = prep;
 
   let review: Review = await store.reviews.create({
     id: newId(now()),
@@ -205,9 +315,14 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     return review;
   };
 
+  // Stopping early: `stop` ends in-flight runs (budget); `stopReason` also holds back queued ones.
+  const stop = new AbortController();
+  const signal = AbortSignal.any([userSignal, stop.signal]);
+  let stopReason: "budget" | "rate-limit" | undefined;
+
   try {
-    // 2. Plan shards (× lens groups)
-    const shards: Shard[] = planRuns(scope, config).map((p) => ({
+    // 2. Shards for the files the cache did not answer
+    const shards: Shard[] = prep.runs.map((p) => ({
       id: newId(now()),
       reviewId: review.id,
       label: p.label,
@@ -216,6 +331,7 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
       status: "queued" as const,
       estimatedTokens: p.estimatedTokens,
       inputTokens: null,
+      cachedTokens: null,
       outputTokens: null,
       durationMs: null,
       agentSessionId: null,
@@ -231,44 +347,18 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     const estimateMs = estimateDurationMs(shards.length, config.concurrency);
     for (const s of shards) await store.shards.create(s);
     emit({ type: "plan", shards, estimateMs });
-    if (shards.length === 0) {
-      const r = await finishReview("completed", "Nothing to review in this scope.");
-      emit({ type: "review-done", reviewId: r.id, findings: [], durationMs: now() - started });
-      return { review: r, findings: [], shards, rules, scope };
-    }
-    if (opts.confirm && !(await opts.confirm({ shards, estimateMs, scope })))
+    if (
+      opts.confirm &&
+      !(await opts.confirm({
+        shards,
+        estimateMs,
+        estimatedTokens: prep.estimatedTokens,
+        cachedFiles: prep.cached.size,
+        scope,
+      }))
+    )
       throw new CancelledError("cancelled before start");
 
-    // 3. Map pass for whole-project reviews (cached per commit)
-    let repoSummary: string | undefined;
-    if (opts.spec.kind === "project") {
-      const key = `map:${repo.id}:${scope.headSha ?? "none"}`;
-      repoSummary = await store.kv.get(key);
-      if (!repoSummary) {
-        const out = await runAgent(
-          opts.provider.adapter,
-          {
-            kind: "map",
-            cwd: scope.root,
-            systemPrompt: MAP_SYSTEM,
-            prompt: mapPrompt(scope.files.map((f) => f.path)),
-            timeoutMs: config.review.timeoutMinutes * 60_000,
-            ...modelOf(opts.provider),
-          },
-          signal,
-        );
-        if (out.ok && out.message) {
-          repoSummary = out.message.trim();
-          await store.kv.set(key, repoSummary);
-        } else
-          emit({
-            type: "warning",
-            message: `repo map pass failed: ${out.errors.join("; ") || `exit ${out.exitCode}`}`,
-          });
-      }
-    }
-
-    // 4–5. Run reviewers and collect findings
     const suppressed = new Set((await store.suppressions.list(repo.id)).map((s) => s.fingerprint));
     const baseIntake = new Intake({
       scope,
@@ -277,7 +367,7 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
       severityThreshold: config.severityThreshold,
     });
     const persist = async (
-      shard: Shard,
+      shardId: string | undefined,
       r: Extract<Awaited<ReturnType<Intake["check"]>>, { accepted: true }>,
     ) => {
       if (r.dropped) return undefined;
@@ -286,7 +376,7 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
         ...rest,
         id: newId(now()),
         reviewId: review.id,
-        shardId: shard.id,
+        ...(shardId ? { shardId } : {}),
         fingerprint: r.fingerprint,
         status: "open",
         selected: false,
@@ -311,6 +401,78 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
       return finding;
     };
 
+    // Files answered by the cache: replay their findings, validated against today's code.
+    const reviewedOk = new Set<string>();
+    let replayed = 0;
+    for (const [path, list] of prep.cached) {
+      const intake = baseIntake.restrictTo([path]);
+      for (const { verdict, verdictReason, ...f } of list) {
+        const r = await intake.check(f, { allowRetry: false });
+        const saved = r.accepted ? await persist(undefined, r) : undefined;
+        if (!saved) continue;
+        replayed++;
+        if (verdict)
+          await store.findings.update(saved.id, {
+            verdict,
+            ...(verdictReason ? { verdictReason } : {}),
+          });
+      }
+    }
+    if (prep.cached.size > 0) emit({ type: "cache", files: prep.cached.size, findings: replayed });
+
+    // Token accounting: effective tokens against budget.maxTokens.
+    const maxTokens = config.budget.maxTokens;
+    let finishedSpend = 0;
+    const live = new Map<string, number>();
+    const spent = () => finishedSpend + [...live.values()].reduce((a, b) => a + b, 0);
+    let lastReported = -1;
+    const report_usage = (task: "review" | "skeptic" | "map") => {
+      const now_ = spent();
+      if (now_ === lastReported) return;
+      lastReported = now_;
+      emit({ type: "usage", task, spent: now_, budget: maxTokens });
+    };
+    const checkBudget = () => {
+      if (stopReason || spent() < maxTokens) return;
+      stopReason = "budget";
+      emit({ type: "budget-stop", spent: spent(), limit: maxTokens });
+      stop.abort();
+    };
+
+    // 3. Map pass for whole-project reviews (fast model, cached per repo for a week)
+    let repoSummary: string | undefined;
+    if (opts.spec.kind === "project" && shards.length > 0) {
+      const key = `map:${repo.id}`;
+      const hit = await store.kv.get(key);
+      const fresh = hit ? (JSON.parse(hit) as { at: number; text: string }) : undefined;
+      if (fresh && now() - fresh.at < 7 * 86_400_000) repoSummary = fresh.text;
+      else {
+        const out = await runAgent(
+          opts.provider.adapter,
+          {
+            kind: "map",
+            cwd: scope.root,
+            systemPrompt: MAP_SYSTEM,
+            prompt: mapPrompt(scope.files.map((f) => f.path)),
+            timeoutMs: config.review.timeoutMinutes * 60_000,
+            ...modelOf(opts.provider, "fast"),
+          },
+          signal,
+        );
+        finishedSpend += effectiveTokens(out);
+        report_usage("map");
+        if (out.ok && out.message) {
+          repoSummary = out.message.trim();
+          await store.kv.set(key, JSON.stringify({ at: now(), text: repoSummary }));
+        } else
+          emit({
+            type: "warning",
+            message: `repo map pass failed: ${out.errors.join("; ") || `exit ${out.exitCode}`}`,
+          });
+      }
+    }
+
+    // 4–5. Run reviewers and collect findings
     const runShard = async (shard: Shard): Promise<Shard> => {
       if (signal.aborted) return store.shards.update(shard.id, { status: "cancelled" });
       const t0 = now();
@@ -318,37 +480,7 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
       await store.shards.update(shard.id, { status: "running" });
       const intake = baseIntake.restrictTo(shard.files);
       const accepted: FindingInput[] = [];
-
-      // Cache: (content hashes, rules hash, lenses, provider, model)
-      const contents = await Promise.all(
-        shard.files.map(async (f) => `${f}:${sha((await readAtRevision(scope, f)) ?? "")}`),
-      );
-      const cacheKey = sha(
-        JSON.stringify([
-          contents,
-          rulesHash,
-          shard.lenses,
-          opts.provider.profile.type,
-          opts.provider.profile.name,
-          opts.provider.profile.model,
-          scope.spec.kind,
-        ]),
-      );
-      if (opts.useCache !== false) {
-        const hit = await store.cache.get(cacheKey);
-        const parsed = hit ? CachedShard.safeParse(JSON.parse(hit.value)) : undefined;
-        if (parsed?.success) {
-          for (const f of parsed.data.findings as FindingInput[]) {
-            const r = await intake.check(f, { allowRetry: false });
-            if (r.accepted) await persist(shard, r);
-          }
-          return store.shards.update(shard.id, {
-            status: "cached",
-            summary: parsed.data.summary,
-            durationMs: now() - t0,
-          });
-        }
-      }
+      let toolCalls = 0;
 
       let summary: string | null = null;
       const report = async (raw: FindingInput, allowRetry: boolean) => {
@@ -358,7 +490,7 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
           return { accepted: false as const, errors: r.errors };
         }
         accepted.push(r.finding);
-        const f = await persist(shard, r);
+        const f = await persist(shard.id, r);
         return {
           accepted: true as const,
           id: f?.id ?? "suppressed",
@@ -367,27 +499,35 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
       };
 
       const handler: SessionHandler = {
-        getScope: async () => ({
-          label: scope.label,
-          files: scope.files
-            .filter((f) => shard.files.includes(f.path))
-            .map((f) => ({
-              path: f.path,
-              status: f.status,
-              ...(f.hunks ? { hunks: f.hunks } : {}),
-            })),
-          notes: scope.diff
-            ? "Report on the changed lines of these files."
-            : "Report on any line of these files.",
-        }),
+        getScope: async () => {
+          toolCalls++;
+          return {
+            label: scope.label,
+            files: scope.files
+              .filter((f) => shard.files.includes(f.path))
+              .map((f) => ({
+                path: f.path,
+                status: f.status,
+                ...(f.hunks ? { hunks: f.hunks } : {}),
+              })),
+            notes: scope.diff
+              ? "Report on the changed lines of these files."
+              : "Report on any line of these files.",
+          };
+        },
         getRules: async (ids) => {
+          toolCalls++;
           const pool = [...rules.listed, ...rules.native, ...rules.attached, ...rules.skills];
           return pool
             .filter((r) => !ids || ids.includes(r.id))
             .map((r): RuleView => ({ id: r.id, title: r.title, path: r.path, body: r.body }));
         },
-        reportFinding: (f) => report(f, true),
+        reportFinding: (f) => {
+          toolCalls++;
+          return report(f, true);
+        },
         finish: async (input) => {
+          toolCalls++;
           summary = input.coverage
             ? `${input.summary}\n\nNot covered: ${input.coverage}`
             : input.summary;
@@ -397,15 +537,19 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
 
       const useMcp = opts.provider.adapter.capabilities.mcp;
       const host = useMcp ? await startSessionHost({ handler, dir: opts.sessionsDir }) : undefined;
+      const contents = new Map<string, string>();
+      if (scope.diff === undefined)
+        for (const f of shard.files) contents.set(f, (await readAtRevision(scope, f)) ?? "");
       const task: AgentTask = {
         kind: "review",
         cwd: scope.root,
-        systemPrompt: reviewSystemPrompt({ mcp: useMcp }),
+        systemPrompt: reviewSystemPrompt({ mcp: useMcp, diff: scope.diff !== undefined }),
         prompt: reviewPrompt({
           scope,
           files: shard.files,
           lenses: shard.lenses,
           rules,
+          contents,
           ...(repoSummary ? { repoSummary } : {}),
         }),
         timeoutMs: config.review.timeoutMinutes * 60_000,
@@ -430,6 +574,11 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
           out = await runAgent(opts.provider.adapter, task, signal, (e) => {
             if (e.type === "progress")
               emit({ type: "shard-progress", shardId: shard.id, text: e.text });
+            if (e.type === "usage") {
+              live.set(shard.id, effectiveTokens(e));
+              report_usage("review");
+              checkBudget();
+            }
           });
           if (!out.rateLimited || signal.aborted) break;
           const wait = Math.min(out.rateLimited.retryAfterMs ?? 30_000, maxWait);
@@ -451,6 +600,7 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
               ...again,
               inputTokens: out.inputTokens + again.inputTokens,
               outputTokens: out.outputTokens + again.outputTokens,
+              cachedInputTokens: out.cachedInputTokens + again.cachedInputTokens,
             };
           }
           if (parsed.ok) {
@@ -471,34 +621,68 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
         await host?.close();
       }
 
+      // An agent that exits cleanly without ever calling crit's tools reported nothing; that is
+      // not "no findings". Treat it as a failure so it is neither cached nor shown as clean.
+      const silent = useMcp && !!out?.ok && toolCalls === 0 && !signal.aborted;
+      if (silent)
+        emit({
+          type: "warning",
+          message: `${shard.label}: the agent finished without calling crit's tools, so nothing was recorded (run crit doctor)`,
+        });
+      const rateLimited = out?.rateLimited !== undefined;
+      if (rateLimited && !stopReason) stopReason = "rate-limit";
       const failed =
         !out ||
         signal.aborted ||
-        out.rateLimited !== undefined ||
+        silent ||
+        rateLimited ||
         out.exitCode !== 0 ||
         (out.errors.length > 0 && accepted.length === 0);
       const status: Shard["status"] = signal.aborted ? "cancelled" : failed ? "failed" : "done";
+      const spend = out ? effectiveTokens(out) : 0;
+      live.delete(shard.id);
+      finishedSpend += spend;
+      report_usage("review");
       const updated = await store.shards.update(shard.id, {
         status,
         summary,
         inputTokens: out?.inputTokens ?? null,
+        cachedTokens: out?.cachedInputTokens ?? null,
         outputTokens: out?.outputTokens ?? null,
         durationMs: now() - t0,
         agentSessionId: out?.sessionId ?? null,
         error: failed
-          ? out?.rateLimited
-            ? "rate limited; re-run to resume"
-            : out?.errors.join("; ") || `agent exited with code ${out?.exitCode}`
+          ? userSignal.aborted
+            ? null
+            : stopReason === "budget" && signal.aborted
+              ? "stopped: token budget reached"
+              : silent
+                ? "the agent never called crit's tools"
+                : rateLimited
+                  ? "rate limited; re-run to resume"
+                  : out?.errors.join("; ") || `agent exited with code ${out?.exitCode}`
           : null,
       });
-      if (status === "done" && opts.useCache !== false) {
-        await store.cache.put({
-          key: cacheKey,
-          reviewId: review.id,
-          value: JSON.stringify({ findings: accepted, summary }),
-          transcriptPath: null,
-        });
+      if (status === "done") {
+        for (const file of shard.files) reviewedOk.add(file);
+        if (opts.useCache !== false) {
+          for (const file of shard.files) {
+            await store.cache.put({
+              key: await cacheKeyFor(prep, opts, file),
+              reviewId: review.id,
+              value: JSON.stringify({ findings: accepted.filter((f) => f.file === file) }),
+              transcriptPath: null,
+            });
+          }
+        }
+        // Learn how many effective tokens a file token really costs on this provider.
+        if (shard.estimatedTokens > 0 && spend > 0) {
+          const key = `cost-ratio:${opts.provider.profile.type}`;
+          const next = Math.min(30, Math.max(0.5, spend / shard.estimatedTokens));
+          await store.kv.set(key, String(Math.round((0.5 * prep.ratio + 0.5 * next) * 100) / 100));
+        }
       }
+      checkBudget();
       return updated;
     };
 
@@ -506,7 +690,7 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     const queue = [...shards];
     await Promise.all(
       Array.from({ length: Math.min(config.concurrency, queue.length) }, async () => {
-        while (queue.length) {
+        while (queue.length && !stopReason && !signal.aborted) {
           const s = queue.shift()!;
           const r = await runShard(s);
           done.push(r);
@@ -514,7 +698,7 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
         }
       }),
     );
-    if (signal.aborted) throw new CancelledError("cancelled");
+    if (userSignal.aborted) throw new CancelledError("cancelled");
 
     // 6. Merge and dedupe
     const all = await store.findings.listByReview(review.id);
@@ -533,10 +717,19 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     const mode = depthProfile(config).skeptic;
     const skeptic =
       mode === "off" ? null : opts.skeptic === undefined ? opts.provider : opts.skeptic;
-    const toCheck = findings.filter((f) => mode === "all" || f.severity !== "nit");
-    if (skeptic && toCheck.length > 0) {
+    const toCheck = findings.filter(
+      (f) => f.verdict === undefined && (mode === "all" || f.severity !== "nit"),
+    );
+    if (skeptic && toCheck.length > 0 && stopReason === "budget")
+      emit({ type: "warning", message: "skeptic skipped: token budget reached" });
+    else if (skeptic && toCheck.length > 0) {
       emit({ type: "verify-started", count: toCheck.length });
-      const verdicts = await verify(toCheck, skeptic, scope, config, signal);
+      const verdicts = await verify(toCheck, skeptic, scope, config, userSignal, {
+        fast: mode !== "all",
+      });
+      finishedSpend += effectiveTokens(verdicts.usage);
+      report_usage("skeptic");
+      await store.events.append(review.id, "usage", { task: "skeptic", ...verdicts.usage });
       for (const w of verdicts.warnings) emit({ type: "warning", message: w });
       for (const f of toCheck) {
         const v = verdicts.results.get(f.id);
@@ -557,9 +750,42 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     }
     findings = await store.findings.listByReview(review.id);
 
+    // Re-save what we just reviewed with verdicts and merged fixes, so the next run reuses them.
+    if (opts.useCache !== false) {
+      for (const file of reviewedOk) {
+        const entries: CachedFinding[] = [];
+        for (const f of findings.filter((x) => x.file === file)) {
+          const fix = await store.fixes.active(f.id);
+          const {
+            id: _i,
+            reviewId: _r,
+            shardId: _s,
+            fingerprint: _f,
+            status: _st,
+            selected: _se,
+            mergedFrom: _m,
+            groupId: _g,
+            createdAt: _c,
+            dismissReason: _d,
+            ...input
+          } = f;
+          entries.push({
+            ...input,
+            ...(fix?.author === "ai" ? { fix: { summary: fix.summary, patch: fix.patch } } : {}),
+          });
+        }
+        await store.cache.put({
+          key: await cacheKeyFor(prep, opts, file),
+          reviewId: review.id,
+          value: JSON.stringify({ findings: entries }),
+          transcriptPath: null,
+        });
+      }
+    }
+
     const failedShards = done.filter((s) => s.status === "failed");
     const summaries = done.map((s) => s.summary).filter((s): s is string => Boolean(s));
-    if (failedShards.length === done.length) {
+    if (failedShards.length === done.length && done.length > 0 && !stopReason) {
       throw new Error(
         `crit: every shard failed: ${failedShards
           .map((s) => s.error)
@@ -569,11 +795,32 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     }
     for (const s of failedShards)
       emit({ type: "warning", message: `shard ${s.label} failed: ${s.error}` });
-    const r = await finishReview("completed", summaries.join("\n\n") || null);
-    emit({ type: "review-done", reviewId: r.id, findings, durationMs: now() - started });
+    const ran = done.filter((s) => s.status === "done").length;
+    const partial = stopReason
+      ? stopReason === "budget"
+        ? `Stopped at the ${config.budget.maxTokens.toLocaleString("en-US")}-token budget after ${ran} of ${shards.length} runs. Findings so far are kept; run again to resume (finished files are cached), or raise the budget with --budget.`
+        : `Stopped early because the provider is rate limited, after ${ran} of ${shards.length} runs. Findings so far are kept; run again later to resume (finished files are cached).`
+      : undefined;
+    const r = await finishReview(
+      partial ? "partial" : "completed",
+      partial ??
+        (summaries.join("\n\n") ||
+          (shards.length === 0
+            ? prep.cached.size > 0
+              ? `All ${prep.cached.size} files are unchanged since their last review; results come from the cache.`
+              : "Nothing to review in this scope."
+            : null)),
+    );
+    emit({
+      type: "review-done",
+      reviewId: r.id,
+      findings,
+      durationMs: now() - started,
+      ...(partial ? { partial } : {}),
+    });
     return { review: r, findings, shards: await store.shards.listByReview(r.id), rules, scope };
   } catch (err) {
-    const cancelled = err instanceof CancelledError || signal.aborted;
+    const cancelled = err instanceof CancelledError || userSignal.aborted;
     const message = (err as Error).message;
     await finishReview(cancelled ? "cancelled" : "failed", cancelled ? "Cancelled." : message);
     emit({ type: "review-failed", reviewId: review.id, error: message });
@@ -581,8 +828,11 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
   }
 }
 
-const modelOf = (p: ProviderRun): { model?: string } =>
-  p.profile.model ? { model: p.profile.model } : {};
+/** The model for a task: `fast` tasks (skeptic, map, drafts) use the profile's cheaper model when set. */
+const modelOf = (p: ProviderRun, kind: "main" | "fast" = "main"): { model?: string } => {
+  const model = (kind === "fast" && p.profile.fastModel) || p.profile.model;
+  return model ? { model } : {};
+};
 
 /** Skeptic pass: confirmed / plausible / rejected per finding, in chunks, with one repair round. */
 export async function verify(
@@ -591,10 +841,12 @@ export async function verify(
   scope: ResolvedScope,
   config: Pick<ResolvedConfig, "review">,
   signal: AbortSignal,
-  chunkSize = 15,
-): Promise<{ results: Map<string, SkepticResult>; warnings: string[] }> {
+  opts: { fast?: boolean; chunkSize?: number } = {},
+): Promise<{ results: Map<string, SkepticResult>; warnings: string[]; usage: TokenUsage }> {
+  const chunkSize = opts.chunkSize ?? 15;
   const results = new Map<string, SkepticResult>();
   const warnings: string[] = [];
+  let usage = emptyUsage();
   for (let i = 0; i < findings.length; i += chunkSize) {
     const chunk = findings.slice(i, i + chunkSize);
     const items = await Promise.all(
@@ -609,9 +861,10 @@ export async function verify(
       systemPrompt: SKEPTIC_SYSTEM,
       prompt: skepticPrompt(items),
       timeoutMs: config.review.timeoutMinutes * 60_000,
-      ...modelOf(skeptic),
+      ...modelOf(skeptic, opts.fast ? "fast" : "main"),
     };
     let out = await runAgent(skeptic.adapter, task, signal);
+    usage = addUsage(usage, out);
     let parsed = parseJsonReply(out.message ?? "", SkepticJson);
     if (!parsed.ok && out.exitCode === 0) {
       out = await runAgent(
@@ -619,6 +872,7 @@ export async function verify(
         { ...task, prompt: `${task.prompt}\n\n${repairPrompt(parsed.error)}` },
         signal,
       );
+      usage = addUsage(usage, out);
       parsed = parseJsonReply(out.message ?? "", SkepticJson);
     }
     if (!parsed.ok) {
@@ -638,7 +892,7 @@ export async function verify(
         });
     }
   }
-  return { results, warnings };
+  return { results, warnings, usage };
 }
 
 /** Re-locate old findings in the current code; findings whose code is gone are closed. */

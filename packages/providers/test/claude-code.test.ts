@@ -48,7 +48,9 @@ const profile: ProviderProfile = {
 
 describe("Claude Code stream-json contract (recorded transcripts)", () => {
   it("maps a review run with MCP tool calls to AgentEvents", () => {
-    const events = replay("review.jsonl");
+    const all = replay("review.jsonl");
+    // Running usage (one per API call) is checked separately; the rest is the contract.
+    const events = all.filter((e) => !(e.type === "usage" && e.partial));
     expect(events.map((e) => e.type)).toEqual([
       "session",
       "tool",
@@ -63,6 +65,18 @@ describe("Claude Code stream-json contract (recorded transcripts)", () => {
     ]);
     expect(events[1]).toEqual({ type: "tool", name: "Read" });
     expect(events[2]).toEqual({ type: "progress", text: "reading refund.ts" });
+    const partials = all.filter(
+      (e): e is Extract<AgentEvent, { type: "usage" }> => e.type === "usage" && e.partial === true,
+    );
+    expect(partials.length).toBeGreaterThan(2);
+    // cumulative: output never goes down, and the final figure matches the last running one
+    const outs = partials.map((e) => e.outputTokens ?? 0);
+    expect(outs).toEqual([...outs].sort((a, b) => a - b));
+    const final = events.find((e) => e.type === "usage") as Extract<AgentEvent, { type: "usage" }>;
+    expect(final.partial).toBeUndefined();
+    expect(final.cachedInputTokens).toBeGreaterThan(0);
+    // streamed per-message output counts are provisional; the final result is authoritative
+    expect(final.outputTokens).toBeGreaterThanOrEqual(partials.at(-1)!.outputTokens ?? 0);
     expect(
       events.filter((e) => e.type === "tool").map((e) => (e as { name: string }).name),
     ).toEqual(["Read", "mcp__crit__get_scope", "mcp__crit__report_finding", "mcp__crit__finish"]);

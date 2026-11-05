@@ -163,8 +163,10 @@ export class CodexStreamParser {
         if (u)
           out.push({
             type: "usage",
-            inputTokens: u.input_tokens ?? 0,
+            // Codex counts cached tokens inside input_tokens.
+            inputTokens: Math.max(0, (u.input_tokens ?? 0) - (u.cached_input_tokens ?? 0)),
             outputTokens: (u.output_tokens ?? 0) + (u.reasoning_output_tokens ?? 0),
+            cachedInputTokens: u.cached_input_tokens ?? 0,
           });
         if (this.lastMessage !== undefined) out.push({ type: "message", text: this.lastMessage });
         break;

@@ -28,10 +28,26 @@ export type ReviewEvent =
   | { type: "shard-done"; shard: Shard }
   | { type: "rate-limited"; shardId: string; retryAfterMs?: number }
   | { type: "budget-exceeded"; required: number; limit: number }
+  | {
+      type: "usage";
+      task: "review" | "skeptic" | "map";
+      /** Effective tokens spent so far in this review, and the budget it stops at. */
+      spent: number;
+      budget: number;
+    }
+  | { type: "cache"; files: number; findings: number }
+  | { type: "budget-stop"; spent: number; limit: number }
   | { type: "verify-started"; count: number }
   | { type: "verified"; result: SkepticResult }
   | { type: "warning"; message: string }
-  | { type: "review-done"; reviewId: string; findings: Finding[]; durationMs: number }
+  | {
+      type: "review-done";
+      reviewId: string;
+      findings: Finding[];
+      durationMs: number;
+      /** Why the review stopped early, if it did. */
+      partial?: string;
+    }
   | { type: "review-failed"; reviewId: string; error: string };
 
 export type ReviewEventListener = (event: ReviewEvent) => void;

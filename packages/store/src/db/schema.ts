@@ -64,6 +64,7 @@ export const shards = sqliteTable(
     status: text("status").notNull(),
     estimatedTokens: integer("estimated_tokens").notNull(),
     inputTokens: integer("input_tokens"),
+    cachedTokens: integer("cached_tokens"),
     outputTokens: integer("output_tokens"),
     durationMs: integer("duration_ms"),
     agentSessionId: text("agent_session_id"),

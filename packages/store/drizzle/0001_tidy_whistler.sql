@@ -1,0 +1,1 @@
+ALTER TABLE `shards` ADD `cached_tokens` integer;

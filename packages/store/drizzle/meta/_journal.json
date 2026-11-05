@@ -8,6 +8,13 @@
       "when": 1793800152222,
       "tag": "0000_public_night_thrasher",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793880839160,
+      "tag": "0001_tidy_whistler",
+      "breakpoints": true
     }
   ]
 }

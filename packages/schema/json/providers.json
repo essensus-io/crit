@@ -47,6 +47,18 @@
               "null"
             ]
           },
+          "effort": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fastModel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "enabled": {
             "default": true,
             "type": "boolean"

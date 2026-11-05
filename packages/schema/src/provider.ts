@@ -16,6 +16,10 @@ export const ProviderProfile = z.object({
   command: z.string().min(1),
   /** null = the CLI's own default model. */
   model: z.string().nullable().default(null),
+  /** Reasoning effort (low, medium, high, xhigh, max); null = the CLI's own default. */
+  effort: z.string().nullable().optional(),
+  /** Cheaper model for the skeptic, repo map and draft tasks; null = use `model`. */
+  fastModel: z.string().nullable().optional(),
   enabled: z.boolean().default(true),
 });
 export type ProviderProfile = z.infer<typeof ProviderProfile>;

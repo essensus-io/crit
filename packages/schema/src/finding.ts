@@ -54,6 +54,10 @@ export const FindingInput = z.object({
 export type FindingInput = z.infer<typeof FindingInput>;
 export type FindingInputRaw = z.input<typeof FindingInput>;
 
+/** Input of the `report_findings` MCP tool: several findings in one call. */
+export const FindingsInput = z.object({ findings: z.array(FindingInput).min(1) });
+export type FindingsInput = z.infer<typeof FindingsInput>;
+
 /** Skeptic verdict on a finding. */
 export const SkepticVerdict = z.enum(["confirmed", "plausible", "rejected"]);
 export type SkepticVerdict = z.infer<typeof SkepticVerdict>;

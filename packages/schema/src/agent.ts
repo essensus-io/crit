@@ -35,7 +35,16 @@ export type AgentEvent =
   | { type: "progress"; text: string }
   | { type: "tool"; name: string }
   | { type: "message"; text: string }
-  | { type: "usage"; inputTokens?: number; outputTokens?: number }
+  | {
+      type: "usage";
+      /** Fresh (uncached) input tokens. */
+      inputTokens?: number;
+      outputTokens?: number;
+      /** Input tokens served from the provider's prompt cache. */
+      cachedInputTokens?: number;
+      /** A cumulative running total for the run so far, superseded by the final usage event. */
+      partial?: boolean;
+    }
   | { type: "rate-limited"; retryAfterMs?: number }
   | { type: "session"; id: string }
   | { type: "error"; message: string }

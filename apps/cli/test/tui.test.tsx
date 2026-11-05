@@ -471,6 +471,7 @@ describe("run progress", () => {
     status: "queued",
     estimatedTokens: 1,
     inputTokens: null,
+    cachedTokens: null,
     outputTokens: null,
     durationMs: null,
     agentSessionId: null,

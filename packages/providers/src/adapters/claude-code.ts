@@ -93,7 +93,7 @@ type Line =
       session_id?: string;
       mcp_servers?: { name: string; status: string }[];
     }
-  | { type: "assistant"; message: { content: Block[] } }
+  | { type: "assistant"; message: { id?: string; content: Block[]; usage?: ClaudeUsage } }
   | { type: "user" }
   | {
       type: "rate_limit_event";
@@ -104,13 +104,22 @@ type Line =
       subtype: string;
       is_error?: boolean;
       result?: string;
-      usage?: {
-        input_tokens?: number;
-        cache_read_input_tokens?: number;
-        cache_creation_input_tokens?: number;
-        output_tokens?: number;
-      };
+      usage?: ClaudeUsage;
     };
+
+type ClaudeUsage = {
+  input_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+  output_tokens?: number;
+};
+
+/** Fresh input includes cache writes (billed above normal input); cache reads are the cached part. */
+const claudeUsage = (u: ClaudeUsage) => ({
+  inputTokens: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0),
+  outputTokens: u.output_tokens ?? 0,
+  cachedInputTokens: u.cache_read_input_tokens ?? 0,
+});
 
 const short = (s: string, n = 80) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
@@ -139,6 +148,7 @@ const NOT_LOGGED_IN =
 /** Turn Claude Code stream-json lines into AgentEvents. Stateful per run. */
 export class ClaudeStreamParser {
   private gotResult = false;
+  private readonly perMessage = new Map<string, ReturnType<typeof claudeUsage>>();
   readonly stderr: string[] = [];
 
   private readonly loginHint: string;
@@ -168,6 +178,21 @@ export class ClaudeStreamParser {
         }
         break;
       case "assistant":
+        // Each content block of one API call arrives as its own line with the same
+        // usage; keep the latest per message id and report the running total.
+        if (d.message?.usage) {
+          this.perMessage.set(
+            d.message.id ?? `m${this.perMessage.size}`,
+            claudeUsage(d.message.usage),
+          );
+          const total = { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 };
+          for (const m of this.perMessage.values()) {
+            total.inputTokens += m.inputTokens;
+            total.outputTokens += m.outputTokens;
+            total.cachedInputTokens += m.cachedInputTokens;
+          }
+          out.push({ type: "usage", partial: true, ...total });
+        }
         for (const b of d.message?.content ?? []) {
           if (b.type === "tool_use" && b.name) {
             out.push({ type: "tool", name: b.name });
@@ -191,14 +216,7 @@ export class ClaudeStreamParser {
         this.gotResult = true;
         const u = d.usage;
         if (u) {
-          out.push({
-            type: "usage",
-            inputTokens:
-              (u.input_tokens ?? 0) +
-              (u.cache_read_input_tokens ?? 0) +
-              (u.cache_creation_input_tokens ?? 0),
-            outputTokens: u.output_tokens ?? 0,
-          });
+          out.push({ type: "usage", ...claudeUsage(u) });
         }
         if (d.is_error || d.subtype !== "success") {
           const msg = d.result ?? d.subtype;

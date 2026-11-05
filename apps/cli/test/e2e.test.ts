@@ -197,6 +197,7 @@ describe("built CLI", () => {
         "get_scope",
         "get_rules",
         "report_finding",
+        "report_findings",
         "finish",
       ]);
       const r = await client.callTool({ name: "finish", arguments: { summary: "done" } });

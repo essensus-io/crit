@@ -408,7 +408,7 @@ describe("prompts", () => {
   });
 
   it("switches reporting instructions for MCP and JSON fallback", () => {
-    expect(reviewSystemPrompt({ mcp: true })).toContain("Call get_scope first");
+    expect(reviewSystemPrompt({ mcp: true })).toContain("ONE report_findings call");
     expect(reviewSystemPrompt({ mcp: false })).toContain(
       '{"findings": [<finding>, ...], "summary": "<one paragraph>"}',
     );

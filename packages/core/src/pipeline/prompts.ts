@@ -23,11 +23,16 @@ const SEVERITY_GUIDE = `Severity:
 - nit: small, optional improvement`;
 
 /** System prompt for reviewer runs (shared by every shard so it caches well). */
-export function reviewSystemPrompt(opts: { mcp: boolean }): string {
+export function reviewSystemPrompt(opts: { mcp: boolean; diff?: boolean }): string {
   return `You are crit, a careful senior code reviewer. You review code; you never change it.
 
 Ground rules:
-- You are read-only. Do not try to edit, write or create files. Read files, search, and run read-only git commands as needed.
+- You are read-only. Do not try to edit, write or create files. Search and run read-only git commands only when you need to check something.
+${
+  opts.diff
+    ? "- Review from the diff in the prompt. Open a file only to check a specific suspicion the diff raises; do not read files just to browse."
+    : "- The files under review are in the prompt with line numbers. Do not read them again. The line-number prefix is not part of the code: never include it in an anchor."
+}
 - Report only real, specific problems you can point to in the code. No praise, no summaries of what the code does, no speculative "consider" items without a concrete failure.
 - Each finding needs: the file and line range, an exact code excerpt as \`anchor\` (copied verbatim from the file at that range), what is wrong, how it fails (a concrete input or scenario), and a confidence from 0 to 1.
 - When a fix is clear, include it as a minimal unified diff against the current file contents, with headers \`--- a/<path>\` and \`+++ b/<path>\` and correct @@ hunk headers. Only change what the fix needs.
@@ -38,10 +43,10 @@ ${SEVERITY_GUIDE}
 
 ${
   opts.mcp
-    ? `How to report:
-1. Call get_scope first to see which files and lines you may report on.
-2. Call report_finding once per issue. If it returns errors, fix them and call it again.
-3. When done, call finish with a one-paragraph summary and anything you could not cover. Then stop.`
+    ? `How to report (every call resends your whole conversation, so use as few calls as you can):
+1. The scope is listed in the prompt; do not call get_scope.
+2. Collect all your findings, then report them together in ONE report_findings call. If it rejects some, fix and resend only those. (report_finding takes a single finding.)
+3. Then call finish once with a one-paragraph summary and anything you could not cover, and stop.`
     : `How to report:
 You cannot call crit tools in this run. When you are done, reply with ONLY a JSON object, no prose and no code fences:
 {"findings": [<finding>, ...], "summary": "<one paragraph>"}
@@ -53,6 +58,8 @@ const ruleBlock = (r: Rule) =>
   `### ${r.id} ${r.title}\nSource: ${r.path}${r.globs.length ? ` (applies to ${r.globs.join(", ")})` : ""}\n\n${r.body}`;
 
 export type ReviewPromptInput = {
+  /** File contents to inline (whole-file scopes), keyed by path. */
+  contents?: Map<string, string>;
   scope: ResolvedScope;
   files: string[];
   lenses: Lens[];
@@ -62,19 +69,58 @@ export type ReviewPromptInput = {
   diffBudgetChars?: number;
 };
 
-/** The per-shard prompt: scope, diff, rules and lenses. */
+/** Source with 1-based line numbers, for whole-file scopes. */
+function numbered(content: string): string {
+  const lines = content.split("\n");
+  if (lines.at(-1) === "") lines.pop();
+  const w = String(lines.length).length;
+  return lines.map((l, i) => `${String(i + 1).padStart(w)}  ${l}`).join("\n");
+}
+
+/**
+ * The per-shard prompt. Text that is the same for every shard (rules, skills,
+ * repo overview) comes first so the provider's prompt cache can reuse it; what
+ * differs per shard (scope, lenses, files, diff) comes last.
+ */
 export function reviewPrompt(i: ReviewPromptInput): string {
   const inShard = new Set(i.files);
   const parts: string[] = [];
   const isDiff = i.scope.diff !== undefined;
+
+  // Stable across shards
+  if (i.rules.attached.length) {
+    parts.push(`Review rules (cite by id):\n\n${i.rules.attached.map(ruleBlock).join("\n\n")}`);
+  }
+  const indexed = [...i.rules.listed, ...i.rules.native];
+  if (indexed.length) {
+    parts.push(
+      `More rules, listed by id only (call get_rules with their ids for the full text when relevant):\n${indexed
+        .map((r) => `- ${r.id} ${r.title} (${r.path})`)
+        .join("\n")}`,
+    );
+  }
+  const skills = i.rules.skills.filter((r) => r.layer !== "global");
+  if (skills.length) {
+    parts.push(
+      `Skills in this repo (open the file only when relevant):\n${skills
+        .map((r) => `- ${r.id} ${r.title}: ${r.description ?? ""} (${r.path})`)
+        .join("\n")}`,
+    );
+  }
+  if (i.rules.conflicts.length) {
+    parts.push(
+      `Rule conflicts (the first id wins): ${i.rules.conflicts.map((c) => `${c.winner} over ${c.ruleIds.filter((x) => x !== c.winner).join(", ")}`).join("; ")}`,
+    );
+  }
+  if (i.repoSummary) parts.push(`Repository overview:\n${i.repoSummary}`);
+
+  // Specific to this shard
   parts.push(
     `Review scope: ${i.scope.label}${i.scope.baseRef ? ` (base ${i.scope.baseRef})` : ""}.`,
   );
   parts.push(
     `Lenses for this run:\n${i.lenses.map((l) => `- ${l}: ${LENS_INSTRUCTIONS[l]}`).join("\n")}\nReport issues in these areas only.`,
   );
-  if (i.repoSummary) parts.push(`Repository overview:\n${i.repoSummary}`);
-
   const files = i.scope.files.filter((f) => inShard.has(f.path));
   const fileLines = files.map((f) => {
     const hunks = f.hunks?.length
@@ -107,30 +153,11 @@ export function reviewPrompt(i: ReviewPromptInput): string {
       parts.push(
         `Diff omitted for size (read these files and run git diff yourself): ${omitted.join(", ")}`,
       );
-  }
-
-  if (i.rules.attached.length) {
-    parts.push(`Review rules (cite by id):\n\n${i.rules.attached.map(ruleBlock).join("\n\n")}`);
-  }
-  const indexed = [...i.rules.listed, ...i.rules.native];
-  if (indexed.length) {
-    parts.push(
-      `More rules, listed by id only (call get_rules with their ids for the full text when relevant):\n${indexed
-        .map((r) => `- ${r.id} ${r.title} (${r.path})`)
-        .join("\n")}`,
-    );
-  }
-  if (i.rules.skills.length) {
-    parts.push(
-      `Skills in this repo (open the file only when relevant):\n${i.rules.skills
-        .map((r) => `- ${r.id} ${r.title}: ${r.description ?? ""} (${r.path})`)
-        .join("\n")}`,
-    );
-  }
-  if (i.rules.conflicts.length) {
-    parts.push(
-      `Rule conflicts (the first id wins): ${i.rules.conflicts.map((c) => `${c.winner} over ${c.ruleIds.filter((x) => x !== c.winner).join(", ")}`).join("; ")}`,
-    );
+  } else if (i.contents) {
+    const blocks = files
+      .filter((f) => i.contents!.has(f.path))
+      .map((f) => `### ${f.path}\n\`\`\`\n${numbered(i.contents!.get(f.path)!)}\n\`\`\``);
+    if (blocks.length) parts.push(`The files under review:\n\n${blocks.join("\n\n")}`);
   }
   return parts.join("\n\n");
 }

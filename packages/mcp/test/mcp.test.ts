@@ -66,13 +66,14 @@ async function connect(handler: SessionHandler) {
 const textOf = (r: unknown) => (r as { content: { text: string }[] }).content[0]!.text;
 
 describe("crit MCP server", () => {
-  it("lists the four tools with the finding schema", async () => {
+  it("lists the five tools with the finding schema", async () => {
     const client = await connect(fakeHandler().handler);
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name)).toEqual([
       "get_scope",
       "get_rules",
       "report_finding",
+      "report_findings",
       "finish",
     ]);
     const report = tools.find((t) => t.name === "report_finding")!;
@@ -96,6 +97,41 @@ describe("crit MCP server", () => {
     );
     const bad = await client.callTool({ name: "get_rules", arguments: { ids: "R1" } });
     expect(bad.isError).toBe(true);
+  });
+
+  it("records a batch: valid items are kept, invalid ones listed, nothing lost to one bad item", async () => {
+    const { handler, reported } = fakeHandler();
+    const client = await connect(handler);
+    const ok = await client.callTool({
+      name: "report_findings",
+      arguments: {
+        findings: [finding, { ...finding, severity: "blocker" }, { ...finding, title: "Second" }],
+      },
+    });
+    expect(ok.isError).toBeFalsy();
+    expect(textOf(ok)).toMatch(/^2 of 3 findings recorded\. Fix and resend the 1 rejected:/);
+    expect(textOf(ok)).toContain("#1 recorded as f1");
+    expect(textOf(ok)).toContain('#2 rejected:\n  - severity: must be one of "critical"');
+    expect(textOf(ok)).toContain("#3 recorded as f2");
+    expect(reported.map((f) => f.title)).toEqual([finding.title, "Second"]);
+
+    const none = await client.callTool({ name: "report_findings", arguments: { findings: [{}] } });
+    expect(none.isError).toBe(true);
+    expect(
+      (await client.callTool({ name: "report_findings", arguments: { findings: [] } })).isError,
+    ).toBe(true);
+    expect((await client.callTool({ name: "report_findings", arguments: {} })).isError).toBe(true);
+
+    const rejecting = await connect({
+      ...handler,
+      reportFinding: async () => ({ accepted: false, errors: ["not in scope"] }),
+    });
+    const r = await rejecting.callTool({
+      name: "report_findings",
+      arguments: { findings: [finding] },
+    });
+    expect(r.isError).toBe(true);
+    expect(textOf(r)).toContain("#1 rejected:\n  - not in scope");
   });
 
   it("records a valid finding", async () => {

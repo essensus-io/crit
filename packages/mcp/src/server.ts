@@ -34,7 +34,13 @@ export interface SessionHandler {
   finish(input: FinishInputT): Promise<{ ok: true }>;
 }
 
-export const TOOL_NAMES = ["get_scope", "get_rules", "report_finding", "finish"] as const;
+export const TOOL_NAMES = [
+  "get_scope",
+  "get_rules",
+  "report_finding",
+  "report_findings",
+  "finish",
+] as const;
 
 /** Turn Zod issues into lines an agent can act on: `range.end: Too small: expected …`. */
 export function formatIssues(error: z.ZodError): string[] {
@@ -84,6 +90,12 @@ function toolList() {
       description:
         "Report ONE review finding. Call once per issue. `anchor` must be an exact excerpt of the code at the range. `fix.patch` is a unified diff against the reviewed revision (paths a/<file> b/<file>). If the result lists errors, fix them and call again.",
       inputSchema: strip(schemas["finding.json"]!),
+    },
+    {
+      name: "report_findings",
+      description:
+        "Report ALL your findings in one call (preferred: every call resends the conversation, so batching saves tokens). Each item is validated on its own: accepted ones are recorded, rejected ones are listed with their errors; resend only the rejected ones.",
+      inputSchema: strip(schemas["findings.json"]!),
     },
     {
       name: "finish",
@@ -137,6 +149,35 @@ export function createCritMcpServer(
             ? `\nWarnings:\n- ${result.warnings.join("\n- ")}`
             : "";
           return text(`Recorded finding ${result.id}.${warn}`);
+        }
+        case "report_findings": {
+          const list = (args as { findings?: unknown }).findings;
+          if (!Array.isArray(list) || list.length === 0)
+            return text("findings: expected a non-empty array of findings", true);
+          const lines: string[] = [];
+          let accepted = 0;
+          for (const [n, raw] of list.entries()) {
+            const item = FindingInput.safeParse(raw);
+            if (!item.success) {
+              lines.push(`#${n + 1} rejected:\n  - ${formatIssues(item.error).join("\n  - ")}`);
+              continue;
+            }
+            const result = await handler.reportFinding(item.data);
+            if (!result.accepted) {
+              lines.push(`#${n + 1} rejected:\n  - ${result.errors.join("\n  - ")}`);
+              continue;
+            }
+            accepted++;
+            const warn = result.warnings?.length
+              ? ` (warnings: ${result.warnings.join("; ")})`
+              : "";
+            lines.push(`#${n + 1} recorded as ${result.id}${warn}`);
+          }
+          const rejected = list.length - accepted;
+          return text(
+            `${accepted} of ${list.length} findings recorded.${rejected ? ` Fix and resend the ${rejected} rejected:` : ""}\n${lines.join("\n")}`,
+            accepted === 0,
+          );
         }
         case "finish": {
           const parsed = FinishInput.safeParse(args);

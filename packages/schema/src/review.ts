@@ -63,6 +63,8 @@ export const ReviewStatus = z.enum([
   "failed",
   "cancelled",
   "superseded",
+  /** Stopped early (budget or rate limit); finished files are cached, a re-run resumes. */
+  "partial",
 ]);
 export type ReviewStatus = z.infer<typeof ReviewStatus>;
 
@@ -106,7 +108,9 @@ export const Shard = z.object({
   lenses: z.array(Lens),
   status: ShardStatus,
   estimatedTokens: z.number().int().min(0),
+  /** Fresh (uncached) input tokens. */
   inputTokens: z.number().int().nullable().default(null),
+  cachedTokens: z.number().int().nullable().default(null),
   outputTokens: z.number().int().nullable().default(null),
   durationMs: z.number().int().nullable().default(null),
   agentSessionId: z.string().nullable().default(null),

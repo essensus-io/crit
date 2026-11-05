@@ -35,6 +35,7 @@ export function shard(reviewId: string, over: Partial<Shard> = {}): Shard {
     status: "done",
     estimatedTokens: 1200,
     inputTokens: null,
+    cachedTokens: null,
     outputTokens: null,
     durationMs: null,
     agentSessionId: null,

@@ -17,6 +17,7 @@ import {
   type AgentRunner,
   fingerprint,
   Intake,
+  prepareReview,
   reanchorFindings,
   resolveScope,
   type ReviewOptions,
@@ -259,18 +260,25 @@ describe("runReview with the fake provider", () => {
     } satisfies FakeScriptInput;
     const adapter = fake(script);
     const first = await runReview(options(adapter));
-    const second = await runReview(options(adapter));
-    expect(second.shards[0]!.status).toBe("cached");
+    const o2 = options(adapter);
+    const second = await runReview(o2);
+    // Every file is answered by the cache: no shards, no agent calls, verdicts kept.
+    expect(second.shards).toEqual([]);
+    expect(second.review.summary).toMatch(/^All 2 files are unchanged since their last review/);
     expect(adapter.calls.filter((c) => c.task.kind === "review")).toHaveLength(1);
-    expect(second.findings.map((f) => f.fingerprint)).toEqual(
-      first.findings.map((f) => f.fingerprint),
+    expect(adapter.calls.filter((c) => c.task.kind === "skeptic")).toHaveLength(1);
+    expect(second.findings.map((f) => [f.fingerprint, f.verdict, f.selected])).toEqual(
+      first.findings.map((f) => [f.fingerprint, f.verdict, f.selected]),
     );
+    expect(await store.fixes.active(second.findings[0]!.id)).toMatchObject({ author: "ai" });
+    expect(o2.events).toContainEqual({ type: "cache", files: 2, findings: 1 });
     expect((await store.reviews.get(first.review.id))?.status).toBe("superseded");
 
-    // Edit the file: cache misses and the reviewer runs again.
+    // Edit one file: only that file is reviewed again; the other still comes from the cache.
     repo.write({ "src/api/payments.ts": `${PAYMENTS_FEATURE}// edited\n` });
     const third = await runReview(options(fake(script)));
-    expect(third.shards[0]!.status).toBe("done");
+    expect(third.shards).toHaveLength(1);
+    expect(third.shards[0]).toMatchObject({ status: "done", files: ["src/api/payments.ts"] });
   });
 
   it("drops dismissed fingerprints and findings below the severity threshold", async () => {
@@ -413,9 +421,145 @@ describe("runReview with the fake provider", () => {
         yield { type: "done", exitCode: 1 } as AgentEvent;
       },
     };
-    await expect(runReview(options(limited, { maxRateLimitWaitMs: 5 }))).rejects.toThrow(
-      /rate limited; re-run to resume/,
+    const r = await runReview(options(limited, { maxRateLimitWaitMs: 5 }));
+    expect(r.review.status).toBe("partial");
+    expect(r.review.summary).toMatch(/rate limited, after 0 of 1 runs/);
+    expect(r.shards[0]).toMatchObject({
+      status: "failed",
+      error: "rate limited; re-run to resume",
+    });
+  });
+
+  it("stops the whole queue on a rate limit; queued shards stay queued", async () => {
+    let calls = 0;
+    const limited: AgentRunner = {
+      capabilities: { mcp: false, nativeContext: [] },
+      async *run() {
+        calls++;
+        yield { type: "rate-limited", retryAfterMs: 10 * 60_000 } as AgentEvent;
+        yield { type: "done", exitCode: 1 } as AgentEvent;
+      },
+    };
+    const o = options(limited, { maxRateLimitWaitMs: 5, skeptic: null });
+    o.config.shardTokens = 5;
+    o.config.concurrency = 1;
+    const r = await runReview(o);
+    // a wait longer than maxRateLimitWaitMs is not retried, and no further shard starts
+    expect(calls).toBe(1);
+    expect(r.shards.map((s) => s.status)).toEqual(["failed", "queued"]);
+    expect(r.review.status).toBe("partial");
+    expect(o.events.find((e) => e.type === "review-done")).toMatchObject({
+      partial: expect.stringContaining("run again later to resume"),
+    });
+  });
+
+  it("stops at the token budget: in-flight work is aborted and queued shards stay queued", async () => {
+    const adapter = fake({
+      runs: [
+        {
+          ...reviewRun([
+            { tool: "report_finding", args: refundFinding({ fix: undefined, ruleIds: [] }) },
+          ]),
+          events: [
+            {
+              type: "usage",
+              partial: true,
+              inputTokens: 5000,
+              outputTokens: 0,
+              cachedInputTokens: 0,
+            },
+          ],
+          repeat: true,
+        },
+      ],
+    });
+    const o = options(adapter, { skeptic: null });
+    o.config.shardTokens = 5;
+    o.config.concurrency = 1;
+    o.config.budget.maxTokens = 1000;
+    const r = await runReview(o);
+    expect(r.review.status).toBe("partial");
+    expect(r.review.summary).toMatch(/Stopped at the 1,000-token budget after 0 of 2 runs/);
+    expect(r.shards.map((s) => [s.status, s.error])).toEqual([
+      ["cancelled", "stopped: token budget reached"],
+      ["queued", null],
+    ]);
+    expect(o.events).toContainEqual({ type: "budget-stop", spent: 5000, limit: 1000 });
+    expect(adapter.calls.filter((c) => c.task.kind === "review")).toHaveLength(1);
+  });
+
+  it("records fresh, cached and output tokens, reports effective spend, and calibrates the cost ratio", async () => {
+    const metered: AgentRunner = {
+      capabilities: { mcp: false, nativeContext: [] },
+      async *run(): AsyncIterable<AgentEvent> {
+        yield {
+          type: "usage",
+          partial: true,
+          inputTokens: 500,
+          outputTokens: 10,
+          cachedInputTokens: 4000,
+        };
+        yield { type: "message", text: '{"findings": [], "summary": "ok"}' };
+        yield { type: "usage", inputTokens: 1000, outputTokens: 50, cachedInputTokens: 9000 };
+        yield { type: "done", exitCode: 0 };
+      },
+    };
+    const o = options(metered, { skeptic: null });
+    const r = await runReview(o);
+    expect(r.shards[0]).toMatchObject({ inputTokens: 1000, cachedTokens: 9000, outputTokens: 50 });
+    const spent = o.events
+      .filter((e) => e.type === "usage")
+      .map((e) => (e as { spent: number }).spent);
+    expect(spent).toEqual([910, 1950]); // running figure, then the final one
+    const ratio = Number(await store.kv.get("cost-ratio:fake"));
+    expect(ratio).toBeCloseTo((3 + 1950 / r.shards[0]!.estimatedTokens) / 2, 1);
+  });
+
+  it("treats an agent that never calls crit's tools as a failure, not as 'no findings'", async () => {
+    const adapter = fake({ runs: [{ match: { kind: "review" }, message: "Looks fine to me." }] });
+    const o = options(adapter, { skeptic: null });
+    await expect(runReview(o)).rejects.toThrow(
+      /every shard failed: the agent never called crit's tools/,
     );
+    expect(
+      o.events.some((e) => e.type === "warning" && /without calling crit's tools/.test(e.message)),
+    ).toBe(true);
+    const prep = await prepareReview(options(adapter));
+    expect(prep.cached.size).toBe(0);
+  });
+
+  it("previews a review: runs, the cache, and an effective-token estimate that learns from past runs", async () => {
+    const adapter = fake({ runs: [{ ...reviewRun([]), repeat: true }] });
+    const before = await prepareReview(options(adapter));
+    expect(before.runs).toHaveLength(1);
+    expect(before.ratio).toBe(3);
+    expect(before.estimatedTokens).toBe(Math.round(before.runs[0]!.estimatedTokens * 3));
+    expect(before.toReview.files.map((f) => f.path)).toEqual([
+      "src/api/payments.ts",
+      "src/db/orders.ts",
+    ]);
+    await runReview(options(adapter, { skeptic: null }));
+    const after = await prepareReview(options(adapter));
+    expect(after.cached.size).toBe(2);
+    expect(after.runs).toEqual([]);
+    expect(after.estimatedTokens).toBe(0);
+    expect(after.scope.files).toHaveLength(2);
+  });
+
+  it("passes the plan with its token estimate to confirm", async () => {
+    const adapter = fake({ runs: [{ ...reviewRun([]), repeat: true }] });
+    let seen: { estimatedTokens: number; cachedFiles: number } | undefined;
+    await runReview(
+      options(adapter, {
+        skeptic: null,
+        confirm: async (plan) => {
+          seen = { estimatedTokens: plan.estimatedTokens, cachedFiles: plan.cachedFiles };
+          return true;
+        },
+      }),
+    );
+    expect(seen).toEqual({ estimatedTokens: expect.any(Number), cachedFiles: 0 });
+    expect(seen!.estimatedTokens).toBeGreaterThan(0);
   });
 
   it("reviews the whole project with a cached map pass and asks for confirmation", async () => {
@@ -428,11 +572,16 @@ describe("runReview with the fake provider", () => {
     const o = options(adapter, {
       spec: { kind: "project" },
       skeptic: null,
+      useCache: false,
       confirm: async (plan) => plan.shards.length === 1,
     });
     const r = await runReview(o);
     expect(r.review.status).toBe("completed");
     expect(adapter.calls[1]!.task.prompt).toContain("Repository overview:\nA tiny shop");
+    expect(adapter.calls[1]!.task.prompt).toContain("The files under review:");
+    expect(adapter.calls[1]!.task.prompt).toMatch(
+      /### src\/api\/payments\.ts\n```\n1 {2}export async function refund/,
+    );
     await runReview(o);
     expect(adapter.calls.filter((c) => c.task.kind === "map")).toHaveLength(1);
 
@@ -457,7 +606,7 @@ describe("runReview with the fake provider", () => {
       o.events.some((e) => e.type === "warning" && /repo map pass failed/.test(e.message)),
     ).toBe(true);
 
-    const tight = options(adapter, { spec: { kind: "project" } });
+    const tight = options(adapter, { spec: { kind: "project" }, useCache: false });
     tight.config.budget.maxShards = 1;
     tight.config.shardTokens = 5;
     await expect(runReview(tight)).rejects.toThrow(/exceed budget.maxShards \(1\)/);
