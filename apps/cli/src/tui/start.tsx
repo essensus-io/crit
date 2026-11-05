@@ -213,7 +213,7 @@ export async function openTui(
   root: string,
   reviewId: string,
   config: ResolvedConfig,
-): Promise<void> {
+): Promise<Choice | undefined> {
   const review = await store.reviews.get(reviewId);
   const switcher = review ? makeSwitcher(ctx, config, { provider: review.provider }) : undefined;
   const session = await makeSession(
@@ -224,9 +224,25 @@ export async function openTui(
     config,
     switcher ? { switcher } : {},
   );
-  await renderFullScreen(<ReviewApp session={session} {...(switcher ? { switcher } : {})} />);
+  let rerun: Choice | undefined;
+  await renderFullScreen(
+    <ReviewApp
+      session={session}
+      {...(switcher ? { switcher } : {})}
+      onRerun={() => {
+        rerun = switcher?.current() ?? {
+          provider: "",
+          model: null,
+          effort: null,
+          depth: config.depth,
+        };
+      }}
+    />,
+  );
+  if (rerun) return rerun;
   const line = await summaryLine(store, reviewId);
   if (line) ctx.out(line);
+  return undefined;
 }
 
 /**

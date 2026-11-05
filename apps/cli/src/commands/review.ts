@@ -69,6 +69,26 @@ export function scopeFromArgs(args: ReviewArgs): ScopeSpec {
   return { kind: "branch", ...(args.base ? { base: args.base } : {}) };
 }
 
+/** The CLI arguments that review the same scope again (for re-running a saved review). */
+export function argsFromScope(spec: ScopeSpec): ReviewArgs {
+  switch (spec.kind) {
+    case "branch":
+      return { _: [], ...(spec.base ? { base: spec.base } : {}) };
+    case "staged":
+      return { _: [], staged: true };
+    case "commit":
+      return { _: [], commit: spec.sha };
+    case "project":
+      return { _: [], all: true };
+    case "paths":
+      return {
+        _: spec.paths,
+        diff: spec.diff,
+        ...(spec.base ? { base: spec.base } : {}),
+      };
+  }
+}
+
 function parseLenses(v: string | undefined): Lens[] | undefined {
   if (!v) return undefined;
   const list = v

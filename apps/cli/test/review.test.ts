@@ -1,8 +1,9 @@
+import type { ScopeSpec } from "@crit/schema";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createFixtureRepo, type FixtureRepo } from "@crit/testkit";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { parseTokens, scopeFromArgs } from "../src/commands/review.ts";
+import { argsFromScope, parseTokens, scopeFromArgs } from "../src/commands/review.ts";
 import { fakeProvidersJson, normalize, type TestEnv, testContext } from "./helpers.ts";
 
 const FEATURE = `export async function refund(orders, provider, orderId, amount) {
@@ -292,5 +293,20 @@ describe("crit review --no-tui", () => {
     expect(scopeFromArgs({ _: [], staged: true })).toEqual({ kind: "staged" });
     expect(scopeFromArgs({ _: [], commit: "abc" })).toEqual({ kind: "commit", sha: "abc" });
     expect(scopeFromArgs({ _: [], all: true })).toEqual({ kind: "project" });
+  });
+});
+
+describe("argsFromScope", () => {
+  it("turns every saved scope back into the arguments that review it again", () => {
+    const specs: ScopeSpec[] = [
+      { kind: "branch" },
+      { kind: "branch", base: "develop" },
+      { kind: "staged" },
+      { kind: "commit", sha: "abc123" },
+      { kind: "project" },
+      { kind: "paths", paths: ["src", "lib/*.ts"], diff: true, base: "dev" },
+      { kind: "paths", paths: ["src"], diff: false },
+    ];
+    for (const spec of specs) expect(scopeFromArgs(argsFromScope(spec))).toEqual(spec);
   });
 });

@@ -137,14 +137,24 @@ export async function openCommand(
   const review = await resolveReview(ctx, store, root, args.review);
   if (ctx.interactive && args.tui !== false) {
     const { openTui } = await import("../tui/start.tsx");
-    await openTui(
+    const rerun = await openTui(
       ctx,
       store,
       root,
       review.id,
       resolveConfig(loadUserConfig(ctx.paths), loadProjectConfig(root)),
     );
-    return EXIT.ok;
+    if (!rerun) return EXIT.ok;
+    // "Re-run": the same scope with whatever provider, model, effort and depth was picked.
+    const { argsFromScope, runReviewCommand } = await import("./review.ts");
+    return runReviewCommand(ctx, {
+      ...argsFromScope(review.scope),
+      ...(rerun.provider ? { provider: rerun.provider } : {}),
+      ...(rerun.model ? { model: rerun.model } : {}),
+      ...(rerun.effort ? { effort: rerun.effort } : {}),
+      depth: rerun.depth,
+      cache: true,
+    });
   }
   ctx.out(textReport(await exportReview(store, review.id), { color: ctx.color }));
   return EXIT.ok;

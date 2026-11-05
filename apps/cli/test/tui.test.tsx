@@ -1048,3 +1048,46 @@ describe("copy as prompt and the rules panel", () => {
     app.unmount();
   });
 });
+
+describe("re-run the review", () => {
+  it("R asks, then leaves with a re-run request; the hint and menu entry show only when available", async () => {
+    const s = session();
+    await s.load();
+    let reran = 0;
+    const app = render(<ReviewApp session={s} onRerun={() => reran++} />);
+    const f = await until(app.lastFrame, "of 2 reviewed");
+    expect(f).toContain("R re-run review");
+    await sleep(80);
+    app.stdin.write("R");
+    await until(
+      app.lastFrame,
+      "Re-run the review of feature/payments → main? Unchanged files come from the cache.",
+    );
+    await sleep(80);
+    app.stdin.write(ESC);
+    await sleep(80);
+    expect(reran).toBe(0);
+    app.stdin.write("o");
+    await until(app.lastFrame, "Re-run this review");
+    await sleep(80);
+    app.stdin.write("n");
+    await until(app.lastFrame, "Re-run the review of");
+    await sleep(80);
+    app.stdin.write("y");
+    await sleep(120);
+    expect(reran).toBe(1);
+    app.unmount();
+  });
+
+  it("without a re-run handler (history) there is no hint and R does nothing", async () => {
+    const app = await mount(session());
+    expect(app.lastFrame()).not.toContain("re-run");
+    await app.press("R");
+    await sleep(60);
+    expect(app.lastFrame()).not.toContain("Re-run the review");
+    await app.press("o");
+    await until(app.lastFrame, "options ·");
+    expect(app.lastFrame()).not.toContain("Re-run this review");
+    app.unmount();
+  });
+});

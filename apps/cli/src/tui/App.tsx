@@ -33,7 +33,8 @@ type Mode =
   | "describe"
   | "ask"
   | "reply"
-  | "apply";
+  | "apply"
+  | "rerun";
 
 /**
  * The interactive review screen: one stream of code with a card under every
@@ -44,11 +45,14 @@ export function ReviewApp({
   onExit,
   switcher,
   onConnect,
+  onRerun,
 }: {
   session: ReviewSession;
   onExit?: () => void;
   switcher?: Switcher;
   onConnect?: () => void;
+  /** Leave and review the same scope again; unchanged files come from the cache. */
+  onRerun?: () => void;
 }) {
   const app = useApp();
   useEffect(() => {
@@ -138,6 +142,7 @@ export function ReviewApp({
       if (input === "?") return setMode("help");
       if (input === "/") return setMode("search");
       if (input === "o") return setMode("options");
+      if (input === "R" && onRerun) return setMode("rerun");
       if (key.escape) {
         if (current && expanded.has(current.finding.id)) return toggleExpanded(current.finding.id);
         if (query) {
@@ -323,6 +328,20 @@ export function ReviewApp({
     );
   }
 
+  if (mode === "rerun" && onRerun)
+    prompt = (
+      <Choice
+        label={`Re-run the review of ${state.review.scopeLabel}? Unchanged files come from the cache.`}
+        options={[["y", "yes, re-run"]]}
+        onCancel={done}
+        onPick={() => {
+          done();
+          onRerun();
+          app.exit();
+        }}
+      />
+    );
+
   if (mode === "help") return <HelpOverlay width={width} height={height} onClose={done} />;
   if (mode === "actions" && current) {
     const items2: MenuItem[] = [
@@ -371,6 +390,15 @@ export function ReviewApp({
             { key: "s", label: "Save this as the default", hint: describeChoice(c) },
           ]
         : []),
+      ...(onRerun
+        ? [
+            {
+              key: "n",
+              label: "Re-run this review",
+              hint: "same scope; only changed files cost tokens",
+            },
+          ]
+        : []),
       { key: "r", label: "Rules", hint: "turn rules on or off" },
     ];
     return (
@@ -383,6 +411,7 @@ export function ReviewApp({
         onPick={(k) => {
           done();
           if (k === "r") return setMode("rules");
+          if (k === "n") return setMode("rerun");
           const key = { m: "m", p: "P", e: "E", d: "D", s: "S" }[k] as "m" | "P" | "E" | "D" | "S";
           switching.open(key);
         }}
@@ -428,6 +457,7 @@ export function ReviewApp({
           height={height}
           prompt={prompt}
           idle={idle}
+          canRerun={Boolean(onRerun)}
         />
       ) : (
         <ProposalScreen
@@ -540,6 +570,9 @@ export function RunApp(props: {
         session={session}
         {...(props.onExit ? { onExit: props.onExit } : {})}
         {...(props.switcher ? { switcher: props.switcher } : {})}
+        {...(props.onRecover
+          ? { onRerun: () => props.onRecover!({ kind: "retry", ...selection }) }
+          : {})}
       />
     );
   if (overlay) return overlay;

@@ -28,6 +28,7 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
       [".", "actions: propose, edit, ask, re-check, use my fix"],
       ["o", "options: model, provider, effort, depth, rules"],
       ["y", "copy this finding as a prompt for another agent"],
+      ["R", "re-run the review of this scope (unchanged files come from the cache)"],
       ["q", "quit"],
     ],
   },

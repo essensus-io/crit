@@ -47,20 +47,21 @@ right now; press `?` for all of them.
 It runs on the terminal's alternate screen: your terminal's own scrollback is
 untouched and comes back when you leave, and only the panels inside crit scroll.
 
-| Key                   | Does                                                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `j` `k`               | next / previous finding                                                                                       |
-| `a`                   | accept the fix (again to undo); on a finding without a fix, propose one                                       |
-| `d`                   | dismiss with a reason, remembered as a false positive (again to restore)                                      |
-| `enter`               | show or hide the full explanation, fix and thread in place                                                    |
-| `A`                   | apply every accepted fix (working tree or a new branch)                                                       |
-| `↑` `↓` `PgUp` `PgDn` | scroll the code (the mouse wheel too)                                                                         |
-| `/`                   | search: words, `sev:major`, `lens:security`, `file:cart`, `is:filtered`                                       |
-| `.`                   | actions: propose a fix, edit it in `$EDITOR`, ask a question, re-check the file, copy as a prompt, use my fix |
-| `o`                   | options: model, provider, reasoning effort, depth, save as default, rules on/off                              |
-| `y`                   | copy the finding as a prompt for another agent                                                                |
-| `h` `l`               | files list ⇄ code · `g` `G` first / last finding                                                              |
-| `?` `q`               | help · back / quit                                                                                            |
+| Key                   | Does                                                                                                                        |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `j` `k`               | next / previous finding                                                                                                     |
+| `a`                   | accept the fix (again to undo); on a finding without a fix, get one: the AI writes it, or you describe or write it          |
+| `d`                   | dismiss with a reason, remembered as a false positive (again to restore)                                                    |
+| `enter`               | show or hide the full explanation, fix and thread in place                                                                  |
+| `A`                   | apply every accepted fix (working tree or a new branch): accepting stages a fix, `A` writes the accepted ones to your files |
+| `R`                   | re-run the review of this scope (unchanged files come from the cache, so only changed files cost tokens)                    |
+| `↑` `↓` `PgUp` `PgDn` | scroll the code (the mouse wheel too)                                                                                       |
+| `/`                   | search: words, `sev:major`, `lens:security`, `file:cart`, `is:filtered`                                                     |
+| `.`                   | actions: propose a fix, edit it in `$EDITOR`, ask a question, re-check the file, copy as a prompt, use my fix               |
+| `o`                   | options: model, provider, reasoning effort, depth, save as default, rules on/off                                            |
+| `y`                   | copy the finding as a prompt for another agent                                                                              |
+| `h` `l`               | files list ⇄ code · `g` `G` first / last finding                                                                            |
+| `?` `q`               | help · back / quit                                                                                                          |
 
 Model, provider, effort and depth apply to the _next_ ask, proposal or re-check. While
 a review runs, `m` `P` `E` `D` `S` change the next run instead and `r` retries with

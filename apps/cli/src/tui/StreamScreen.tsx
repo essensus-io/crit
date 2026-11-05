@@ -54,6 +54,8 @@ export function StreamScreen(props: {
   prompt?: React.ReactNode;
   /** Another screen has the keys (a menu, a prompt): the stream does not react to them. */
   idle: boolean;
+  /** Show the re-run hint. */
+  canRerun?: boolean;
 }) {
   const { state, items, width, height } = props;
   const review = state.review;
@@ -199,6 +201,7 @@ export function StreamScreen(props: {
           <Text color={T.mint}>{`${p.reviewed} of ${p.total} reviewed`}</Text>
           <Text dimColor> · </Text>
           <Text color={T.orange}>{`${p.accepted} accepted`}</Text>
+          {props.canRerun ? <Text dimColor>{"  ·  R re-run review"}</Text> : null}
           {p.total > 0 && p.reviewed === p.total ? (
             <Text dimColor>
               {p.applicable > 0
