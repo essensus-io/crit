@@ -38,7 +38,7 @@ import {
   repairPrompt,
   reviewPrompt,
   reviewSystemPrompt,
-  SKEPTIC_SYSTEM,
+  skepticSystem,
   skepticPrompt,
 } from "./prompts.ts";
 import { depthProfile, estimateDurationMs, type PlannedRun, planRuns } from "./shards.ts";
@@ -554,6 +554,9 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
         }),
         timeoutMs: config.review.timeoutMinutes * 60_000,
         allowedCommands: config.review.allowedCommands,
+        // A shell costs ~1.5k tokens per turn: only when commands are allowlisted or at deep depth.
+        access:
+          config.review.allowedCommands.length > 0 || config.depth === "deep" ? "shell" : "read",
         ...modelOf(opts.provider),
         ...(host
           ? {
@@ -727,6 +730,7 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
       emit({ type: "verify-started", count: toCheck.length });
       const verdicts = await verify(toCheck, skeptic, scope, config, userSignal, {
         fast: mode !== "all",
+        deep: mode === "all",
       });
       finishedSpend += effectiveTokens(verdicts.usage);
       report_usage("skeptic");
@@ -844,7 +848,7 @@ export async function verify(
   scope: ResolvedScope,
   config: Pick<ResolvedConfig, "review">,
   signal: AbortSignal,
-  opts: { fast?: boolean; chunkSize?: number } = {},
+  opts: { fast?: boolean; deep?: boolean; chunkSize?: number } = {},
 ): Promise<{ results: Map<string, SkepticResult>; warnings: string[]; usage: TokenUsage }> {
   const chunkSize = opts.chunkSize ?? 15;
   const results = new Map<string, SkepticResult>();
@@ -855,13 +859,14 @@ export async function verify(
     const items = await Promise.all(
       chunk.map(async (f) => ({
         finding: f,
-        excerpt: excerpt((await readAtRevision(scope, f.file)) ?? "", f.range),
+        excerpt: excerpt((await readAtRevision(scope, f.file)) ?? "", f.range, opts.deep ? 6 : 20),
       })),
     );
     const task: AgentTask = {
       kind: "skeptic",
       cwd: scope.root,
-      systemPrompt: SKEPTIC_SYSTEM,
+      systemPrompt: skepticSystem(opts.deep === true),
+      access: opts.deep ? "read" : "none",
       prompt: skepticPrompt(items),
       timeoutMs: config.review.timeoutMinutes * 60_000,
       ...modelOf(skeptic, opts.fast ? "fast" : "main"),

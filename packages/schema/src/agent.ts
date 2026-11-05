@@ -24,6 +24,15 @@ export type AgentTask = {
    */
   mcp?: { command: string; args: string[]; sessionsDir: string };
   model?: string;
+  /**
+   * What the agent may use besides crit's own tools. Tool definitions are resent
+   * every turn (Claude Code: ~1.5k tokens for the shell alone, ~2.6k for file
+   * tools), so tasks get only what they need. Default "shell".
+   * - none: nothing; the prompt carries everything
+   * - read: read and search files
+   * - shell: read plus read-only git and the allowlisted commands
+   */
+  access?: "none" | "read" | "shell";
   timeoutMs: number;
   /** Extra shell commands the agent may run (review.allowedCommands). */
   allowedCommands?: string[];

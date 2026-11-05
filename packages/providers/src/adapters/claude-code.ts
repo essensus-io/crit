@@ -71,14 +71,27 @@ export function buildClaudeInvocation(
   if (task.systemPrompt) {
     const promptFile = join(dir, "system.md");
     files.push({ path: promptFile, content: task.systemPrompt });
-    args.push("--append-system-prompt-file", promptFile);
+    // Replaces Claude Code's default system prompt: measured 8.0k to 4.8k tokens of context per turn.
+    args.push("--system-prompt-file", promptFile);
   }
   const bashRules = [...GIT_READ_COMMANDS, ...(task.allowedCommands ?? [])].flatMap((c) => [
     `Bash(${c})`,
     `Bash(${c}:*)`,
   ]);
-  args.push("--tools", "Read,Grep,Glob,Bash");
-  args.push("--allowedTools", ["Read", "Grep", "Glob", ...bashRules, "mcp__crit"].join(","));
+  const access = task.access ?? "shell";
+  const tools =
+    access === "none"
+      ? []
+      : access === "read"
+        ? ["Read", "Grep", "Glob"]
+        : ["Read", "Grep", "Glob", "Bash"];
+  args.push("--tools", tools.join(","));
+  const allowed = [
+    ...tools.filter((t) => t !== "Bash"),
+    ...(access === "shell" ? bashRules : []),
+    ...(task.mcp ? ["mcp__crit"] : []),
+  ];
+  if (allowed.length) args.push("--allowedTools", allowed.join(","));
   args.push("--disallowedTools", DISALLOWED.join(","));
   const model = task.model ?? profile.model;
   if (model) args.push("--model", model);

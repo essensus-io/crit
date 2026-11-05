@@ -272,7 +272,41 @@ describe("buildClaudeInvocation", () => {
     expect(inv.files.find((f) => f.path.endsWith("system.md"))!.content).toBe(
       "You are a reviewer.",
     );
+    // replaces the default system prompt instead of appending to it
+    expect(flag("--system-prompt-file")).toBe(join(inv.cleanupDir, "system.md"));
+    expect(inv.args).not.toContain("--append-system-prompt-file");
     expect(flag("--mcp-config")).toBe(join(inv.cleanupDir, "mcp.json"));
+  });
+
+  it("gives each task only the tools it needs: none, read, or read plus shell", () => {
+    const mcp = { command: "node", args: ["crit"], sessionsDir: "/s" };
+    const build = (access?: "none" | "read" | "shell", allowedCommands?: string[]) => {
+      const inv = buildClaudeInvocation(
+        profile,
+        task({
+          mcpSession: "s",
+          mcp,
+          ...(access ? { access } : {}),
+          ...(allowedCommands ? { allowedCommands } : {}),
+        }),
+        "/tmp/x",
+      );
+      const flag = (n: string) => inv.args[inv.args.indexOf(n) + 1];
+      return { tools: flag("--tools"), allowed: flag("--allowedTools")?.split(",") };
+    };
+    expect(build("none")).toEqual({ tools: "", allowed: ["mcp__crit"] });
+    expect(build("read")).toEqual({
+      tools: "Read,Grep,Glob",
+      allowed: ["Read", "Grep", "Glob", "mcp__crit"],
+    });
+    const shell = build("shell", ["pnpm test"]);
+    expect(shell.tools).toBe("Read,Grep,Glob,Bash");
+    expect(shell.allowed).toEqual(expect.arrayContaining(["Bash(git diff:*)", "Bash(pnpm test)"]));
+    expect(build().tools).toBe("Read,Grep,Glob,Bash"); // default keeps the shell
+    // no tools and no MCP (a skeptic on a JSON-only run): no allowlist flag at all
+    const bare = buildClaudeInvocation(profile, task({ access: "none" }), "/tmp/x");
+    expect(bare.args).not.toContain("--allowedTools");
+    expect(bare.args[bare.args.indexOf("--tools") + 1]).toBe("");
   });
 
   it("omits MCP, system prompt and model when not given; task model wins", () => {
@@ -282,7 +316,7 @@ describe("buildClaudeInvocation", () => {
       "/tmp/x",
     );
     expect(inv.args).not.toContain("--mcp-config");
-    expect(inv.args).not.toContain("--append-system-prompt-file");
+    expect(inv.args).not.toContain("--system-prompt-file");
     expect(inv.args).not.toContain("--model");
     expect(inv.files).toEqual([]);
     const m = buildClaudeInvocation(profile, task({ model: "haiku" }), "/tmp/x");

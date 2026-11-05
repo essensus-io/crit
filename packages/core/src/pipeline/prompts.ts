@@ -162,9 +162,15 @@ export function reviewPrompt(i: ReviewPromptInput): string {
   return parts.join("\n\n");
 }
 
-export const SKEPTIC_SYSTEM = `You are crit's skeptic. Another reviewer reported the findings below. Your job is to check each one against the actual code and reject the ones that are wrong.
+export const skepticSystem = (
+  canRead: boolean,
+) => `You are crit's skeptic. Another reviewer reported the findings below. Your job is to check each one against the actual code and reject the ones that are wrong.
 
-For each finding, read the code (you may open files and run read-only git commands) and decide:
+${
+  canRead
+    ? "For each finding, read the code (you may open files) and decide:"
+    : "You cannot open files: each finding comes with the code around it. Judge from that. When the excerpt is not enough to say a finding is wrong, answer plausible rather than guessing. Decide:"
+}
 - confirmed: the problem is real and the explanation is right
 - plausible: it could be real, but depends on context you cannot verify
 - rejected: it is wrong, not reachable, already handled, or not a problem
