@@ -26,6 +26,7 @@ export async function listRules(
     cwd: root,
     spec: { kind: "project" },
     ignore: config.ignore,
+    maxFileTokens: config.maxFileTokens,
   }).catch(() => undefined);
   const set = await loadRules({
     files,

@@ -1,6 +1,13 @@
 import { closeSync, openSync, readFileSync, readSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { DEFAULT_IGNORES, type ResolvedScope, type ScopedFile, type ScopeSpec } from "@crit/schema";
+import {
+  BINARY_EXTENSIONS,
+  NOISE_IGNORES,
+  type ResolvedScope,
+  type ScopedFile,
+  type ScopeSpec,
+  SECRET_IGNORES,
+} from "@crit/schema";
 import picomatch from "picomatch";
 import { diffPath, hunksOf, type ParsedFile, parseUnifiedDiff } from "./diff.ts";
 import {
@@ -20,17 +27,36 @@ export type ResolveScopeOptions = {
   spec: ScopeSpec;
   /** Extra ignore globs (config `ignore`), on top of the secret/lockfile defaults. */
   ignore?: string[];
+  /** Whole-file scopes skip files above this many tokens (default 20k). Named files are exempt. */
+  maxFileTokens?: number;
 };
 
 export class ScopeError extends Error {
   override name = "ScopeError";
 }
 
+const fmtTokens = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
 const toPosix = (p: string) => p.split(sep).join("/");
 
-/** Matcher for ignored paths: secrets, keys, lockfiles and user ignores. */
+/** Matcher for ignored paths: secrets, keys, lockfiles, noise and user ignores. */
 export function ignoreMatcher(extra: string[] = []): (path: string) => boolean {
-  return picomatch([...DEFAULT_IGNORES, ...extra], { dot: true });
+  const why = skipReasonMatcher(extra);
+  return (path) => why(path) !== undefined;
+}
+
+/** Why a path is ignored by pattern, or undefined. `named` files bypass the noise list only. */
+export function skipReasonMatcher(
+  extra: string[] = [],
+): (path: string, named?: boolean) => string | undefined {
+  const secret = picomatch(SECRET_IGNORES, { dot: true });
+  const noise = picomatch(NOISE_IGNORES, { dot: true });
+  const user = extra.length ? picomatch(extra, { dot: true }) : () => false;
+  return (path, named) => {
+    if (secret(path)) return "secret, key or lockfile";
+    if (user(path)) return "ignored by config";
+    if (!named && noise(path)) return "docs, assets or generated (default ignore)";
+    return undefined;
+  };
 }
 
 function looksBinary(abs: string): boolean {
@@ -113,13 +139,17 @@ async function branchDiff(
 function scopedFromDiff(
   root: string,
   files: ParsedFile[],
-): { files: ScopedFile[]; binary: string[] } {
+): { files: ScopedFile[]; skipped: { path: string; reason: string }[] } {
   const out: ScopedFile[] = [];
-  const binary: string[] = [];
+  const skipped: { path: string; reason: string }[] = [];
   for (const f of files) {
     const path = diffPath(f);
-    if (f.binary) {
-      binary.push(path);
+    if (f.binary || BINARY_EXTENSIONS.test(path)) {
+      skipped.push({ path, reason: "binary file" });
+      continue;
+    }
+    if (f.status === "renamed" && f.hunks.length === 0) {
+      skipped.push({ path, reason: "renamed without changes" });
       continue;
     }
     const sf: ScopedFile = {
@@ -131,7 +161,7 @@ function scopedFromDiff(
     if (f.status === "renamed" && f.oldPath) sf.oldPath = f.oldPath;
     out.push(sf);
   }
-  return { files: out, binary };
+  return { files: out, skipped };
 }
 
 /** Normalize CLI path args (relative to cwd, possibly globs) into repo-relative matchers. */
@@ -155,14 +185,19 @@ export function pathMatcher(root: string, cwd: string, args: string[]): (file: s
     prefixes.some((p) => p === "" || file === p || file.startsWith(`${p}/`)) || isGlobMatch(file);
 }
 
-function filterIgnored<T extends { path: string }>(items: T[], isIgnored: (p: string) => boolean) {
+function filterIgnored<T extends { path: string }>(
+  items: T[],
+  why: (path: string, named?: boolean) => string | undefined,
+  named: Set<string> = new Set(),
+) {
   const kept: T[] = [];
-  const ignored: string[] = [];
+  const skipped: { path: string; reason: string }[] = [];
   for (const it of items) {
-    if (isIgnored(it.path)) ignored.push(it.path);
+    const reason = why(it.path, named.has(it.path));
+    if (reason) skipped.push({ path: it.path, reason });
     else kept.push(it);
   }
-  return { kept, ignored };
+  return { kept, skipped };
 }
 
 /**
@@ -172,43 +207,61 @@ function filterIgnored<T extends { path: string }>(items: T[], isIgnored: (p: st
 export async function resolveScope(opts: ResolveScopeOptions): Promise<ResolvedScope> {
   const root = await repoRoot(opts.cwd);
   const { spec } = opts;
-  const isIgnored = ignoreMatcher(opts.ignore);
+  const why = skipReasonMatcher(opts.ignore);
+  const maxFileBytes = (opts.maxFileTokens ?? 20_000) * 4;
   const head = await headSha(root);
   const branch = await currentBranch(root);
-  const base: Omit<ResolvedScope, "files" | "label"> = { spec, root, ignored: [] };
+  const base: Omit<ResolvedScope, "files" | "label"> = { spec, root, ignored: [], skipped: [] };
   if (head) base.headSha = head;
   if (branch) base.branch = branch;
 
+  let named = new Set<string>();
   const fromDiff = (
     set: DiffSet,
     label: string,
     extra: Partial<ResolvedScope> = {},
   ): ResolvedScope => {
-    const { files, binary } = scopedFromDiff(root, set.files);
-    const { kept, ignored } = filterIgnored(files, isIgnored);
+    const { files, skipped: dropped } = scopedFromDiff(root, set.files);
+    const { kept, skipped } = filterIgnored(files, why, named);
+    const all = [
+      ...skipped,
+      ...dropped,
+      ...set.skipped.map((path) => ({ path, reason: "binary file" })),
+    ];
     return {
       ...base,
       ...extra,
       label,
       files: kept,
       diff: set.text,
-      ignored: [...ignored, ...binary, ...set.skipped],
+      ignored: all.map((x) => x.path),
+      skipped: all,
     };
   };
 
-  const fromList = (paths: string[], label: string): ResolvedScope => {
-    const binary: string[] = [];
+  const fromList = (
+    paths: string[],
+    label: string,
+    named: Set<string> = new Set(),
+  ): ResolvedScope => {
+    const dropped: { path: string; reason: string }[] = [];
     const files: ScopedFile[] = [];
     for (const p of paths) {
       const abs = join(root, p);
-      if (looksBinary(abs)) {
-        binary.push(p);
+      if (BINARY_EXTENSIONS.test(p) || looksBinary(abs)) {
+        dropped.push({ path: p, reason: "binary file" });
         continue;
       }
-      files.push({ path: p, status: "unchanged", size: fileSize(abs) });
+      const size = fileSize(abs);
+      if (size > maxFileBytes && !named.has(p)) {
+        dropped.push({ path: p, reason: `larger than ${fmtTokens(maxFileBytes / 4)} tokens` });
+        continue;
+      }
+      files.push({ path: p, status: "unchanged", size });
     }
-    const { kept, ignored } = filterIgnored(files, isIgnored);
-    return { ...base, label, files: kept, ignored: [...ignored, ...binary] };
+    const { kept, skipped } = filterIgnored(files, why, named);
+    const all = [...skipped, ...dropped];
+    return { ...base, label, files: kept, ignored: all.map((x) => x.path), skipped: all };
   };
 
   switch (spec.kind) {
@@ -237,6 +290,7 @@ export async function resolveScope(opts: ResolveScopeOptions): Promise<ResolvedS
       const label = spec.paths.join(" ");
       if (spec.diff) {
         const d = await branchDiff(root, spec.base);
+        named = namedFiles(root, opts.cwd, spec.paths, d.files.map(diffPath));
         const r = fromDiff(d, `${label} (changed vs ${d.base})`, {
           baseSha: d.baseSha,
           baseRef: d.base,
@@ -245,11 +299,27 @@ export async function resolveScope(opts: ResolveScopeOptions): Promise<ResolvedS
       }
       const tracked = (await trackedFiles(root)).filter(match);
       if (tracked.length === 0) throw new ScopeError(`crit: no tracked files match ${label}`);
-      return fromList(tracked, label);
+      return fromList(tracked, label, namedFiles(root, opts.cwd, spec.paths, tracked));
     }
     case "project":
       return fromList(await trackedFiles(root), "whole project");
   }
+}
+
+/** Files the user named exactly (not via a folder or glob): they bypass noise ignores and the size cap. */
+export function namedFiles(
+  root: string,
+  cwd: string,
+  args: string[],
+  candidates: string[],
+): Set<string> {
+  const exact = new Set<string>();
+  for (const raw of args) {
+    if (picomatch.scan(raw).isGlob) continue;
+    const rel = toPosix(relative(root, isAbsolute(raw) ? raw : resolve(cwd, raw)));
+    if (candidates.includes(rel)) exact.add(rel);
+  }
+  return exact;
 }
 
 /** Repo-relative paths a finding may be reported on. */

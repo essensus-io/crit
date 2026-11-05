@@ -1,8 +1,9 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { estimateDurationMs, lensGroups, planShards, resolveScope, runReview } from "@crit/core";
+import { estimateDurationMs, planRuns, resolveScope, runReview } from "@crit/core";
 import { resolveProvider } from "@crit/providers";
 import {
+  Depth,
   Lens,
   resolveConfig,
   type ReviewEvent,
@@ -37,6 +38,7 @@ export type ReviewArgs = {
   cache?: boolean;
   "fail-on"?: string;
   "max-shards"?: string;
+  depth?: string;
 };
 
 export function scopeFromArgs(args: ReviewArgs): ScopeSpec {
@@ -128,6 +130,9 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
   const maxShards = args["max-shards"] === undefined ? undefined : Number(args["max-shards"]);
   if (maxShards !== undefined && (!Number.isSafeInteger(maxShards) || maxShards < 1))
     throw new CliError("crit: --max-shards takes a positive integer", { exitCode: EXIT.usage });
+  const depth = args.depth === undefined ? undefined : Depth.safeParse(args.depth);
+  if (depth && !depth.success)
+    throw new CliError(`crit: --depth takes ${Depth.options.join(", ")}`, { exitCode: EXIT.usage });
   const spec = scopeFromArgs(args);
   const format = args.format ?? "text";
   const useTui = ctx.interactive && args.tui !== false && !args.format && !args.output;
@@ -151,6 +156,7 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
   const config = resolveConfig(loadUserConfig(ctx.paths), project, {
     ...(lenses ? { lenses } : {}),
     ...(args.base ? { base: args.base } : {}),
+    ...(depth?.success ? { depth: depth.data } : {}),
     ...(maxShards !== undefined ? { budget: { maxShards } } : {}),
   });
   if (spec.kind === "branch" && !spec.base && config.base) spec.base = config.base;
@@ -196,10 +202,13 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
   if (useTui) {
     // Whole-project reviews confirm here, before the screen takes over the terminal.
     if (spec.kind === "project" && !args.yes) {
-      const scope = await resolveScope({ cwd: ctx.cwd, spec, ignore: config.ignore });
-      const runs = planShards(scope, config.shardTokens).flatMap((p) =>
-        lensGroups(config.lenses, config.shardTokens, p.estimatedTokens),
-      );
+      const scope = await resolveScope({
+        cwd: ctx.cwd,
+        spec,
+        ignore: config.ignore,
+        maxFileTokens: config.maxFileTokens,
+      });
+      const runs = planRuns(scope, config);
       if (
         !(await confirm({
           shards: runs,
@@ -282,6 +291,11 @@ export const reviewCommand = (ctx: CliContext) =>
       "max-shards": {
         type: "string",
         description: "Maximum shards approved for this run (overrides the configured budget)",
+      },
+      depth: {
+        type: "string",
+        description:
+          "quick (core lenses, no skeptic), standard (default) or deep (split lenses, check all)",
       },
       lens: { type: "string", description: "Limit to lenses, e.g. security,performance" },
       tui: {

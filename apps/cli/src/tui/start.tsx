@@ -51,6 +51,7 @@ export async function makeSession(
       cwd: root,
       spec: review.scope,
       ignore: config.ignore,
+      maxFileTokens: config.maxFileTokens,
     }).catch(() => undefined);
     fixContext = {
       store,

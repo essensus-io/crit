@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import type { Finding, ResolvedScope, Rule } from "@crit/schema";
+import type { Finding, Lens, ResolvedScope, Rule } from "@crit/schema";
 import { createFixtureRepo, type FixtureRepo } from "@crit/testkit";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -11,7 +11,9 @@ import {
   excerpt,
   fingerprint,
   groupKey,
+  depthProfile,
   lensGroups,
+  planRuns,
   lineCount,
   locateAnchor,
   mergeFindings,
@@ -216,6 +218,7 @@ describe("shards", () => {
     root: repo.root,
     files: files.map(([path, size]) => ({ path, status: "unchanged" as const, size })),
     ignored: [],
+    skipped: [],
     ...(diff ? { diff } : {}),
   });
 
@@ -263,19 +266,65 @@ describe("shards", () => {
     expect(only!.estimatedTokens).toBeGreaterThan(100);
   });
 
-  it("splits lenses only for big shards and estimates time", () => {
+  it("splits lenses only at deep depth and only for big shards; estimates time", () => {
     const all = ["correctness", "security", "performance", "maintainability"] as const;
-    expect(lensGroups([...all], 1000, 100)).toEqual([[...all]]);
-    expect(lensGroups([...all], 1000, 900)).toEqual([
+    expect(lensGroups([...all], 1000, 900)).toEqual([[...all]]);
+    expect(lensGroups([...all], 1000, 100, true)).toEqual([[...all]]);
+    expect(lensGroups([...all], 1000, 900, true)).toEqual([
       ["correctness", "security"],
       ["performance", "maintainability"],
     ]);
-    expect(lensGroups(["security", "style"], 1000, 900)).toEqual([["security", "style"]]);
-    expect(lensGroups(["performance", "style", "maintainability"], 1000, 900)).toEqual([
+    expect(lensGroups(["security", "style"], 1000, 900, true)).toEqual([["security", "style"]]);
+    expect(lensGroups(["performance", "style", "maintainability"], 1000, 900, true)).toEqual([
       ["performance", "style", "maintainability"],
     ]);
     expect(estimateDurationMs(12, 3, 1000)).toBe(4000);
     expect(estimateDurationMs(1, 0, 1000)).toBe(1000);
+  });
+
+  it("depth profiles: quick = core lenses, standard = one pass, deep = split + check all", () => {
+    const lenses = ["correctness", "security", "performance", "maintainability"] as const;
+    expect(depthProfile({ lenses: [...lenses], depth: "quick" })).toEqual({
+      lenses: ["correctness", "security"],
+      split: false,
+      skeptic: "off",
+    });
+    expect(depthProfile({ lenses: ["style"], depth: "quick" }).lenses).toEqual([
+      "correctness",
+      "security",
+    ]);
+    expect(depthProfile({ lenses: [...lenses], depth: "standard" })).toMatchObject({
+      split: false,
+      skeptic: "no-nits",
+    });
+    expect(depthProfile({ lenses: [...lenses], depth: "deep" })).toMatchObject({
+      split: true,
+      skeptic: "all",
+    });
+  });
+
+  it("planRuns: one run per shard by default, two per big shard at deep", () => {
+    const scope = {
+      spec: { kind: "project" },
+      label: "whole project",
+      root: "/nonexistent",
+      files: [{ path: "a.ts", status: "unchanged", size: 3200 }],
+      ignored: [],
+      skipped: [],
+    } as unknown as ResolvedScope;
+    const cfg = {
+      shardTokens: 1000,
+      lenses: ["correctness", "security", "performance", "maintainability"] as Lens[],
+    };
+    expect(planRuns(scope, { ...cfg, depth: "standard" })).toHaveLength(1);
+    expect(planRuns(scope, { ...cfg, depth: "deep" }).map((r) => r.lenses)).toEqual([
+      ["correctness", "security"],
+      ["performance", "maintainability"],
+    ]);
+    expect(planRuns(scope, { ...cfg, depth: "quick" })[0]!.lenses).toEqual([
+      "correctness",
+      "security",
+    ]);
   });
 });
 
@@ -322,6 +371,7 @@ describe("prompts", () => {
     ],
     diff,
     ignored: [],
+    skipped: [],
   };
 
   it("builds the shard prompt with scope, diff, rules, skills and conflicts", () => {

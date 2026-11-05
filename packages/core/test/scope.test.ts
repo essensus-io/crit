@@ -53,24 +53,36 @@ describe("branch scope", () => {
     expect(Object.keys(byPath).sort()).toEqual([
       "src/api/payments.ts",
       "src/api/webhooks.ts",
-      "src/db/order-repo.ts",
       "src/db/schema.sql",
       "src/new/untracked.ts",
     ]);
     expect(byPath["src/api/payments.ts"]!.hunks).toEqual([{ start: 1, lines: 4 }]);
     expect(byPath["src/api/webhooks.ts"]!.status).toBe("deleted");
-    expect(byPath["src/db/order-repo.ts"]).toMatchObject({
-      status: "renamed",
-      oldPath: "src/db/orders.ts",
+    expect(s.skipped).toContainEqual({
+      path: "src/db/order-repo.ts",
+      reason: "renamed without changes",
     });
     expect(byPath["src/new/untracked.ts"]).toMatchObject({
       status: "added",
       hunks: [{ start: 1, lines: 1 }],
     });
-    expect(s.ignored.sort()).toEqual([".env", "bin.dat"]);
+    expect(s.ignored.sort()).toEqual([".env", "bin.dat", "src/db/order-repo.ts"]);
     expect(s.diff).toContain("+  if (amount <= 0) throw new Error();");
     expect(s.diff).toContain("+export const x = 1;\n\\ No newline at end of file");
     expect([...reportableFiles(s)]).not.toContain("src/api/webhooks.ts");
+  });
+
+  it("keeps a renamed file that was also edited, and skips a renamed font", async () => {
+    repo.write({ "assets/Font.otf": "OTF-not-really-binary" });
+    repo.commit("add font", {});
+    repo.git("mv", "assets/Font.otf", "assets/Font-Bold.otf");
+    repo.git("mv", "src/db/schema.sql", "src/db/tables.sql");
+    repo.write({ "src/db/tables.sql": "create table orders (id int, edited int);\n" });
+    repo.commit("renames");
+    const s = await resolveScope({ cwd: repo.root, spec: { kind: "branch", base: "main" } });
+    expect(s.files.map((f) => f.path)).toContain("src/db/tables.sql");
+    expect(s.skipped).toContainEqual({ path: "assets/Font-Bold.otf", reason: "binary file" });
+    expect(s.files.map((f) => f.path)).not.toContain("assets/Font-Bold.otf");
   });
 
   it("detects the base from local main when there is no remote", async () => {
@@ -161,13 +173,17 @@ describe("staged and commit scopes", () => {
     const root = repo.git("rev-list", "--max-parents=0", "HEAD");
     const r = await resolveScope({ cwd: repo.root, spec: { kind: "commit", sha: root } });
     expect(paths(r)).toEqual([
-      "README.md",
       "src/api/payments.ts",
       "src/api/webhooks.ts",
       "src/db/orders.ts",
       "src/db/schema.sql",
     ]);
-    expect(r.ignored).toEqual(["pnpm-lock.yaml"]);
+    expect(r.ignored.sort()).toEqual(["README.md", "pnpm-lock.yaml"]);
+    expect(r.skipped).toContainEqual({
+      path: "README.md",
+      reason: "docs, assets or generated (default ignore)",
+    });
+    expect(r.skipped).toContainEqual({ path: "pnpm-lock.yaml", reason: "secret, key or lockfile" });
     await expect(
       resolveScope({ cwd: repo.root, spec: { kind: "commit", sha: "deadbeef" } }),
     ).rejects.toThrow(/unknown commit/);
@@ -240,13 +256,49 @@ describe("path and project scopes", () => {
     const s = await resolveScope({ cwd: repo.root, spec: { kind: "project" } });
     expect(s.label).toBe("whole project");
     expect(paths(s)).toEqual([
-      "README.md",
       "src/api/payments.ts",
       "src/api/webhooks.ts",
       "src/db/orders.ts",
       "src/db/schema.sql",
     ]);
-    expect(s.ignored.sort()).toEqual(["img/a.png", "pnpm-lock.yaml"]);
+    expect(s.ignored.sort()).toEqual(["README.md", "img/a.png", "pnpm-lock.yaml"]);
+  });
+
+  it("skips files above maxFileTokens unless they are named; named docs bypass the noise list", async () => {
+    repo.commit("big", {
+      "src/big.ts": "x".repeat(4000),
+      "docs/guide.md": "# guide\n",
+      "src/api/a.svg": "<svg/>",
+    });
+    const all = await resolveScope({
+      cwd: repo.root,
+      spec: { kind: "project" },
+      maxFileTokens: 500,
+    });
+    expect(all.files.map((f) => f.path)).not.toContain("src/big.ts");
+    expect(all.skipped).toContainEqual({ path: "src/big.ts", reason: "larger than 500 tokens" });
+    expect(all.skipped.map((x) => x.path)).toEqual(
+      expect.arrayContaining(["docs/guide.md", "src/api/a.svg"]),
+    );
+    const named = await resolveScope({
+      cwd: repo.root,
+      spec: { kind: "paths", paths: ["src/big.ts", "docs/guide.md", "src/api"], diff: false },
+      maxFileTokens: 500,
+    });
+    expect(paths(named)).toEqual([
+      "docs/guide.md",
+      "src/api/payments.ts",
+      "src/api/webhooks.ts",
+      "src/big.ts",
+    ]);
+    expect(named.skipped).toEqual([
+      { path: "src/api/a.svg", reason: "docs, assets or generated (default ignore)" },
+    ]);
+    const secret = await resolveScope({
+      cwd: repo.root,
+      spec: { kind: "paths", paths: ["pnpm-lock.yaml"], diff: false },
+    });
+    expect(secret.files).toEqual([]);
   });
 });
 

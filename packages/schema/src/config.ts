@@ -2,6 +2,9 @@ import { z } from "zod";
 import { Lens, Severity } from "./finding.ts";
 import { RuleLayer } from "./rule.ts";
 
+export const Depth = z.enum(["quick", "standard", "deep"]);
+export type Depth = z.infer<typeof Depth>;
+
 /**
  * `.crit/config.json` (team) merged over `~/.config/crit/config.json` (personal).
  * Every field is optional; `resolveConfig` fills defaults.
@@ -45,16 +48,25 @@ export const ConfigFile = z
       .object({
         maxShards: z.number().int().positive().optional(),
         maxMinutes: z.number().positive().optional(),
+        /** Ask before starting a review estimated above this many effective tokens. */
+        confirmTokens: z.number().int().positive().optional(),
+        /** Stop a review once it has used this many effective tokens. */
+        maxTokens: z.number().int().positive().optional(),
       })
       .strict()
       .optional(),
     /** Target shard size in estimated tokens (4 chars ≈ 1 token). */
     shardTokens: z.number().int().positive().optional(),
+    /** Skip files above this many tokens in whole-file scopes (name a file to review it anyway). */
+    maxFileTokens: z.number().int().positive().optional(),
+    /** How much review to buy: quick, standard (default) or deep. */
+    depth: Depth.optional(),
   })
   .strict();
 export type ConfigFile = z.infer<typeof ConfigFile>;
 
-export const DEFAULT_IGNORES = [
+/** Never sent to an agent: secrets, keys and lockfiles. Naming a file does not bypass these. */
+export const SECRET_IGNORES = [
   ".env",
   ".env.*",
   "**/.env",
@@ -74,6 +86,36 @@ export const DEFAULT_IGNORES = [
   "**/*.map",
 ];
 
+/**
+ * Not worth review tokens: docs, assets, agent config, snapshots, build output
+ * and generated code. Naming the file on the command line still reviews it.
+ */
+export const NOISE_IGNORES = [
+  "**/*.svg",
+  "**/*.md",
+  "**/*.mdx",
+  "**/*.mdc",
+  "**/*.txt",
+  ".claude/**",
+  ".agents/**",
+  ".cursor/**",
+  ".github/**",
+  "**/*.snap",
+  "**/__snapshots__/**",
+  "**/dist/**",
+  "**/build/**",
+  "**/coverage/**",
+  "**/*.generated.*",
+  "**/*.gen.*",
+  "**/*.d.ts",
+];
+
+export const DEFAULT_IGNORES = [...SECRET_IGNORES, ...NOISE_IGNORES];
+
+/** Extensions that are binary or media whatever their content looks like. */
+export const BINARY_EXTENSIONS =
+  /\.(png|jpe?g|gif|webp|avif|ico|icns|bmp|tiff?|heic|otf|ttf|woff2?|eot|mp3|mp4|mov|avi|webm|wav|ogg|flac|zip|gz|tgz|bz2|xz|7z|rar|tar|pdf|psd|sketch|fig|exe|dll|so|dylib|bin|wasm|class|jar|onnx|pt|ckpt|sqlite|db)$/i;
+
 /** Fully resolved config with defaults applied. */
 export type ResolvedConfig = {
   provider?: string;
@@ -90,8 +132,10 @@ export type ResolvedConfig = {
   review: { allowedCommands: string[]; timeoutMinutes: number };
   verify: { commands: string[] };
   concurrency: number;
-  budget: { maxShards: number; maxMinutes: number };
+  budget: { maxShards: number; maxMinutes: number; confirmTokens: number; maxTokens: number };
   shardTokens: number;
+  maxFileTokens: number;
+  depth: Depth;
 };
 
 export const DEFAULT_CONFIG: ResolvedConfig = {
@@ -101,14 +145,16 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
     sources: ["project", "global", "user"],
     include: [],
     exclude: [],
-    budgetTokens: 8000,
+    budgetTokens: 3000,
   },
   ignore: [],
   review: { allowedCommands: [], timeoutMinutes: 15 },
   verify: { commands: [] },
   concurrency: 3,
-  budget: { maxShards: 40, maxMinutes: 20 },
-  shardTokens: 60_000,
+  budget: { maxShards: 40, maxMinutes: 20, confirmTokens: 500_000, maxTokens: 2_000_000 },
+  shardTokens: 30_000,
+  maxFileTokens: 20_000,
+  depth: "standard",
 };
 
 /**
@@ -135,7 +181,11 @@ export function resolveConfig(...layers: (ConfigFile | undefined)[]): ResolvedCo
     if (layer.concurrency) out.concurrency = layer.concurrency;
     if (layer.budget?.maxShards) out.budget.maxShards = layer.budget.maxShards;
     if (layer.budget?.maxMinutes) out.budget.maxMinutes = layer.budget.maxMinutes;
+    if (layer.budget?.confirmTokens) out.budget.confirmTokens = layer.budget.confirmTokens;
+    if (layer.budget?.maxTokens) out.budget.maxTokens = layer.budget.maxTokens;
     if (layer.shardTokens) out.shardTokens = layer.shardTokens;
+    if (layer.maxFileTokens) out.maxFileTokens = layer.maxFileTokens;
+    if (layer.depth) out.depth = layer.depth;
   }
   out.ignore = [...new Set(out.ignore)];
   out.rules.include = [...new Set(out.rules.include)];

@@ -36,7 +36,7 @@ import {
   SKEPTIC_SYSTEM,
   skepticPrompt,
 } from "./prompts.ts";
-import { estimateDurationMs, lensGroups, planShards } from "./shards.ts";
+import { depthProfile, estimateDurationMs, planRuns } from "./shards.ts";
 
 export type ProviderRun = { profile: ProviderProfile; adapter: AgentRunner };
 
@@ -109,7 +109,12 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
   const started = now();
 
   // 1. Resolve scope
-  const scope = await resolveScope({ cwd: opts.cwd, spec: opts.spec, ignore: config.ignore });
+  const scope = await resolveScope({
+    cwd: opts.cwd,
+    spec: opts.spec,
+    ignore: config.ignore,
+    maxFileTokens: config.maxFileTokens,
+  });
   const repo = await store.repos.upsert({
     root: scope.root,
     remoteUrl: await remoteUrl(scope.root),
@@ -155,7 +160,7 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     headSha: scope.headSha ?? null,
     provider: opts.provider.profile.name,
     model: opts.provider.profile.model,
-    lenses: config.lenses,
+    lenses: depthProfile(config).lenses,
     status: "running",
     supersededBy: null,
     summary: null,
@@ -202,27 +207,21 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
 
   try {
     // 2. Plan shards (× lens groups)
-    const planned = planShards(scope, config.shardTokens);
-    const shards: Shard[] = [];
-    for (const p of planned) {
-      for (const lenses of lensGroups(config.lenses, config.shardTokens, p.estimatedTokens)) {
-        shards.push({
-          id: newId(now()),
-          reviewId: review.id,
-          label: p.label,
-          files: p.files,
-          lenses,
-          status: "queued",
-          estimatedTokens: p.estimatedTokens,
-          inputTokens: null,
-          outputTokens: null,
-          durationMs: null,
-          agentSessionId: null,
-          summary: null,
-          error: null,
-        });
-      }
-    }
+    const shards: Shard[] = planRuns(scope, config).map((p) => ({
+      id: newId(now()),
+      reviewId: review.id,
+      label: p.label,
+      files: p.files,
+      lenses: p.lenses,
+      status: "queued" as const,
+      estimatedTokens: p.estimatedTokens,
+      inputTokens: null,
+      outputTokens: null,
+      durationMs: null,
+      agentSessionId: null,
+      summary: null,
+      error: null,
+    }));
     if (shards.length > config.budget.maxShards) {
       emit({ type: "budget-exceeded", required: shards.length, limit: config.budget.maxShards });
       throw new Error(
@@ -530,12 +529,16 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     let findings = await store.findings.listByReview(review.id);
 
     // 7. Verify with the skeptic
-    const skeptic = opts.skeptic === undefined ? opts.provider : opts.skeptic;
-    if (skeptic && findings.length > 0) {
-      emit({ type: "verify-started", count: findings.length });
-      const verdicts = await verify(findings, skeptic, scope, config, signal);
+    // The depth decides what the skeptic checks: nothing, everything but nits, or everything.
+    const mode = depthProfile(config).skeptic;
+    const skeptic =
+      mode === "off" ? null : opts.skeptic === undefined ? opts.provider : opts.skeptic;
+    const toCheck = findings.filter((f) => mode === "all" || f.severity !== "nit");
+    if (skeptic && toCheck.length > 0) {
+      emit({ type: "verify-started", count: toCheck.length });
+      const verdicts = await verify(toCheck, skeptic, scope, config, signal);
       for (const w of verdicts.warnings) emit({ type: "warning", message: w });
-      for (const f of findings) {
+      for (const f of toCheck) {
         const v = verdicts.results.get(f.id);
         if (!v) continue;
         await store.findings.update(f.id, { verdict: v.verdict, verdictReason: v.reason });

@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import type { Lens, ResolvedScope } from "@crit/schema";
+import type { Depth, Lens, ResolvedScope } from "@crit/schema";
 import { diffPath, parseUnifiedDiff } from "../diff.ts";
 
 export const CHARS_PER_TOKEN = 4;
@@ -33,13 +33,20 @@ export function groupKey(root: string, path: string): string {
   return parts.length > 1 ? parts[0]! : ".";
 }
 
-/** Token estimate per file: its diff (for diff scopes) plus the file itself, which the agent reads. */
+/**
+ * Token estimate per file. Diff scopes count the diff only: the agent reviews
+ * from it and reads a file only to check a suspicion. Whole-file scopes count
+ * the file, which is inlined into the prompt.
+ */
 export function fileTokens(scope: ResolvedScope): Map<string, number> {
   const diffChars = new Map<string, number>();
-  if (scope.diff)
+  if (scope.diff !== undefined)
     for (const f of parseUnifiedDiff(scope.diff)) diffChars.set(diffPath(f), f.text.length);
   return new Map(
-    scope.files.map((f) => [f.path, estimateTokensOf(f.size + (diffChars.get(f.path) ?? 0))]),
+    scope.files.map((f) => [
+      f.path,
+      estimateTokensOf(scope.diff !== undefined ? (diffChars.get(f.path) ?? f.size) : f.size),
+    ]),
   );
 }
 
@@ -105,17 +112,65 @@ export function planShards(scope: ResolvedScope, shardTokens: number): PlannedSh
   return shards.map(({ split: _s, ...rest }) => rest);
 }
 
+export type DepthProfile = {
+  /** Lenses this depth reviews. */
+  lenses: Lens[];
+  /** Split big shards into a correctness/security pass and a quality pass. */
+  split: boolean;
+  /** Which findings the skeptic checks: none, all but nits, or every one. */
+  skeptic: "off" | "no-nits" | "all";
+};
+
 /**
- * Lens groups per shard: small scopes run all lenses in one pass; larger
- * shards split into a correctness/security pass and a quality pass.
+ * What each depth buys: quick reviews only correctness and security with no
+ * skeptic; standard reviews every configured lens in one pass per shard and
+ * skips nits in the skeptic; deep splits big shards by lens and checks all.
  */
-export function lensGroups(lenses: Lens[], shardTokens: number, estimatedTokens: number): Lens[][] {
-  if (estimatedTokens < shardTokens / 2 || lenses.length <= 2) return [lenses];
+export function depthProfile(config: { lenses: Lens[]; depth: Depth }): DepthProfile {
+  if (config.depth === "quick") {
+    const core = config.lenses.filter((l) => l === "correctness" || l === "security");
+    return {
+      lenses: core.length ? core : ["correctness", "security"],
+      split: false,
+      skeptic: "off",
+    };
+  }
+  if (config.depth === "deep") return { lenses: config.lenses, split: true, skeptic: "all" };
+  return { lenses: config.lenses, split: false, skeptic: "no-nits" };
+}
+
+/**
+ * Lens groups per shard. One pass with every lens unless `split` is on and the
+ * shard is at least half full, when it becomes a correctness/security pass and
+ * a quality pass.
+ */
+export function lensGroups(
+  lenses: Lens[],
+  shardTokens: number,
+  estimatedTokens: number,
+  split = false,
+): Lens[][] {
+  if (!split || estimatedTokens < shardTokens / 2 || lenses.length <= 2) return [lenses];
   const first: Lens[] = lenses.filter(
     (l) => l === "correctness" || l === "security" || l === "test",
   );
   const second = lenses.filter((l) => !first.includes(l));
   return [first, second].filter((g) => g.length > 0);
+}
+
+export type PlannedRun = PlannedShard & { lenses: Lens[] };
+
+/** Every agent run a review will make: shards × lens groups, for the configured depth. */
+export function planRuns(
+  scope: ResolvedScope,
+  config: { shardTokens: number; lenses: Lens[]; depth: Depth },
+): PlannedRun[] {
+  const profile = depthProfile(config);
+  return planShards(scope, config.shardTokens).flatMap((p) =>
+    lensGroups(profile.lenses, config.shardTokens, p.estimatedTokens, profile.split).map(
+      (lenses) => ({ ...p, lenses }),
+    ),
+  );
 }
 
 /** Rough wall-clock estimate for confirming whole-project reviews. */

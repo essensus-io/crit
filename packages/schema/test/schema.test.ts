@@ -142,7 +142,28 @@ describe("ConfigFile and resolveConfig", () => {
     });
     expect(r.review).toEqual({ allowedCommands: ["x"], timeoutMinutes: 3 });
     expect(r.verify.commands).toEqual(["v"]);
-    expect(r.budget).toEqual({ maxShards: 2, maxMinutes: 1 });
+    expect(r.budget).toEqual({
+      maxShards: 2,
+      maxMinutes: 1,
+      confirmTokens: 500_000,
+      maxTokens: 2_000_000,
+    });
+    expect(r.depth).toBe("standard");
+    expect(r.maxFileTokens).toBe(20_000);
+    const tuned = resolveConfig(
+      ConfigFile.parse({
+        depth: "deep",
+        maxFileTokens: 5000,
+        budget: { confirmTokens: 1, maxTokens: 2 },
+      }),
+    );
+    expect([
+      tuned.depth,
+      tuned.maxFileTokens,
+      tuned.budget.confirmTokens,
+      tuned.budget.maxTokens,
+    ]).toEqual(["deep", 5000, 1, 2]);
+    expect(ConfigFile.safeParse({ depth: "extreme" }).success).toBe(false);
     expect(r.shardTokens).toBe(10);
     expect(r.severityThreshold).toBe("major");
     expect(r.base).toBe("dev");

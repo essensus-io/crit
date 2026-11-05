@@ -51,6 +51,8 @@ export const ResolvedScope = z.object({
   diff: z.string().optional(),
   /** Files skipped because of ignores (secrets, lockfiles, user ignores). */
   ignored: z.array(z.string()).default([]),
+  /** Why each ignored file was left out ("binary file", "docs and assets (default ignore)", …). */
+  skipped: z.array(z.object({ path: z.string(), reason: z.string() })).default([]),
 });
 export type ResolvedScope = z.infer<typeof ResolvedScope>;
 
