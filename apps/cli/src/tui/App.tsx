@@ -174,7 +174,7 @@ export function ReviewApp({
       if (input === "a") {
         if (triage(current) === "dismissed") return void session.restore(id);
         if (!current.fix && !current.finding.selected) {
-          session.notify("There is no fix to accept yet. Describe or write one:");
+          session.notify("This finding has no fix yet. Have the AI write one, or write your own:");
           return setMode("propose");
         }
         return void session.toggle(id);
@@ -222,14 +222,28 @@ export function ReviewApp({
   if (mode === "propose" && current)
     prompt = (
       <Choice
-        label="Propose a fix:"
+        label="Get a fix:"
         options={[
-          ["e", "write it in $EDITOR"],
+          ["a", "let the AI write it"],
           ["w", "describe it in words"],
+          ["e", "write it in $EDITOR"],
         ]}
         onCancel={done}
         onPick={(k) => {
           if (k === "w") return setMode("describe");
+          if (k === "a") {
+            done();
+            const f = current.finding;
+            const input = {
+              kind: "description" as const,
+              text: `Fix this review finding: ${f.title}. ${f.explanation}${f.failureScenario ? ` It fails when: ${f.failureScenario}` : ""}`,
+            };
+            void session.propose(f.id, input).then((o) => {
+              if (o) setLastInput({ kind: "patch", patch: o.fix.patch });
+              showOutcome(o);
+            });
+            return;
+          }
           done();
           void session.proposeFromEditor(current.finding.id).then((o) => {
             if (o && lastInput === undefined) setLastInput({ kind: "patch", patch: o.fix.patch });

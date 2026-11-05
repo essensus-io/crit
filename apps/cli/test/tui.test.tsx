@@ -214,9 +214,9 @@ describe("review stream", () => {
     expect(f).toContain("Refund amount not validated");
     expect(f).toContain("why POST /refunds");
     expect(f).toContain("fix Validate against captured minus refunded");
-    expect(f).toContain("[a] undo accept  [d] dismiss  [enter] details");
+    expect(f).toContain("[a] undo  [A] apply now  [d] dismiss");
     expect(f).toMatch(/╭─ ○ NIT · style · unsure ─+╮/);
-    expect(f).toContain("no fix yet · a proposes one");
+    expect(f).toContain("no fix yet · press a to get one");
     expect(f).toContain("1 of 2 reviewed · 1 accepted");
     expect(f).toContain("+1 filtered");
     expect(f).toContain(
@@ -232,11 +232,11 @@ describe("review stream", () => {
   it("j/k move between findings; a accepts and undoes; a on a finding without a fix offers to propose", async () => {
     const app = await mount(session());
     await app.press("j");
-    await until(app.lastFrame, "[a] propose a fix");
+    await until(app.lastFrame, "[a] get a fix");
     expect(app.lastFrame()).toContain("2/2");
-    expect(app.lastFrame()).toContain("a propose ·");
+    expect(app.lastFrame()).toContain("a get a fix ·");
     await app.press("a");
-    await until(app.lastFrame, "Propose a fix:");
+    await until(app.lastFrame, "Get a fix:");
     await app.press(ESC);
     await app.press("k", "a");
     await until(app.lastFrame, "0 of 2 reviewed · 0 accepted");
@@ -247,6 +247,28 @@ describe("review stream", () => {
     await until(app.lastFrame, "2/2");
     await app.press("g");
     await until(app.lastFrame, "1/2");
+    app.unmount();
+  });
+
+  it("a on a finding without a fix lets the AI write one; the card then offers to apply it", async () => {
+    const app = await mount(
+      session({
+        runs: [
+          { match: { kind: "draft-fix" }, message: `\`\`\`diff\n${USER_PATCH}\`\`\`` },
+          {
+            match: { kind: "evaluate-fix" },
+            message: JSON.stringify({ verdict: "accepted", reason: "Looks right." }),
+          },
+        ],
+      }),
+    );
+    await app.press("j", "a");
+    await until(app.lastFrame, "Get a fix:");
+    expect(app.lastFrame()).toContain("a let the AI write it");
+    await app.press("a");
+    await until(app.lastFrame, "ACCEPTED");
+    await app.press(ESC);
+    await until(app.lastFrame, "[a] undo  [A] apply now");
     app.unmount();
   });
 
@@ -429,7 +451,7 @@ describe("actions menu", () => {
       }),
     );
     await app.press(".", "p");
-    await until(app.lastFrame, "Propose a fix:");
+    await until(app.lastFrame, "Get a fix:");
     await app.press("w");
     await app.press(..."reject zero too".split(""), ENTER);
     const f = await until(app.lastFrame, "CONCERNS");

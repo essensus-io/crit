@@ -94,7 +94,7 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
             { t: item.fix?.author === "user" ? "your fix " : "fix ", dim: true },
             { t: clip(fixSummary, w - 9) },
           ]
-        : [{ t: "no fix yet · a proposes one", dim: true }],
+        : [{ t: "no fix yet · press a to get one", dim: true }],
     );
   } else {
     out.push([{ t: clip(f.title, w), bold: true }]);
@@ -184,13 +184,19 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
         : state2 === "applied"
           ? [["enter", o.expanded ? "less" : "details"]]
           : [
-              [
-                "a",
-                item.fix ? (state2 === "accepted" ? "undo accept" : "accept fix") : "propose a fix",
-              ],
+              ...(state2 === "accepted"
+                ? ([
+                    ["a", "undo"],
+                    ["A", "apply now"],
+                  ] as [string, string][])
+                : ([["a", item.fix ? "accept fix" : "get a fix"]] as [string, string][])),
               ["d", "dismiss"],
               ["enter", o.expanded ? "less" : "details"],
             ];
+    // Drop hints from the end until they fit the card.
+    const size = (ks: [string, string][]) =>
+      ks.reduce((n, [k, l], i) => n + (i ? 2 : 0) + k.length + l.length + 3, 0);
+    while (keys.length > 2 && size(keys) > w) keys.pop();
     out.push(
       keys.flatMap(([k, label], i): Seg[] => [
         ...(i ? [{ t: "  ", dim: true }] : []),

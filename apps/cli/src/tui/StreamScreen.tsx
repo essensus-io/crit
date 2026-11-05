@@ -107,7 +107,7 @@ export function StreamScreen(props: {
         ]
       : [
           ["j/k", "next"],
-          ["a", current.fix ? (current.finding.selected ? "undo" : "accept") : "propose"],
+          ["a", current.fix ? (current.finding.selected ? "undo" : "accept") : "get a fix"],
           ["d", triage(current) === "dismissed" ? "restore" : "dismiss"],
           ["enter", props.expanded.has(current.finding.id) ? "less" : "more"],
           ...(p.applicable > 0 ? ([["A", `apply ${p.applicable}`]] as [string, string][]) : []),

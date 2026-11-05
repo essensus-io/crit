@@ -144,7 +144,7 @@ function toLines(html: string): Tok[][] {
   return lines;
 }
 
-const MAX_LINES = 4000;
+const MAX_LINES = 20_000;
 
 /**
  * Colors for every line of a file, highlighted as one document so strings and

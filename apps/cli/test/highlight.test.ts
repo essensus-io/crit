@@ -39,12 +39,18 @@ describe("highlight", () => {
     expect(lines[0]!.map((k) => k.t).join("")).toBe("if (a < b && c > d) {  return '&';");
   });
 
-  it("gives plain text for unknown languages and very large files", () => {
+  it("highlights big files (a 5000-line service) and falls back to plain text only for huge ones", () => {
+    expect(
+      highlightFile(
+        "a.ts",
+        Array.from({ length: 5000 }, () => "const x = 1;"),
+      ),
+    ).toHaveLength(5000);
     expect(highlightFile("a.xyz", ["x"])).toBeUndefined();
     expect(
       highlightFile(
         "a.ts",
-        Array.from({ length: 4001 }, () => "x"),
+        Array.from({ length: 20_001 }, () => "x"),
       ),
     ).toBeUndefined();
     expect(highlightLine(undefined, "plain")).toEqual([{ t: "plain" }]);
