@@ -1,62 +1,97 @@
 import type { ProposalOutcome } from "@crit/core";
 import { Box, Text } from "ink";
-import { DiffView, Footer, HRule, Status } from "./components.tsx";
+import type { ReactNode } from "react";
+import { diffRows, Footer, HRule, Status } from "./components.tsx";
 import type { SessionState } from "./session.ts";
+import { T } from "./theme.ts";
+import { Viewport, wrapText } from "./widgets.tsx";
 
-const VERDICT_COLOR = { accepted: "green", concerns: "yellow", rejected: "red" } as const;
+const VERDICT_COLOR = { accepted: T.mint, concerns: T.yellow, rejected: T.red } as const;
 
 /** The result of checking a user proposal: verdict, the user's diff, the AI's reply and a reply box. */
 export function ProposalScreen(props: {
   state: SessionState;
   outcome: ProposalOutcome;
   width: number;
-  input?: React.ReactNode;
+  height: number;
+  input?: ReactNode;
 }) {
-  const { outcome, width, state } = props;
+  const { outcome, width, height, state } = props;
   const e = outcome.evaluation;
   const verify = outcome.verify;
-  return (
-    <Box flexDirection="column" width={width}>
-      <Text>
+  const w = Math.max(20, width - 8);
+  const lines: ReactNode[] = [];
+  if (outcome.drafted) lines.push(<Text dimColor> Drafted from your description:</Text>);
+  lines.push(...diffRows(outcome.fix.patch));
+  lines.push(<Text> </Text>);
+  const ai = [
+    e.reason,
+    ...(e.failingCase ? [`Fails when: ${e.failingCase}`] : []),
+    ...(e.verdict === "concerns" && e.question ? [e.question] : []),
+  ];
+  let first = true;
+  for (const para of ai)
+    for (const l of wrapText(para, w)) {
+      lines.push(
+        <Text>
+          {" "}
+          {first ? (
+            <Text bold color={T.lav}>
+              AI{" "}
+            </Text>
+          ) : (
+            "   "
+          )}{" "}
+          {l}
+        </Text>,
+      );
+      first = false;
+    }
+  if (outcome.finalRound && e.verdict !== "accepted") {
+    lines.push(<Text> </Text>);
+    lines.push(
+      <Text color={T.yellow}>
         {" "}
-        <Text bold>Your fix</Text> · {outcome.fix.active ? "checked" : "not applied"} ·{" "}
-        <Text color={VERDICT_COLOR[e.verdict]} bold>
+        Three rounds used. Pick a fix: u use yours anyway or k keep the AI fix.
+      </Text>,
+    );
+  }
+  // header 1 · rule 1 · body · input 1 · status 1 · footer 2
+  const body = Math.max(3, height - 6);
+  return (
+    <Box flexDirection="column" width={width} height={height} overflow="hidden">
+      <Text wrap="truncate">
+        {" "}
+        <Text bold>Your fix</Text>
+        {` · ${outcome.fix.active ? "checked" : "not applied"} · `}
+        <Text bold color={VERDICT_COLOR[e.verdict]}>
           {e.verdict.toUpperCase()}
         </Text>
         <Text dimColor>{`   round ${outcome.round}/3`}</Text>
         {verify ? (
           <Text>
-            {"   "}verify:{" "}
+            {"   verify: "}
             {verify.commands.map((c) => (
-              <Text key={c.command} {...(c.exitCode === 0 ? { color: "green" } : { color: "red" })}>
-                {c.command.split(" ").slice(-1)[0]} {c.exitCode === 0 ? "✓" : "✗"}{" "}
+              <Text key={c.command} color={c.exitCode === 0 ? T.mint : T.red}>
+                {`${c.command.split(" ").slice(-1)[0]} ${c.exitCode === 0 ? "✓" : "✗"} `}
               </Text>
             ))}
           </Text>
         ) : null}
       </Text>
       <HRule width={width} />
-      {outcome.drafted ? <Text dimColor> Drafted from your description:</Text> : null}
-      <DiffView patch={outcome.fix.patch} maxLines={14} />
-      <Text> </Text>
-      <Box paddingLeft={1} width={width - 2}>
-        <Text>
-          <Text bold color="magenta">
-            AI{" "}
-          </Text>{" "}
-          {e.reason}
-          {e.failingCase ? `\n     Fails when: ${e.failingCase}` : ""}
-          {e.verdict === "concerns" && e.question ? `\n     ${e.question}` : ""}
-        </Text>
-      </Box>
-      <Text> </Text>
-      {e.verdict === "concerns" && !outcome.finalRound ? (props.input ?? null) : null}
-      {outcome.finalRound && e.verdict !== "accepted" ? (
-        <Text color="yellow">
-          {" "}
-          Three rounds used. Pick a fix: u use yours anyway or k keep the AI fix.
-        </Text>
-      ) : null}
+      <Viewport
+        lines={lines}
+        height={body}
+        width={width}
+        resetKey={outcome.fix.id}
+        active={!props.input}
+      />
+      {e.verdict === "concerns" && !outcome.finalRound ? (
+        (props.input ?? <Text> </Text>)
+      ) : (
+        <Text> </Text>
+      )}
       <Status busy={state.busy} notice={state.notice} error={state.error} />
       <Footer
         width={width}
@@ -66,6 +101,7 @@ export function ProposalScreen(props: {
             : []),
           ...(e.verdict !== "accepted" ? ([["u", "use anyway"]] as [string, string][]) : []),
           ["k", "keep AI fix"],
+          ["j/k", "scroll"],
           ["esc", "back"],
         ]}
       />

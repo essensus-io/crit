@@ -289,9 +289,28 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
     )
       return EXIT.cancelled;
     const { runTui } = await import("../tui/start.tsx");
-    const recovery = await runTui(ctx, store, root, config, (onEvent, signal) =>
-      runReview({ ...base, onEvent, signal }),
+    const recovery = await runTui(
+      ctx,
+      store,
+      root,
+      config,
+      (onEvent, signal) => runReview({ ...base, onEvent, signal }),
+      {
+        provider: profile.name,
+        model: profile.model,
+        effort: profile.effort ?? null,
+        depth: config.depth,
+      },
     );
+    if (recovery?.kind === "retry")
+      return runReviewCommand(ctx, {
+        ...args,
+        ...(recovery.provider ? { provider: recovery.provider } : {}),
+        ...(recovery.model !== undefined ? { model: recovery.model ?? "default" } : {}),
+        ...(recovery.effort !== undefined ? { effort: recovery.effort ?? "default" } : {}),
+        ...(recovery.depth ? { depth: recovery.depth } : {}),
+        cache: true,
+      });
     if (recovery?.kind === "provider") {
       const provider = await chooseReviewProvider(ctx);
       return runReviewCommand(ctx, { ...args, provider });

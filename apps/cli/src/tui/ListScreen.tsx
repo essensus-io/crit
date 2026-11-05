@@ -1,8 +1,11 @@
 import { type Lens, SEVERITY_ORDER, type Severity, shortId } from "@crit/schema";
 import { Box, Text } from "ink";
 import { basename, dirname } from "node:path";
-import { Footer, HRule, SEV_COLOR, SEV_LABEL, Status, truncate } from "./components.tsx";
+import { Footer, Status } from "./components.tsx";
 import type { FindingView, SessionState } from "./session.ts";
+import { type Choice, describeChoiceParts } from "./switcher.ts";
+import { SEV_COLOR, SEV_LABEL, T } from "./theme.ts";
+import { Panel, StatusBar, truncate } from "./widgets.tsx";
 
 export type ListFilter = {
   tab: "findings" | "filtered";
@@ -78,76 +81,81 @@ export function ListScreen(props: {
   width: number;
   height: number;
   prompt?: React.ReactNode;
+  choice?: Choice;
 }) {
-  const { state, filter, cursor, width } = props;
+  const { state, filter, cursor, width, height } = props;
   const items = visibleItems(state, filter);
   const all = state.items.filter((v) => !hidden(v));
   const selected = all.filter((v) => v.finding.selected).length;
   const filtered = state.items.length - all.length;
   const review = state.review;
-  const left = 26;
-  const right = Math.max(30, width - left - 3);
+  const leftW = Math.min(30, Math.max(22, Math.floor(width / 4)));
+  const rightW = width - leftW - 1;
   const tree = fileTree(state);
-  const rows = Math.max(5, props.height - 8);
+  // header 1 · panels · status 1 · prompt 1 · footer 2; a panel is border 2 + title row 0
+  const panelH = Math.max(5, height - 5);
+  const rows = panelH - 2;
   const start = Math.max(0, Math.min(cursor - Math.floor(rows / 2), items.length - rows));
+  const fstart = Math.max(
+    0,
+    Math.min(props.fileCursor - Math.floor((rows - 2) / 2), tree.length - (rows - 2)),
+  );
   const sevLabel = filter.severity ? `${filter.severity}+` : "all severities";
   const lensLabel = filter.lens ?? "all lenses";
+  const titleW = Math.max(10, rightW - 36);
 
   return (
-    <Box flexDirection="column" width={width}>
-      <Text>
-        {" "}
-        <Text bold>crit · review {shortId(review.id)}</Text> · {review.scopeLabel} ·{" "}
-        {review.provider}
-        {review.model ? ` (${review.model})` : ""} · {all.length} findings · {selected} selected
+    <Box flexDirection="column" width={width} height={height} overflow="hidden">
+      <Text wrap="truncate">
+        <Text bold color={T.mint}>
+          {" "}
+          crit
+        </Text>
+        <Text dimColor> · review </Text>
+        <Text>{shortId(review.id)}</Text>
+        <Text dimColor> · </Text>
+        <Text>{review.scopeLabel}</Text>
+        <Text
+          dimColor
+        >{` · ${review.provider}${review.model ? ` (${review.model})` : ""} · `}</Text>
+        <Text color={T.mint}>{`${all.length} findings`}</Text>
+        <Text dimColor> · </Text>
+        <Text color={T.orange}>{`${selected} selected`}</Text>
       </Text>
-      <HRule width={width} />
-      <Box>
-        <Box flexDirection="column" width={left}>
-          <Text dimColor bold={props.focus === "files"}>
-            {" "}
-            FILES
-          </Text>
-          {tree.slice(0, rows).map((r, i) => (
-            <Text
-              key={r.key}
-              {...(props.focus === "files" && i === props.fileCursor ? { inverse: true } : {})}
-              {...(filter.file === r.file && r.file ? { color: "cyan" } : {})}
-            >
-              {" "}
-              {truncate(r.label, left - 6).padEnd(left - 5)}
-              {String(r.count).padStart(3)}
-            </Text>
-          ))}
-          <Text> </Text>
-          <Text
-            {...(filter.tab === "filtered" ? { color: "cyan", bold: true } : { dimColor: true })}
-          >
-            {" "}
-            Filtered ({filtered})
-          </Text>
-        </Box>
-        <Box flexDirection="column" width={1}>
-          {Array.from(
-            { length: Math.min(rows, Math.max(tree.length, items.length) + 2) },
-            (_, i) => (
-              <Text key={i} dimColor>
-                │
+      <Box width={width} height={panelH}>
+        <Panel
+          title="files"
+          tone={props.focus === "files" ? "orange" : "mint"}
+          width={leftW}
+          height={panelH}
+        >
+          {tree.slice(fstart, fstart + rows - 2).map((r, k) => {
+            const i = fstart + k;
+            return (
+              <Text
+                key={r.key}
+                wrap="truncate"
+                {...(props.focus === "files" && i === props.fileCursor ? { inverse: true } : {})}
+                {...(filter.file === r.file && r.file ? { color: T.cyan } : {})}
+              >
+                {truncate(r.label, leftW - 9).padEnd(leftW - 8)}
+                {String(r.count).padStart(3)}
               </Text>
-            ),
-          )}
-        </Box>
-        <Box flexDirection="column" width={right} paddingLeft={1}>
-          <Text>
-            <Text dimColor bold={props.focus === "findings"}>
-              {filter.tab === "filtered" ? "FILTERED BY SKEPTIC / DISMISSED" : "FINDINGS"}
-            </Text>
-            <Text dimColor>
-              {"   "}
-              {sevLabel} · {lensLabel}
-              {filter.search ? ` · /${filter.search}` : ""}
-            </Text>
+            );
+          })}
+          <Text
+            {...(filter.tab === "filtered" ? { color: T.cyan, bold: true } : { dimColor: true })}
+          >
+            {`Filtered (${filtered})`}
           </Text>
+        </Panel>
+        <Box width={1} />
+        <Panel
+          title={`${filter.tab === "filtered" ? "filtered by skeptic / dismissed" : "findings"}  ${sevLabel} · ${lensLabel}${filter.search ? ` · /${filter.search}` : ""}`}
+          tone={props.focus === "findings" ? "orange" : "mint"}
+          width={rightW}
+          height={panelH}
+        >
           {items.length === 0 ? (
             <Text dimColor>
               {filter.tab === "filtered" ? "Nothing filtered." : "No findings match."}
@@ -169,21 +177,23 @@ export function ListScreen(props: {
             return (
               <Text
                 key={f.id}
+                wrap="truncate"
                 {...(props.focus === "findings" && idx === cursor ? { inverse: true } : {})}
               >
                 {box} <Text color={SEV_COLOR[f.severity]}>{SEV_LABEL[f.severity].padEnd(4)}</Text>{" "}
-                {truncate(loc, 18).padEnd(18)} {truncate(f.title, right - 32)}
+                {truncate(loc, 18).padEnd(18)} {truncate(f.title, titleW)}
                 <Text dimColor>{tag}</Text>
               </Text>
             );
           })}
-          {items.length > rows ? (
-            <Text dimColor> {items.length - rows} more · j/k to scroll</Text>
-          ) : null}
-        </Box>
+        </Panel>
       </Box>
-      <Status busy={state.busy} notice={state.notice} error={state.error} />
-      {props.prompt ?? null}
+      {state.busy || state.notice || state.error || !props.choice ? (
+        <Status busy={state.busy} notice={state.notice} error={state.error} />
+      ) : (
+        <StatusBar width={width} items={describeChoiceParts(props.choice)} />
+      )}
+      {props.prompt ?? <Text> </Text>}
       <Footer
         width={width}
         keys={[
@@ -195,6 +205,8 @@ export function ListScreen(props: {
           ["a", `apply ${selected}`],
           ["/", "search"],
           ["s", "severity"],
+          ["m", "model"],
+          ["P", "provider"],
           ["tab", "filtered"],
           ["q", "quit"],
         ]}

@@ -66,6 +66,8 @@ export type SessionDeps = {
 export class ReviewSession {
   state!: SessionState;
   private readonly listeners = new Set<() => void>();
+  /** Hands the terminal to a child process (Ink's suspendTerminal); set by the app. */
+  suspend: ((fn: () => Promise<void>) => Promise<void>) | undefined;
   private readonly deps: SessionDeps;
 
   constructor(deps: SessionDeps) {
@@ -199,6 +201,16 @@ export class ReviewSession {
     );
   }
 
+  /** Run something that needs the real terminal (an editor): the alternate screen is left and restored. */
+  private async withTerminal<T>(fn: () => Promise<T>): Promise<T> {
+    if (!this.suspend) return fn();
+    let result!: T;
+    await this.suspend(async () => {
+      result = await fn();
+    });
+    return result;
+  }
+
   private current(file: string): string {
     return readFileSync(join(this.deps.root, file), "utf8");
   }
@@ -213,7 +225,7 @@ export class ReviewSession {
     } catch {
       start = original;
     }
-    const edited = await this.deps.editor(start, it.finding.file);
+    const edited = await this.withTerminal(() => this.deps.editor(start, it.finding.file));
     if (edited === undefined || edited === start) {
       this.notify("No changes.");
       return;
@@ -233,7 +245,7 @@ export class ReviewSession {
   async proposeFromEditor(id: string): Promise<ProposalOutcome | undefined> {
     const it = this.item(id)!;
     const original = this.current(it.finding.file);
-    const edited = await this.deps.editor(original, it.finding.file);
+    const edited = await this.withTerminal(() => this.deps.editor(original, it.finding.file));
     const patch =
       edited === undefined ? undefined : diffFromEdit(it.finding.file, original, edited);
     if (!patch) {

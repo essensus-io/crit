@@ -1,7 +1,10 @@
 import type { ProposalOutcome } from "@crit/core";
 import { type ReviewEvent, SEVERITY_ORDER, type Severity } from "@crit/schema";
-import { Box, useApp, useInput, useStdout } from "ink";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { Box, useApp, useInput } from "ink";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useScreen } from "./screen.tsx";
+import type { Switcher } from "./switcher.ts";
+import { useSwitching } from "./useSwitching.tsx";
 import { Choice, TextInput } from "./components.tsx";
 import { DetailScreen } from "./DetailScreen.tsx";
 import { fileTree, type ListFilter, ListScreen, visibleItems } from "./ListScreen.tsx";
@@ -11,33 +14,39 @@ import {
   type ProgressState,
   reduceProgress,
   type RunRecovery,
+  type Selection,
 } from "./ProgressScreen.tsx";
 import { ProposalScreen } from "./ProposalScreen.tsx";
 import type { ReviewSession } from "./session.ts";
 
 type Mode = "none" | "search" | "dismiss" | "propose" | "describe" | "ask" | "reply" | "apply";
 
-function useSize() {
-  const stdout = useStdout().stdout as NodeJS.WriteStream;
-  const [size, setSize] = useState({ width: stdout.columns || 100, height: stdout.rows || 30 });
-  useEffect(() => {
-    const on = () => setSize({ width: stdout.columns || 100, height: stdout.rows || 30 });
-    stdout.on("resize", on);
-    return () => void stdout.off("resize", on);
-  }, [stdout]);
-  return size;
-}
-
 const SEVERITY_CYCLE: (Severity | undefined)[] = [undefined, ...SEVERITY_ORDER.slice(0, 3)];
 
 /** The interactive review screen: findings list, finding detail, proposal check. */
-export function ReviewApp({ session, onExit }: { session: ReviewSession; onExit?: () => void }) {
+export function ReviewApp({
+  session,
+  onExit,
+  switcher,
+  onConnect,
+}: {
+  session: ReviewSession;
+  onExit?: () => void;
+  switcher?: Switcher;
+  onConnect?: () => void;
+}) {
   const app = useApp();
+  useEffect(() => {
+    session.suspend = (fn) => app.suspendTerminal(fn);
+    return () => {
+      session.suspend = undefined;
+    };
+  }, [session, app]);
   const state = useSyncExternalStore(
     (fn) => session.subscribe(fn),
     () => session.state,
   );
-  const { width, height } = useSize();
+  const { width, height } = useScreen();
   const [screen, setScreen] = useState<"list" | "detail" | "proposal">("list");
   const [filter, setFilter] = useState<ListFilter>({ tab: "findings" });
   const [cursor, setCursor] = useState(0);
@@ -53,6 +62,14 @@ export function ReviewApp({ session, onExit }: { session: ReviewSession; onExit?
   const items = useMemo(() => visibleItems(state, filter), [state, filter]);
   const current = items[Math.min(cursor, Math.max(0, items.length - 1))];
   const busy = Boolean(state.busy);
+  const [, bump] = useState(0);
+  const { overlay, modal } = useSwitching({
+    switcher,
+    active: mode === "none" && !busy,
+    onNotice: (m) => session.notify(m),
+    ...(onConnect ? { onConnect } : {}),
+    onChange: () => bump((n) => n + 1),
+  });
 
   useEffect(() => {
     if (cursor >= items.length && items.length > 0) setCursor(items.length - 1);
@@ -162,7 +179,7 @@ export function ReviewApp({ session, onExit }: { session: ReviewSession; onExit?
         }
       }
     },
-    { isActive: mode === "none" },
+    { isActive: mode === "none" && !modal },
   );
 
   const done = () => setMode("none");
@@ -285,8 +302,9 @@ export function ReviewApp({ session, onExit }: { session: ReviewSession; onExit?
     );
   }
 
+  if (overlay) return overlay;
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" width={width} height={height} overflow="hidden">
       {screen === "list" || !current ? (
         <ListScreen
           state={state}
@@ -297,6 +315,7 @@ export function ReviewApp({ session, onExit }: { session: ReviewSession; onExit?
           width={width}
           height={height}
           prompt={prompt}
+          {...(switcher ? { choice: switcher.current() } : {})}
         />
       ) : screen === "detail" ? (
         <DetailScreen
@@ -304,11 +323,19 @@ export function ReviewApp({ session, onExit }: { session: ReviewSession; onExit?
           item={current}
           fixTab={fixTab}
           width={width}
+          height={height}
           prompt={prompt}
           position={`${Math.min(cursor, items.length - 1) + 1}/${items.length}`}
+          {...(switcher ? { choice: switcher.current() } : {})}
         />
       ) : (
-        <ProposalScreen state={state} outcome={outcome!} width={width} input={prompt} />
+        <ProposalScreen
+          state={state}
+          outcome={outcome!}
+          width={width}
+          height={height}
+          input={prompt}
+        />
       )}
     </Box>
   );
@@ -324,13 +351,17 @@ export function RunApp(props: {
   onStop: () => void;
   onRecover?: (action: RunRecovery) => void;
   onExit?: () => void;
+  switcher?: Switcher;
 }) {
   const app = useApp();
-  const { width } = useSize();
+  const { width, height } = useScreen();
   const [progress, setProgress] = useState<ProgressState>(emptyProgress);
   const [reviewId, setReviewId] = useState<string>();
   const [session, setSession] = useState<ReviewSession>();
   const [open, setOpen] = useState(false);
+  const [notice, setNotice] = useState<string>();
+  const [, bump] = useState(0);
+  const initial = useRef(props.switcher?.current());
 
   useEffect(
     () =>
@@ -347,6 +378,7 @@ export function RunApp(props: {
       progress.done &&
       !progress.failed &&
       !progress.rateLimited &&
+      !progress.partial &&
       ![...progress.shards.values()].some((s) => s.status === "failed")
     )
       setOpen(true);
@@ -355,10 +387,32 @@ export function RunApp(props: {
     if (open && reviewId && !session) void props.makeSession(reviewId).then(setSession);
   }, [open, reviewId, session, props]);
 
+  // What the user picked on this screen, as the difference from what the run started with.
+  const now = props.switcher?.current();
+  const was = initial.current;
+  const selection: Selection = {};
+  if (now && was) {
+    if (now.provider !== was.provider) selection.provider = now.provider;
+    if (now.model !== was.model) selection.model = now.model;
+    if (now.effort !== was.effort) selection.effort = now.effort;
+    if (now.depth !== was.depth) selection.depth = now.depth;
+  }
+  const connect = () => {
+    props.onRecover?.({ kind: "provider" });
+    app.exit();
+  };
+  const { overlay, modal } = useSwitching({
+    switcher: props.switcher,
+    active: !session,
+    onNotice: setNotice,
+    ...(props.onRecover ? { onConnect: connect } : {}),
+    onChange: () => bump((n) => n + 1),
+  });
+
   useInput(
     (input, key) => {
-      if (input === "p" && props.onRecover) {
-        props.onRecover({ kind: "provider" });
+      if (input === "r" && progress.done && props.onRecover) {
+        props.onRecover({ kind: "retry", ...selection });
         app.exit();
         return;
       }
@@ -376,10 +430,26 @@ export function RunApp(props: {
       }
       if (key.return && reviewId) setOpen(true);
     },
-    { isActive: !session },
+    { isActive: !session && !modal },
   );
 
   if (session)
-    return <ReviewApp session={session} {...(props.onExit ? { onExit: props.onExit } : {})} />;
-  return <ProgressScreen progress={progress} width={width} />;
+    return (
+      <ReviewApp
+        session={session}
+        {...(props.onExit ? { onExit: props.onExit } : {})}
+        {...(props.switcher ? { switcher: props.switcher } : {})}
+      />
+    );
+  if (overlay) return overlay;
+  return (
+    <ProgressScreen
+      progress={progress}
+      width={width}
+      height={height}
+      selection={selection}
+      {...(was ? { depth: was.depth, effort: was.effort } : {})}
+      {...(notice ? { notice } : {})}
+    />
+  );
 }

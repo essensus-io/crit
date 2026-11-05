@@ -1,6 +1,7 @@
 import { resolveConfig, shortId } from "@crit/schema";
 import { type HistoryRow, loadProjectConfig, loadUserConfig, type SqliteStore } from "@crit/store";
-import { Box, render, Text, useApp, useInput } from "ink";
+import { Box, Text, useApp, useInput } from "ink";
+import { useScreen } from "./screen.tsx";
 import { useState } from "react";
 import {
   compareReviews,
@@ -31,7 +32,7 @@ export function HistoryApp({
   initial,
   actions,
   now,
-  width = 110,
+  width: widthProp,
 }: {
   initial: HistoryRow[];
   actions: HistoryActions;
@@ -39,6 +40,8 @@ export function HistoryApp({
   width?: number;
 }) {
   const app = useApp();
+  const screen = useScreen();
+  const width = widthProp ?? screen.width;
   const [rows, setRows] = useState(initial);
   const [cursor, setCursor] = useState(0);
   const [mode, setMode] = useState<"none" | "filter" | "delete">("none");
@@ -164,7 +167,7 @@ export async function historyTui(
   rows: HistoryRow[],
   args: HistoryArgs,
 ): Promise<void> {
-  const { makeSession } = await import("./start.tsx");
+  const { makeSession, renderFullScreen } = await import("./start.tsx");
   const root = await repoRootOrThrow(ctx.cwd);
   const config = resolveConfig(loadUserConfig(ctx.paths), loadProjectConfig(root));
   const actions: HistoryActions = {
@@ -176,13 +179,5 @@ export async function historyTui(
     remove: (row) => store.reviews.delete(row.review.id),
     open: (row) => makeSession(ctx, store, root, row.review.id, config),
   };
-  const app = render(
-    <HistoryApp
-      initial={rows}
-      actions={actions}
-      now={ctx.now()}
-      width={process.stdout.columns || 110}
-    />,
-  );
-  await app.waitUntilExit();
+  await renderFullScreen(<HistoryApp initial={rows} actions={actions} now={ctx.now()} />);
 }

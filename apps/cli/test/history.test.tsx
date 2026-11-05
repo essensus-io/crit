@@ -224,7 +224,7 @@ describe("history screen", () => {
     await sleep(80);
     app.stdin.write("\r");
     await sleep(200);
-    expect(app.lastFrame()).toContain("FINDINGS");
+    expect(app.lastFrame()).toContain("all severities");
     app.unmount();
   });
 });
