@@ -201,6 +201,8 @@ export function ListScreen(props: {
           ["space", "select"],
           ["enter", "open"],
           ["p", "propose"],
+          ["y", "copy prompt"],
+          ["R", "rules"],
           ["d", "dismiss"],
           ["a", `apply ${selected}`],
           ["/", "search"],

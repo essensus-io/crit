@@ -171,6 +171,19 @@ export async function makeSession(
     ...(recheck ? { recheck } : {}),
   });
   await session.load();
+  if (review && fixContext) {
+    // Tell the user once if their agent CLI is newer or older than what crit was tested with.
+    void ctx.registry
+      .create(fixContext.provider.profile, { env: ctx.env, tmpDir: ctx.paths.cache })
+      .detect()
+      .then((d) => {
+        if (d.installed && d.untestedVersion)
+          session.notify(
+            `${fixContext.provider.profile.name} ${d.version ?? ""} has not been tested with this crit version; if something misbehaves, run crit doctor.`,
+          );
+      })
+      .catch(() => undefined);
+  }
   return session;
 }
 

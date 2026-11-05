@@ -3,6 +3,7 @@ import type { RuleFile } from "./parse.ts";
 import { discoverGlobalRules, discoverProjectRules, discoverUserRules } from "./sources.ts";
 
 export * from "./parse.ts";
+export * from "./disabled.ts";
 export * from "./select.ts";
 export * from "./sources.ts";
 

@@ -5,6 +5,7 @@ import { createFixtureRepo, type FixtureRepo } from "@crit/testkit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   discoverRules,
+  getDisabledRules,
   isReviewRelevant,
   loadRules,
   parseRuleFile,
@@ -12,6 +13,7 @@ import {
   RuleParseError,
   ruleApplies,
   ruleLabel,
+  setRuleDisabled,
   type RuleSet,
   type RuleTagger,
   splitSections,
@@ -482,5 +484,26 @@ describe("loadRules selection", () => {
     expect(ruleLabel({ kind: "cursor-rule", path: ".cursor/rules/p.mdc", title: "P" })).toBe(
       ".cursor/rules/p.mdc",
     );
+  });
+});
+
+describe("disabled rules", () => {
+  it("are stored per repository, sorted, and can be turned back on", async () => {
+    const mem = new Map<string, string>();
+    const store = {
+      kv: {
+        get: async (k: string) => mem.get(k),
+        set: async (k: string, v: string) => void mem.set(k, v),
+      },
+    };
+    expect(await getDisabledRules(store, "repo")).toEqual([]);
+    await setRuleDisabled(store, "repo", "b.md#B", true);
+    await setRuleDisabled(store, "repo", "a.md", true);
+    await setRuleDisabled(store, "repo", "a.md", true);
+    expect(await getDisabledRules(store, "repo")).toEqual(["a.md", "b.md#B"]);
+    expect(await getDisabledRules(store, "other")).toEqual([]);
+    expect(await setRuleDisabled(store, "repo", "a.md", false)).toEqual(["b.md#B"]);
+    mem.set("disabled-rules:repo", "not json");
+    expect(await getDisabledRules(store, "repo")).toEqual([]);
   });
 });

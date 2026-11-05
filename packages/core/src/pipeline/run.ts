@@ -25,7 +25,13 @@ import {
 import type { Repositories } from "@crit/store";
 import { z } from "zod";
 import { remoteUrl } from "../git.ts";
-import { discoverRules, loadRules, type RuleFile, type RuleSet } from "../rules/index.ts";
+import {
+  discoverRules,
+  getDisabledRules,
+  loadRules,
+  type RuleFile,
+  type RuleSet,
+} from "../rules/index.ts";
 import { resolveScope } from "../scope.ts";
 import { type AgentOutcome, type AgentRunner, runAgent } from "./agent.ts";
 import { excerpt, reanchor } from "./anchor.ts";
@@ -167,7 +173,7 @@ export async function prepareReview(opts: ReviewOptions): Promise<Prepared> {
     nativeKinds: opts.provider.adapter.capabilities.nativeContext,
     sources: config.rules.sources,
     exclude: config.rules.exclude,
-    disabled: opts.disabledRules ?? [],
+    disabled: opts.disabledRules ?? (await getDisabledRules(store, repo.id)),
     budgetTokens: config.rules.budgetTokens,
     tagCache: {
       get: async (h) => {

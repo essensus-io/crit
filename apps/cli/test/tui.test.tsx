@@ -10,7 +10,7 @@ import { render } from "ink-testing-library";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ReviewApp, RunApp } from "../src/tui/App.tsx";
 import { emptyProgress, ProgressScreen, reduceProgress } from "../src/tui/ProgressScreen.tsx";
-import { type Editor, ReviewSession } from "../src/tui/session.ts";
+import { type Editor, ReviewSession, type SessionDeps } from "../src/tui/session.ts";
 import type { Choice, Switcher } from "../src/tui/switcher.ts";
 
 const CODE = `export async function refund(order, amount, provider) {
@@ -143,7 +143,11 @@ afterEach(() => {
   rmSync(backups, { recursive: true, force: true });
 });
 
-function session(script: FakeScriptInput = { runs: [] }, editor: Editor = async () => undefined) {
+function session(
+  script: FakeScriptInput = { runs: [] },
+  editor: Editor = async () => undefined,
+  extra: Partial<SessionDeps> = {},
+) {
   const fake = new FakeAdapter(FakeScript.parse(script), { model: null });
   const fixContext: FixContext = {
     store,
@@ -163,6 +167,7 @@ function session(script: FakeScriptInput = { runs: [] }, editor: Editor = async 
     editor,
     backupRoot: backups,
     verifyCommands: [],
+    ...extra,
   });
 }
 
@@ -872,5 +877,61 @@ describe("progress reducer: tokens, cache, budget and the session log", () => {
     ev({ type: "verify-started", count: 4 });
     ev({ type: "verified", result: { findingId: "a", verdict: "confirmed", reason: "" } });
     expect([p.verifying, p.verified]).toEqual([4, 1]);
+  });
+});
+
+describe("copy as prompt and the rules panel", () => {
+  it("y copies the finding as a prompt, with location, explanation, rule and fix", async () => {
+    const copied: string[] = [];
+    const app = await mount(
+      session(undefined, undefined, { copy: (t) => (copied.push(t), "test clipboard") }),
+    );
+    await app.press("y");
+    await until(app.lastFrame, "Copied a prompt for “Refund amount not validated”");
+    expect(app.lastFrame()).toContain("via test clipboard");
+    const text = copied[0]!;
+    expect(text).toContain("Fix this critical correctness issue found in code review.");
+    expect(text).toContain("Location: src/payments.ts:2");
+    expect(text).toContain(
+      "How it fails: POST /refunds {orderId: 17, amount: 5000} on a 2000 capture",
+    );
+    expect(text).toContain("- Validate money inputs at the boundary (.cursor/rules/payments.mdc)");
+    expect(text).toContain("Suggested fix: Validate against captured minus refunded");
+    expect(text).toContain("```diff");
+    // from the detail screen too
+    await app.press(ENTER, "y");
+    expect(copied).toHaveLength(2);
+    app.unmount();
+  });
+
+  it("R lists the review's rules; turning one off stores it, re-checks the files citing it, and can be undone", async () => {
+    const rechecked: string[] = [];
+    const s = session(undefined, undefined, {
+      recheck: async (file) => {
+        rechecked.push(file);
+        const temp = await store.reviews.create({
+          ...(await store.reviews.get(reviewId))!,
+          id: `temp-${rechecked.length}`,
+        });
+        return temp.id;
+      },
+    });
+    const app = await mount(s);
+    await app.press("R");
+    const f = await until(app.lastFrame, "rules in this review");
+    expect(f).toContain("[x] R4  Validate money inputs at the boundary");
+    await app.press(ENTER);
+    await until(app.lastFrame, "R4 is off; re-checked 1 file(s).");
+    expect(rechecked).toEqual(["src/payments.ts"]);
+    expect(s.state.disabledRules).toEqual([".cursor/rules/payments.mdc"]);
+    expect(s.ruleRows()[0]).toMatchObject({ disabled: true });
+    // back on: no re-check, applies next time
+    await app.press("R");
+    await until(app.lastFrame, "[ ] R4");
+    await app.press(ENTER);
+    await until(app.lastFrame, "R4 is on again");
+    expect(rechecked).toHaveLength(1);
+    expect(s.ruleRows()[0]).toMatchObject({ disabled: false });
+    app.unmount();
   });
 });

@@ -3,6 +3,7 @@ import { type ReviewEvent, SEVERITY_ORDER, type Severity } from "@crit/schema";
 import { Box, useApp, useInput } from "ink";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useScreen } from "./screen.tsx";
+import { Picker } from "./widgets.tsx";
 import type { Switcher } from "./switcher.ts";
 import { useSwitching } from "./useSwitching.tsx";
 import { Choice, TextInput } from "./components.tsx";
@@ -19,7 +20,16 @@ import {
 import { ProposalScreen } from "./ProposalScreen.tsx";
 import type { ReviewSession } from "./session.ts";
 
-type Mode = "none" | "search" | "dismiss" | "propose" | "describe" | "ask" | "reply" | "apply";
+type Mode =
+  | "none"
+  | "rules"
+  | "search"
+  | "dismiss"
+  | "propose"
+  | "describe"
+  | "ask"
+  | "reply"
+  | "apply";
 
 const SEVERITY_CYCLE: (Severity | undefined)[] = [undefined, ...SEVERITY_ORDER.slice(0, 3)];
 
@@ -134,6 +144,8 @@ export function ReviewApp({
           return;
         }
         if (input === "a") return setMode("apply");
+        if (input === "R") return setMode("rules");
+        if (input === "y" && current) return void session.copyPrompt(current.finding.id);
         if (!current) return;
         if (key.return) return openDetail();
         if (input === " ") return void session.toggle(current.finding.id);
@@ -159,6 +171,8 @@ export function ReviewApp({
             ? void session.restore(current.finding.id)
             : setMode("dismiss");
         if (input === "r") return void session.recheck(current.finding.id);
+        if (input === "y") return void session.copyPrompt(current.finding.id);
+        if (input === "R") return setMode("rules");
         if (input === "u" && current.userFix && !current.userFix.active)
           return void session.useAnyway(current.userFix.id);
         if (input === "k" && current.aiFix && !current.aiFix.active)
@@ -302,6 +316,27 @@ export function ReviewApp({
     );
   }
 
+  if (mode === "rules") {
+    const rows = session.ruleRows();
+    return (
+      <Picker
+        title="rules in this review · enter toggles"
+        options={rows.map((r) => ({
+          value: r.ref.id,
+          label: `${r.disabled ? "[ ]" : "[x]"} ${r.ref.id}  ${r.ref.title}`,
+          hint: r.ref.path,
+        }))}
+        width={width}
+        height={height}
+        note="off = skipped from now on; its files are re-checked"
+        onPick={(id) => {
+          done();
+          void session.toggleRule(id);
+        }}
+        onCancel={done}
+      />
+    );
+  }
   if (overlay) return overlay;
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">

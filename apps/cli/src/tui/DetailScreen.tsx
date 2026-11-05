@@ -181,6 +181,8 @@ export function DetailScreen(props: {
           ["space", "include"],
           ["e", "edit fix"],
           ["p", "propose"],
+          ["y", "copy prompt"],
+          ["R", "rules"],
           ["?", "ask"],
           ["d", "dismiss"],
           ["r", "re-check"],

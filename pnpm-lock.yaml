@@ -44,6 +44,19 @@ importers:
       '@clack/prompts':
         specifier: ^1.8.1
         version: 1.8.1
+      citty:
+        specifier: ^0.2.2
+        version: 0.2.2
+      ink:
+        specifier: ^8.0.0
+        version: 8.0.0(@types/react@19.3.0)(react@19.3.1)
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
       '@crit/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -59,19 +72,6 @@ importers:
       '@crit/store':
         specifier: workspace:*
         version: link:../../packages/store
-      citty:
-        specifier: ^0.2.2
-        version: 0.2.2
-      ink:
-        specifier: ^8.0.0
-        version: 8.0.0(@types/react@19.3.0)(react@19.3.1)
-      react:
-        specifier: ^19.3.1
-        version: 19.3.1
-      zod:
-        specifier: ^4.6.7
-        version: 4.6.7
-    devDependencies:
       '@crit/testkit':
         specifier: workspace:*
         version: link:../../packages/testkit

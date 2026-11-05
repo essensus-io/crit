@@ -8,6 +8,7 @@ import {
   diffFromEdit,
   dismissFinding,
   type FixContext,
+  getDisabledRules,
   keepAiFix,
   patchedContent,
   type ProposalInput,
@@ -16,10 +17,13 @@ import {
   type Rebaser,
   restoreFinding,
   saveEditedFix,
+  setRuleDisabled,
   useFixAnyway,
 } from "@crit/core";
 import type { DismissReason, Finding, Fix, Message, Review } from "@crit/schema";
 import type { SqliteStore } from "@crit/store";
+import { copyToClipboard } from "../clipboard.ts";
+import { findingPrompt } from "./prompt.ts";
 
 export type RuleRef = { id: string; title: string; path: string; section?: string };
 
@@ -37,6 +41,8 @@ export type SessionState = {
   review: Review;
   items: FindingView[];
   rules: Map<string, RuleRef>;
+  /** Keys (`path#Section`) of rules turned off for this repository. */
+  disabledRules: string[];
   busy?: string;
   notice?: string;
   error?: string;
@@ -57,6 +63,8 @@ export type SessionDeps = {
   rebase?: Rebaser;
   /** Re-review one file; returns the id of a temporary review holding the fresh findings. */
   recheck?: (file: string) => Promise<string>;
+  /** Put text on the clipboard; returns where it went. */
+  copy?: (text: string) => string;
 };
 
 /**
@@ -113,6 +121,7 @@ export class ReviewSession {
       review,
       items,
       rules: new Map((ruleEvent?.rules ?? []).map((r) => [r.id, r])),
+      disabledRules: await getDisabledRules(this.deps.store, review.repoId),
     };
     for (const l of this.listeners) l();
     return this.state;
@@ -283,20 +292,80 @@ export class ReviewSession {
   /** Re-run review for one file and replace this review's open findings on it with the fresh ones. */
   recheck(id: string) {
     const it = this.item(id)!;
-    const recheck = this.deps.recheck;
-    if (!recheck)
+    if (!this.deps.recheck)
       return Promise.resolve(this.set({ error: "re-check needs a provider (crit providers add)" }));
-    return this.run(`Re-checking ${it.finding.file}…`, async () => {
-      const { store, reviewId } = this.deps;
-      const temp = await recheck(it.finding.file);
-      for (const f of await store.findings.listByReview(reviewId)) {
-        if (f.file === it.finding.file && f.status === "open")
-          await store.findings.update(f.id, { status: "closed", selected: false });
-      }
-      for (const f of await store.findings.listByReview(temp)) {
-        if (f.file === it.finding.file) await store.findings.reassign(f.id, reviewId);
-      }
-      await store.reviews.delete(temp);
+    return this.run(`Re-checking ${it.finding.file}…`, () => this.recheckFile(it.finding.file));
+  }
+
+  private async recheckFile(file: string) {
+    const { store, reviewId, recheck } = this.deps;
+    const temp = await recheck!(file);
+    for (const f of await store.findings.listByReview(reviewId)) {
+      if (f.file === file && f.status === "open")
+        await store.findings.update(f.id, { status: "closed", selected: false });
+    }
+    for (const f of await store.findings.listByReview(temp)) {
+      if (f.file === file) await store.findings.reassign(f.id, reviewId);
+    }
+    await store.reviews.delete(temp);
+  }
+
+  /** The finding as a prompt for another agent, on the clipboard. */
+  copyPrompt(id: string) {
+    const it = this.item(id);
+    if (!it) return;
+    const refs = it.finding.ruleIds
+      .map((r) => this.state.rules.get(r))
+      .filter((r): r is RuleRef => r !== undefined);
+    const text = findingPrompt(it.finding, it.fix, refs);
+    const via = (this.deps.copy ?? copyToClipboard)(text);
+    this.notify(`Copied a prompt for “${it.finding.title}” (${text.length} chars) via ${via}.`);
+  }
+
+  /** The rules this review used, with whether the user has turned each off. */
+  ruleRows() {
+    return [...this.state.rules.values()].map((ref) => {
+      const key = ref.section ? `${ref.path}#${ref.section}` : ref.path;
+      return { ref, key, disabled: this.state.disabledRules.includes(key) };
     });
+  }
+
+  /**
+   * Turn a rule off or on for this repository. Turning one off re-checks the
+   * files whose findings cite it; turning one on applies to the next review
+   * or re-check.
+   */
+  async toggleRule(ruleId: string) {
+    const row = this.ruleRows().find((r) => r.ref.id === ruleId);
+    if (!row) return;
+    const { store, recheck } = this.deps;
+    const disable = !row.disabled;
+    await setRuleDisabled(store, this.state.review.repoId, row.key, disable);
+    if (!disable) {
+      await this.load();
+      return this.notify(`${row.ref.id} is on again. It applies to the next review or re-check.`);
+    }
+    const files = [
+      ...new Set(
+        this.state.items
+          .filter((i) => i.finding.status === "open" && i.finding.ruleIds.includes(ruleId))
+          .map((i) => i.finding.file),
+      ),
+    ];
+    if (!files.length || !recheck) {
+      await this.load();
+      return this.notify(
+        files.length
+          ? `${row.ref.id} is off. Connect a provider to re-check ${files.length} file(s).`
+          : `${row.ref.id} is off. No open findings cite it.`,
+      );
+    }
+    await this.run(
+      `Re-checking ${files.length} file${files.length === 1 ? "" : "s"} without ${row.ref.id}…`,
+      async () => {
+        for (const f of files) await this.recheckFile(f);
+      },
+    );
+    this.notify(`${row.ref.id} is off; re-checked ${files.length} file(s).`);
   }
 }
