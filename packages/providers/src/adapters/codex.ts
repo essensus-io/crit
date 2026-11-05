@@ -48,6 +48,12 @@ export function buildCodexInvocation(
     'approval_policy="never"',
     "-c",
     "project_doc_max_bytes=0",
+    // Measured with `codex debug prompt-input`: the plugin runtime (JS tools) and apps add ~2.8k
+    // tokens to every turn (16.8k -> 14.4k) and crit uses neither.
+    "--disable",
+    "plugins",
+    "--disable",
+    "apps",
   ];
   if (task.mcp && task.mcpSession) {
     // Only crit's own tools are pre-approved; shell commands stay in the read-only sandbox.

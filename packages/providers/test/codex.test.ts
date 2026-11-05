@@ -147,6 +147,8 @@ describe("buildCodexInvocation", () => {
     expect(inv.args).toContain('mcp_servers.crit.command="/usr/bin/node"');
     expect(inv.args).toContain('mcp_servers.crit.args=["/crit.js","mcp","--session","s1"]');
     expect(inv.args).toContain('mcp_servers.crit.default_tools_approval_mode="approve"');
+    // trims ~2.8k tokens of unused tool definitions from every turn
+    expect(inv.args.join(" ")).toContain("--disable plugins --disable apps");
     expect(flag("-m")).toBe("o4");
     expect(flag("-C")).toBe("/repo");
     expect(flag("--output-schema")).toBe(join(inv.cleanupDir, "schema.json"));
