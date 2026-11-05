@@ -1,6 +1,7 @@
 import {
   addProfile,
   emptyProvidersFile,
+  listModels,
   removeProfile,
   rolesOf,
   setDefault,
@@ -11,7 +12,7 @@ import { loadProviders, saveProviders } from "@crit/store";
 import { defineCommand } from "citty";
 import type { CliContext } from "../context.ts";
 import { CliError, EXIT } from "../errors.ts";
-import { CLI_DEFAULT, editProfileFlow, firstRun, profilePrompts, testProvider } from "../setup.ts";
+import { editProfileFlow, firstRun, profilePrompts, testProvider } from "../setup.ts";
 import { colors, duration, table } from "../ui.ts";
 
 function load(ctx: CliContext): ProvidersFile {
@@ -90,6 +91,8 @@ export async function addProvider(
     type?: string;
     name?: string;
     model?: string;
+    effort?: string;
+    "fast-model"?: string;
     command?: string;
     default?: boolean;
     test?: boolean;
@@ -123,17 +126,31 @@ export async function addProvider(
 
   let name = args.name;
   let model = parseModel(args.model);
-  if (ctx.interactive && (name === undefined || model === undefined)) {
-    const answers = await profilePrompts(ctx, file, factory);
+  let effort = parseModel(args.effort);
+  let fastModel = parseModel(args["fast-model"]);
+  if (
+    ctx.interactive &&
+    (name === undefined || model === undefined || effort === undefined || fastModel === undefined)
+  ) {
+    const answers = await profilePrompts(ctx, file, factory, undefined, args.command);
     name ??= answers.name;
-    if (model === undefined) model = answers.model === CLI_DEFAULT ? null : answers.model;
+    if (model === undefined) model = answers.model;
+    if (effort === undefined) effort = answers.effort;
+    if (fastModel === undefined) fastModel = answers.fastModel;
   }
   name ??= file.providers.some((p) => p.name === factory.defaultName)
     ? `${factory.defaultName}-2`
     : factory.defaultName;
   file = addProfile(
     file,
-    { name, type, command: args.command ?? factory.defaultCommand, model: model ?? null },
+    {
+      name,
+      type,
+      command: args.command ?? factory.defaultCommand,
+      model: model ?? null,
+      effort: effort ?? null,
+      fastModel: fastModel ?? null,
+    },
     { makeDefault: Boolean(args.default) },
   );
   const profile = file.providers.find((p) => p.name === name)!;
@@ -150,13 +167,22 @@ export async function addProvider(
 export async function editProvider(
   ctx: CliContext,
   name: string,
-  args: { model?: string; enabled?: boolean; roles?: string; test?: boolean },
+  args: {
+    model?: string;
+    effort?: string;
+    "fast-model"?: string;
+    enabled?: boolean;
+    roles?: string;
+    test?: boolean;
+  },
 ): Promise<number> {
   const file = load(ctx);
   const profile = need(file, name);
   const roles = parseRoles(args.roles);
   const next = await editProfileFlow(ctx, file, profile, {
     ...(args.model !== undefined ? { model: parseModel(args.model)! } : {}),
+    ...(args.effort !== undefined ? { effort: parseModel(args.effort)! } : {}),
+    ...(args["fast-model"] !== undefined ? { fastModel: parseModel(args["fast-model"])! } : {}),
     ...(args.enabled !== undefined ? { enabled: args.enabled } : {}),
     ...(roles ? { roles } : {}),
     ...(args.test !== undefined ? { test: args.test } : {}),
@@ -168,6 +194,56 @@ export async function editProvider(
   }
   saveProviders(ctx.paths, next);
   ctx.out(`Updated ${name}\n`);
+  return EXIT.ok;
+}
+
+/** `crit providers models [name|type]`: what the agent CLI offers, with the profile's current choice marked. */
+export async function listProviderModels(
+  ctx: CliContext,
+  target: string | undefined,
+  args: { search?: string; json?: boolean },
+): Promise<number> {
+  const file = loadProviders(ctx.paths);
+  const profile = target ? file?.providers.find((p) => p.name === target) : undefined;
+  const byDefault = !target ? file?.providers.find((p) => p.name === file.default) : undefined;
+  const chosen = profile ?? byDefault;
+  const factory = ctx.registry.get(chosen?.type ?? target ?? "");
+  if (!factory)
+    throw new CliError(`crit: ${target ?? "no provider"} is not a provider name or type`, {
+      hint: `Providers: ${file?.providers.map((p) => p.name).join(", ") || "none"}. Types: ${ctx.registry
+        .list()
+        .map((f) => f.type)
+        .join(", ")}.`,
+    });
+  const command = chosen?.command ?? factory.defaultCommand;
+  const { models, live } = await listModels(factory, { command, env: ctx.env });
+  const q = args.search?.toLowerCase();
+  const shown = q
+    ? models.filter((m) => m.id.toLowerCase().includes(q) || m.label.toLowerCase().includes(q))
+    : models;
+  if (args.json) {
+    ctx.out(
+      `${JSON.stringify({ provider: chosen?.name ?? null, type: factory.type, live, current: chosen?.model ?? null, models: shown }, null, 2)}\n`,
+    );
+    return EXIT.ok;
+  }
+  const c = colors(ctx.color);
+  const rows = [["", c.dim("MODEL ID"), c.dim("NAME"), c.dim("EFFORTS")]];
+  for (const m of shown)
+    rows.push([
+      m.id === chosen?.model ? "●" : " ",
+      m.id,
+      m.label,
+      m.efforts?.length
+        ? `${m.efforts.join(" ")}${m.defaultEffort ? c.dim(` (default ${m.defaultEffort})`) : ""}`
+        : factory.efforts.length
+          ? c.dim("per CLI")
+          : c.dim("in the model id"),
+    ]);
+  ctx.out(`\n${table(rows)}\n\n`);
+  ctx.out(
+    `  ${c.dim(`${shown.length}${q ? ` of ${models.length}` : ""} models${live ? "" : " (built-in list; the CLI did not list its own)"} · crit providers edit ${chosen?.name ?? "<name>"} --model <id>`)}\n\n`,
+  );
   return EXIT.ok;
 }
 
@@ -294,6 +370,11 @@ export const providersCommand = (ctx: CliContext) =>
           },
           name: { type: "string", description: "Profile name" },
           model: { type: "string", description: "Model, or 'default' for the CLI default" },
+          effort: { type: "string", description: "Reasoning effort, or 'default'" },
+          "fast-model": {
+            type: "string",
+            description: "Cheaper model for the skeptic and repo map, or 'default' for the same",
+          },
           command: { type: "string", description: "Path to the agent CLI" },
           default: { type: "boolean", description: "Make it the default" },
           test: {
@@ -309,13 +390,32 @@ export const providersCommand = (ctx: CliContext) =>
         meta: { name: "edit", description: "Edit a provider profile" },
         args: {
           name: { type: "positional", required: true },
-          model: { type: "string" },
+          model: { type: "string", description: "Model, or 'default' for the CLI default" },
+          effort: { type: "string", description: "Reasoning effort, or 'default'" },
+          "fast-model": {
+            type: "string",
+            description: "Cheaper model for the skeptic and repo map, or 'default' for the same",
+          },
           enabled: { type: "boolean" },
           roles: { type: "string", description: "Comma-separated: review, skeptic, evaluate" },
           test: { type: "boolean" },
         },
         run: async ({ args }) => {
           process.exitCode = await editProvider(ctx, args.name, args as never);
+        },
+      }),
+      models: defineCommand({
+        meta: {
+          name: "models",
+          description: "List the models an agent CLI offers (a profile name or a type like codex)",
+        },
+        args: {
+          name: { type: "positional", required: false },
+          search: { type: "string", description: "Only models whose id or name contains this" },
+          json: { type: "boolean", description: "Print JSON" },
+        },
+        run: async ({ args }) => {
+          process.exitCode = await listProviderModels(ctx, args.name, args);
         },
       }),
       remove: defineCommand({

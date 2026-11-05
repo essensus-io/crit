@@ -18,6 +18,13 @@ export interface Prompter {
     validate?: (v: string) => string | undefined;
   }): Promise<string>;
   select<T>(opts: { message: string; options: Option<T>[]; initialValue?: T }): Promise<T>;
+  /** A searchable list: type to filter (for long lists such as Cursor's ~270 models). */
+  autocomplete<T>(opts: {
+    message: string;
+    options: Option<T>[];
+    initialValue?: T;
+    placeholder?: string;
+  }): Promise<T>;
   multiselect<T>(opts: {
     message: string;
     options: Option<T>[];
@@ -63,6 +70,22 @@ export class ClackPrompter implements Prompter {
       await p.select<T>({
         message: o.message,
         options: o.options as never,
+        ...(o.initialValue !== undefined ? { initialValue: o.initialValue } : {}),
+      }),
+    );
+  }
+  async autocomplete<T>(o: {
+    message: string;
+    options: Option<T>[];
+    initialValue?: T;
+    placeholder?: string;
+  }) {
+    return unwrap<T>(
+      await p.autocomplete<T>({
+        message: o.message,
+        options: o.options as never,
+        maxItems: 10,
+        ...(o.placeholder ? { placeholder: o.placeholder } : {}),
         ...(o.initialValue !== undefined ? { initialValue: o.initialValue } : {}),
       }),
     );
@@ -137,6 +160,9 @@ export class ScriptedPrompter implements Prompter {
     const hit = o.options.find((x) => x.value === v || x.label === v);
     if (!hit) throw new Error(`no option ${String(v)} for "${o.message}"`);
     return hit.value;
+  }
+  async autocomplete<T>(o: { message: string; options: Option<T>[]; initialValue?: T }) {
+    return this.select(o);
   }
   async multiselect<T>(o: { message: string; options: Option<T>[]; initialValues?: T[] }) {
     const v = this.next(o.message, o.initialValues ?? []) as unknown[];

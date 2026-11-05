@@ -24,6 +24,8 @@ export type AgentTask = {
    */
   mcp?: { command: string; args: string[]; sessionsDir: string };
   model?: string;
+  /** Reasoning effort (low … max); adapters whose CLI has no such setting ignore it. */
+  effort?: string;
   /**
    * What the agent may use besides crit's own tools. Tool definitions are resent
    * every turn (Claude Code: ~1.5k tokens for the shell alone, ~2.6k for file

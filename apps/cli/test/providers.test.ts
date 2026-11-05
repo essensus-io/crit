@@ -67,6 +67,8 @@ describe.skipIf(!posix)("first run", () => {
       ? Which providers do you want to add?
       ? Name for Test Agent
       ? Model for Test Agent
+      ? Reasoning effort for Test Agent
+      ? Cheaper model for Test Agent's skeptic and repo map
       spin Testing providers
       done Testing providers
       ✓ claude     replied in <dur>
@@ -228,14 +230,15 @@ describe("crit providers", () => {
 
     const i = testContext({
       interactive: true,
-      answers: ["CLI default", false, ["evaluate"], true],
+      // model, effort, cheaper model, enabled, roles, test now
+      answers: ["CLI default", "low", "fake-small", false, ["evaluate"], true],
     });
     i.ctx.paths = t.ctx.paths;
     i.script(okScript);
     expect(await i.run("providers", "edit", "codex")).toBe(0);
     expect(saved(t)).toMatchObject({
       roles: { evaluate: "codex" },
-      providers: [{}, { model: null, enabled: false }],
+      providers: [{}, { model: null, effort: "low", fastModel: "fake-small", enabled: false }],
     });
     expect(i.prompter.log.join("\n")).toMatch(/success replied in/);
     i.cleanup();

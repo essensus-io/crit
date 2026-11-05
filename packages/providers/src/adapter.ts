@@ -1,3 +1,4 @@
+import type { ModelInfo } from "./models.ts";
 import type {
   AdapterCapabilities,
   AgentEvent,
@@ -39,8 +40,18 @@ export type AdapterFactory = {
   defaultName: string;
   /** What to tell the user when the CLI is not logged in. */
   loginHint: string;
-  /** Models offered during setup (any name is accepted). */
+  /** Models offered when the CLI cannot list its own (any name is accepted). */
   models: string[];
+  /** The CLI's own model list, when it has one (Codex, Cursor). */
+  listModels?(opts: {
+    command: string;
+    env: NodeJS.ProcessEnv;
+    timeoutMs?: number;
+  }): Promise<ModelInfo[]>;
+  /** What "CLI default" means for the model, when it is not obvious. */
+  defaultModelNote?: string;
+  /** Reasoning efforts to offer when a model does not report its own; empty = effort is part of the model id. */
+  efforts: string[];
   /** Hidden from first-run detection (the fake provider). */
   hidden?: boolean;
   create(profile: ProviderProfile, env: AdapterEnv): ProviderAdapter;

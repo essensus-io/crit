@@ -7,3 +7,4 @@ export * from "./registry.ts";
 export * from "./adapters/claude-code.ts";
 export * from "./adapters/codex.ts";
 export * from "./adapters/cursor.ts";
+export * from "./models.ts";

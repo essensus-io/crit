@@ -7,6 +7,7 @@ import {
   FakeScript,
   type FakeScriptInput,
   fakeFactory,
+  type ModelInfo,
 } from "@crit/providers";
 import { critPaths, dbPath, openStore, type SqliteStore } from "@crit/store";
 import type { CliContext } from "../src/context.ts";
@@ -37,6 +38,8 @@ export function testContext(
     interactive?: boolean;
     answers?: ConstructorParameters<typeof ScriptedPrompter>[0];
     cwd?: string;
+    /** Give the fake agent CLI its own model list, as Codex and Cursor have. */
+    models?: ModelInfo[];
   } = {},
 ): TestEnv {
   const dir = mkdtempSync(join(tmpdir(), "crit-cli-"));
@@ -60,6 +63,7 @@ export function testContext(
     defaultName: "agent",
     loginHint: "run `test-agent login`",
     hidden: false,
+    ...(opts.models ? { listModels: async () => opts.models! } : {}),
     create: (profile) => {
       const f = new FakeAdapter(script, profile);
       fakes.push(f);

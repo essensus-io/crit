@@ -2,6 +2,7 @@ import { basename } from "node:path";
 import type { AgentEvent, AgentTask, ProviderProfile } from "@crit/schema";
 import type { AdapterEnv, AdapterFactory, ProviderAdapter } from "../adapter.ts";
 import { detectCli } from "../detect.ts";
+import { cursorModels } from "../models.ts";
 import { streamProcess } from "../process.ts";
 
 export const CURSOR_TESTED = { min: "2026.10.0", max: "2026.12.999" };
@@ -184,5 +185,7 @@ export const cursorFactory: AdapterFactory = {
   defaultName: "cursor",
   loginHint: "run `cursor-agent login`",
   models: [],
+  listModels: ({ command, env, timeoutMs }) => cursorModels(command, env, timeoutMs),
+  efforts: [],
   create: (profile, env) => new CursorAdapter(profile, env),
 };

@@ -5,6 +5,7 @@ import {
   type AdapterFactory,
   addProfile,
   detectInstalled,
+  type ModelInfo,
   emptyProvidersFile,
   type ProviderAdapter,
   setDefault,
@@ -14,11 +15,11 @@ import {
 import { type ProviderProfile, ProviderName, type ProvidersFile, type Role } from "@crit/schema";
 import { loadProviders, providersPath, saveProviders } from "@crit/store";
 import type { CliContext } from "./context.ts";
+import { askEffort, askFastModel, askModel, CLI_DEFAULT, loadModels } from "./model-picker.ts";
 import { CliError } from "./errors.ts";
 import { colors, duration } from "./ui.ts";
 
-export const CLI_DEFAULT = "__cli_default__";
-const CUSTOM = "__custom__";
+export { CLI_DEFAULT };
 
 export function adapterFor(ctx: CliContext, profile: ProviderProfile): ProviderAdapter {
   const tmpDir = join(ctx.paths.cache, "runs");
@@ -89,36 +90,6 @@ export async function ensureProviders(ctx: CliContext, continuing: string): Prom
   return firstRun(ctx, continuing);
 }
 
-async function askModel(
-  ctx: CliContext,
-  factory: AdapterFactory | undefined,
-  label: string,
-  current: string | null,
-): Promise<string | null> {
-  const models = factory?.models ?? [];
-  const options = [
-    { value: CLI_DEFAULT, label: "CLI default" },
-    ...models.map((m) => ({ value: m, label: m })),
-    { value: CUSTOM, label: "Other…" },
-  ];
-  const initial = current === null ? CLI_DEFAULT : models.includes(current) ? current : CUSTOM;
-  const pick = await ctx.prompter.select({
-    message: `Model for ${label}`,
-    options,
-    initialValue: initial,
-  });
-  if (pick === CLI_DEFAULT) return null;
-  if (pick === CUSTOM)
-    return (
-      await ctx.prompter.text({
-        message: "Model name",
-        initialValue: current ?? "",
-        validate: (v) => (v.trim() ? undefined : "enter a model name"),
-      })
-    ).trim();
-  return pick;
-}
-
 const validateName = (file: ProvidersFile, except?: string) => (v: string) => {
   const r = ProviderName.safeParse(v.trim());
   if (!r.success) return r.error.issues[0]!.message;
@@ -127,13 +98,19 @@ const validateName = (file: ProvidersFile, except?: string) => (v: string) => {
   return undefined;
 };
 
-/** Ask for a profile's name and model. */
+/** Ask for a profile's name, model, reasoning effort and cheaper model. */
 export async function profilePrompts(
   ctx: CliContext,
   file: ProvidersFile,
   factory: AdapterFactory,
   existing?: ProviderProfile,
-): Promise<{ name: string; model: string | null }> {
+  command: string = existing?.command ?? factory.defaultCommand,
+): Promise<{
+  name: string;
+  model: string | null;
+  effort: string | null;
+  fastModel: string | null;
+}> {
   const suggested =
     existing?.name ??
     (file.providers.some((p) => p.name === factory.defaultName)
@@ -146,8 +123,23 @@ export async function profilePrompts(
       validate: validateName(file, existing?.name),
     })
   ).trim();
-  const model = await askModel(ctx, factory, factory.label, existing?.model ?? null);
-  return { name, model };
+  const picked = await askModel(ctx, factory, {
+    label: factory.label,
+    command,
+    current: existing?.model ?? null,
+  });
+  const effort = await askEffort(ctx, factory, {
+    label: factory.label,
+    info: picked.info,
+    current: existing?.effort,
+  });
+  const fastModel = await askFastModel(ctx, {
+    label: factory.label,
+    command,
+    current: existing?.fastModel,
+    models: picked.models,
+  });
+  return { name, model: picked.model, effort, fastModel };
 }
 
 async function testAndReport(ctx: CliContext, profiles: ProviderProfile[]): Promise<void> {
@@ -206,8 +198,15 @@ export async function firstRun(ctx: CliContext, continuing: string): Promise<Pro
   let file = emptyProvidersFile();
   for (const type of types) {
     const d = detected.find((x) => x.factory.type === type)!;
-    const { name, model } = await profilePrompts(ctx, file, d.factory);
-    file = addProfile(file, { name, type, command: d.path ?? d.factory.defaultCommand, model });
+    const command = d.path ?? d.factory.defaultCommand;
+    const { name, model, effort, fastModel } = await profilePrompts(
+      ctx,
+      file,
+      d.factory,
+      undefined,
+      command,
+    );
+    file = addProfile(file, { name, type, command, model, effort, fastModel });
   }
   if (file.providers.length > 1) {
     const def = await p.select({
@@ -230,23 +229,64 @@ export async function editProfileFlow(
   ctx: CliContext,
   file: ProvidersFile,
   existing: ProviderProfile,
-  flags: { model?: string | null; enabled?: boolean; roles?: Role[]; test?: boolean },
+  flags: {
+    model?: string | null;
+    effort?: string | null;
+    fastModel?: string | null;
+    enabled?: boolean;
+    roles?: Role[];
+    test?: boolean;
+  },
 ): Promise<ProvidersFile> {
   const factory = ctx.registry.get(existing.type);
   let next = file;
-  const model =
-    flags.model !== undefined
-      ? flags.model
-      : ctx.interactive
-        ? await askModel(ctx, factory, existing.name, existing.model)
-        : existing.model;
+  let model: string | null = existing.model;
+  let effort: string | null = existing.effort ?? null;
+  let fastModel: string | null = existing.fastModel ?? null;
+  if (factory && ctx.interactive) {
+    // Prompt only for what the flags did not set; the model list is loaded once.
+    let models: ModelInfo[] | undefined;
+    let info: ModelInfo | undefined;
+    if (flags.model !== undefined) model = flags.model;
+    else {
+      const picked = await askModel(ctx, factory, {
+        label: existing.name,
+        command: existing.command,
+        current: existing.model,
+      });
+      model = picked.model;
+      info = picked.info;
+      models = picked.models;
+    }
+    if (flags.effort !== undefined) effort = flags.effort;
+    else
+      effort = await askEffort(ctx, factory, {
+        label: existing.name,
+        info,
+        current: existing.effort,
+      });
+    if (flags.fastModel !== undefined) fastModel = flags.fastModel;
+    else {
+      models ??= (await loadModels(ctx, factory, existing.command)).models;
+      fastModel = await askFastModel(ctx, {
+        label: existing.name,
+        command: existing.command,
+        current: existing.fastModel,
+        models,
+      });
+    }
+  } else {
+    if (flags.model !== undefined) model = flags.model;
+    if (flags.effort !== undefined) effort = flags.effort;
+    if (flags.fastModel !== undefined) fastModel = flags.fastModel;
+  }
   const enabled =
     flags.enabled !== undefined
       ? flags.enabled
       : ctx.interactive
         ? await ctx.prompter.confirm({ message: "Enabled", initialValue: existing.enabled })
         : existing.enabled;
-  next = updateProfile(next, existing.name, { model, enabled });
+  next = updateProfile(next, existing.name, { model, effort, fastModel, enabled });
   if (flags.roles !== undefined || ctx.interactive) {
     const current = (Object.entries(next.roles) as [Role, string][])
       .filter(([, n]) => n === existing.name)

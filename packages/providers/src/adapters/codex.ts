@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { AgentEvent, AgentTask, ProviderProfile } from "@crit/schema";
 import type { AdapterEnv, AdapterFactory, ProviderAdapter } from "../adapter.ts";
 import { detectCli } from "../detect.ts";
+import { codexModels } from "../models.ts";
 import { streamProcess } from "../process.ts";
 
 export const CODEX_TESTED = { min: "0.160.0", max: "0.199.999" };
@@ -26,7 +27,7 @@ export type CodexInvocation = {
  * no system-prompt flag, so crit's instructions lead the stdin prompt.
  */
 export function buildCodexInvocation(
-  profile: Pick<ProviderProfile, "command" | "model">,
+  profile: Pick<ProviderProfile, "command" | "model" | "effort">,
   task: AgentTask,
   tmpDir: string,
 ): CodexInvocation {
@@ -73,6 +74,8 @@ export function buildCodexInvocation(
   }
   const model = task.model ?? profile.model;
   if (model) args.push("-m", model);
+  const effort = task.effort ?? profile.effort;
+  if (effort) args.push("-c", `model_reasoning_effort=${toml(effort)}`);
   args.push("-");
   const stdin = task.systemPrompt ? `${task.systemPrompt}\n\n---\n\n${task.prompt}` : task.prompt;
   return { command: profile.command, args, stdin, files, cleanupDir: dir };
@@ -259,5 +262,9 @@ export const codexFactory: AdapterFactory = {
   defaultName: "codex",
   loginHint: "run `codex login`",
   models: codexFactoryModels,
+  listModels: ({ command, env, timeoutMs }) => codexModels(command, env, timeoutMs),
+  efforts: ["low", "medium", "high", "xhigh", "max"],
+  // crit runs Codex with --ignore-user-config, so a model set in ~/.codex/config.toml does not apply.
+  defaultModelNote: "Codex built-in default; your ~/.codex/config.toml is not used",
   create: (profile, env) => new CodexAdapter(profile, env),
 };

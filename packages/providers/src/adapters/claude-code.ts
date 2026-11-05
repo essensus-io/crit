@@ -40,7 +40,7 @@ export type Invocation = {
  * - `--permission-mode dontAsk` denies anything not in `--allowedTools`.
  */
 export function buildClaudeInvocation(
-  profile: Pick<ProviderProfile, "command" | "model">,
+  profile: Pick<ProviderProfile, "command" | "model" | "effort">,
   task: AgentTask,
   tmpDir: string,
 ): Invocation {
@@ -95,6 +95,8 @@ export function buildClaudeInvocation(
   args.push("--disallowedTools", DISALLOWED.join(","));
   const model = task.model ?? profile.model;
   if (model) args.push("--model", model);
+  const effort = task.effort ?? profile.effort;
+  if (effort) args.push("--effort", effort);
   return { command: profile.command, args, stdin: task.prompt, files, cleanupDir: dir };
 }
 
@@ -319,5 +321,6 @@ export const claudeCodeFactory: AdapterFactory = {
   defaultName: "claude",
   loginHint: "run `claude` once to log in",
   models: ["opus", "sonnet", "haiku"],
+  efforts: ["low", "medium", "high", "xhigh", "max"],
   create: (profile, env) => new ClaudeCodeAdapter(profile, env),
 };

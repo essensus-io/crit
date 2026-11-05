@@ -41,6 +41,8 @@ export type ReviewArgs = {
   "fail-on"?: string;
   "max-shards"?: string;
   depth?: string;
+  model?: string;
+  effort?: string;
   budget?: string;
   "dry-run"?: boolean;
 };
@@ -213,7 +215,15 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
     ...(config.provider ? { preferred: config.provider } : {}),
   });
   for (const w of resolved.warnings) ctx.err(colors(ctx.color).yellow(`warning: ${w}\n`));
-  const reviewer = { profile: resolved.profile, adapter: adapterFor(ctx, resolved.profile) };
+  // --model / --effort apply to this run only; the saved profile is not changed.
+  const profile = {
+    ...resolved.profile,
+    ...(args.model !== undefined ? { model: args.model === "default" ? null : args.model } : {}),
+    ...(args.effort !== undefined
+      ? { effort: args.effort === "default" ? null : args.effort }
+      : {}),
+  };
+  const reviewer = { profile, adapter: adapterFor(ctx, profile) };
   let skeptic: typeof reviewer | null = reviewer;
   if (args.verify === false) skeptic = null;
   else if (providers.roles.skeptic) {
@@ -365,6 +375,8 @@ export const reviewCommand = (ctx: CliContext) =>
         type: "string",
         description: "Maximum shards approved for this run (overrides the configured budget)",
       },
+      model: { type: "string", description: "Model for this run, e.g. opus or gpt-6-sol" },
+      effort: { type: "string", description: "Reasoning effort for this run (low … max)" },
       depth: {
         type: "string",
         description:

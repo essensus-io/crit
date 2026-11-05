@@ -557,7 +557,7 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
         // A shell costs ~1.5k tokens per turn: only when commands are allowlisted or at deep depth.
         access:
           config.review.allowedCommands.length > 0 || config.depth === "deep" ? "shell" : "read",
-        ...modelOf(opts.provider),
+        ...modelOf(opts.provider, "main", depthEffort(config.depth)),
         ...(host
           ? {
               mcpSession: host.sessionId,
@@ -836,10 +836,21 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
 }
 
 /** The model for a task: `fast` tasks (skeptic, map, drafts) use the profile's cheaper model when set. */
-const modelOf = (p: ProviderRun, kind: "main" | "fast" = "main"): { model?: string } => {
+const modelOf = (
+  p: ProviderRun,
+  kind: "main" | "fast" = "main",
+  depthEffort?: string,
+): { model?: string; effort?: string } => {
   const model = (kind === "fast" && p.profile.fastModel) || p.profile.model;
-  return model ? { model } : {};
+  // Cheap tasks (skeptic, map, drafts) always run at low effort; main tasks use the profile's
+  // effort, else the depth's. Both CLIs accept "low"; adapters without efforts ignore it.
+  const effort = kind === "fast" ? "low" : (p.profile.effort ?? depthEffort);
+  return { ...(model ? { model } : {}), ...(effort ? { effort } : {}) };
 };
+
+/** Quick reviews think less, deep ones more; standard leaves the CLI's own default. */
+export const depthEffort = (depth: ResolvedConfig["depth"]): string | undefined =>
+  depth === "quick" ? "low" : depth === "deep" ? "high" : undefined;
 
 /** Skeptic pass: confirmed / plausible / rejected per finding, in chunks, with one repair round. */
 export async function verify(
