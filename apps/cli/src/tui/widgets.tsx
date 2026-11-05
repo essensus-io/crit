@@ -160,6 +160,8 @@ export function Viewport({
   active = true,
   follow = false,
   resetKey,
+  vim = true,
+  reveal,
 }: {
   lines: ReactNode[];
   height: number;
@@ -168,6 +170,10 @@ export function Viewport({
   follow?: boolean;
   /** Changing this scrolls back to the top (a new finding, a new screen). */
   resetKey?: string;
+  /** j/k/g/G scroll too. Off when those keys belong to the screen. */
+  vim?: boolean;
+  /** When `key` changes, scroll just enough to show rows `from`..`to`. */
+  reveal?: { key: string; from: number; to: number };
 }) {
   const [offset, setOffset] = useState(0);
   const pinned = useRef(follow);
@@ -180,6 +186,16 @@ export function Viewport({
     pinned.current = follow;
   }, [resetKey, follow]);
 
+  useEffect(() => {
+    if (!reveal) return;
+    pinned.current = false;
+    setOffset((cur) => {
+      const now = Math.min(max, Math.max(0, cur));
+      if (reveal.from >= now && reveal.to < now + height) return now;
+      return Math.min(max, Math.max(0, Math.min(reveal.from, reveal.to - height + 1)));
+    });
+  }, [reveal?.key]);
+
   useInput(
     (input, key) => {
       const move = (to: number) => {
@@ -187,12 +203,12 @@ export function Viewport({
         pinned.current = follow && next >= max;
         setOffset(next);
       };
-      if (key.upArrow || input === "k") return move(shown - 1);
-      if (key.downArrow || input === "j") return move(shown + 1);
+      if (key.upArrow || (vim && input === "k")) return move(shown - 1);
+      if (key.downArrow || (vim && input === "j")) return move(shown + 1);
       if (key.pageUp || (key.ctrl && input === "u")) return move(shown - Math.max(1, height - 1));
       if (key.pageDown || (key.ctrl && input === "d")) return move(shown + Math.max(1, height - 1));
-      if (key.home || input === "g") return move(0);
-      if (key.end || input === "G") return move(max);
+      if (key.home || (vim && input === "g")) return move(0);
+      if (key.end || (vim && input === "G")) return move(max);
     },
     { isActive: active && max > 0 },
   );
@@ -311,6 +327,57 @@ export function Picker<V>({
         {" "}
         {note ? `${note} · ` : ""}type to search · ↑/↓ move · enter pick · esc cancel
       </Text>
+    </Box>
+  );
+}
+
+export type MenuItem = { key: string; label: string; hint?: string };
+
+/**
+ * A short list where each row has its own letter: press it, or move with the
+ * arrows and press enter. Used for the actions and options menus.
+ */
+export function Menu({
+  title,
+  items,
+  width,
+  height,
+  note,
+  onPick,
+  onCancel,
+}: {
+  title: string;
+  items: MenuItem[];
+  width: number;
+  height: number;
+  note?: string;
+  onPick: (key: string) => void;
+  onCancel: () => void;
+}) {
+  const [index, setIndex] = useState(0);
+  useInput((input, key) => {
+    // Letters belong to the rows, so only arrows move.
+    if (key.escape) return onCancel();
+    if (key.return) return void (items[index] && onPick(items[index]!.key));
+    if (key.upArrow) return setIndex((i) => Math.max(0, i - 1));
+    if (key.downArrow) return setIndex((i) => Math.min(items.length - 1, i + 1));
+    const hit = items.find((i) => i.key === input);
+    if (hit) onPick(hit.key);
+  });
+  const w = Math.min(width - 2, 74);
+  return (
+    <Box flexDirection="column" width={width} height={height} overflow="hidden">
+      <Panel title={title} tone="lav" width={w} height={items.length + 3}>
+        {items.map((it, i) => (
+          <Text key={it.key} wrap="truncate" {...(i === index ? { inverse: true } : {})}>
+            {i === index ? "› " : "  "}
+            <Text bold color={T.cyan}>{`${it.key}`}</Text>
+            {`  ${it.label}`}
+            {it.hint ? <Text dimColor>{`  ${it.hint}`}</Text> : null}
+          </Text>
+        ))}
+      </Panel>
+      <Text dimColor> {note ? `${note} · ` : ""}press a letter · ↑/↓ + enter · esc close</Text>
     </Box>
   );
 }

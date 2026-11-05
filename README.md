@@ -38,28 +38,33 @@ crit history                     # browse, compare (--compare a b), rm, prune --
 
 ### The screen
 
-The UI runs on the terminal's alternate screen: your terminal's own scrollback
-is untouched and comes back when you leave, and only the panels inside crit
-scroll (`j/k`, arrows, PgUp/PgDn, `g/G`, the mouse wheel).
+The review is one scrolling stream: each file with findings shows the code around
+them (changed lines marked `+`), and every finding is a card right under the lines
+it is about. `○` is pending, `✓` accepted, `✗` dismissed. The bottom line says how
+far you are ("2 of 5 reviewed · 1 accepted") and lists only the keys that work
+right now; press `?` for all of them.
 
-| Key              | Does                                                                      |
-| ---------------- | ------------------------------------------------------------------------- |
-| `j` `k` / arrows | move; scroll long text                                                    |
-| `space`          | check or uncheck a finding                                                |
-| `enter`          | open a finding: what is wrong, how it fails, the rule, the fix diff       |
-| `p`              | propose a fix · `e` edit it in `$EDITOR` · `a` apply checked fixes        |
-| `d`              | dismiss with a reason (remembered as a false positive)                    |
-| `y`              | copy the finding as a prompt for another agent                            |
-| `r`              | re-check this finding's file                                              |
-| `R`              | rules panel: turn a rule off (its files are re-checked) or back on        |
-| `/` `s`          | search · filter by severity                                               |
-| `m` `P` `E` `D`  | change model · provider · reasoning effort · depth for the next AI action |
-| `S`              | save the current model/provider/effort as the profile default             |
-| `q`              | back / quit                                                               |
+It runs on the terminal's alternate screen: your terminal's own scrollback is
+untouched and comes back when you leave, and only the panels inside crit scroll.
 
-While a review runs, the same keys apply to the _next_ run: change something and
-press `r` to retry with it. Finished files are cached, so a retry only pays for
-what is left.
+| Key                   | Does                                                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `j` `k`               | next / previous finding                                                                                       |
+| `a`                   | accept the fix (again to undo); on a finding without a fix, propose one                                       |
+| `d`                   | dismiss with a reason, remembered as a false positive (again to restore)                                      |
+| `enter`               | show or hide the full explanation, fix and thread in place                                                    |
+| `A`                   | apply every accepted fix (working tree or a new branch)                                                       |
+| `↑` `↓` `PgUp` `PgDn` | scroll the code (the mouse wheel too)                                                                         |
+| `/`                   | search: words, `sev:major`, `lens:security`, `file:cart`, `is:filtered`                                       |
+| `.`                   | actions: propose a fix, edit it in `$EDITOR`, ask a question, re-check the file, copy as a prompt, use my fix |
+| `o`                   | options: model, provider, reasoning effort, depth, save as default, rules on/off                              |
+| `y`                   | copy the finding as a prompt for another agent                                                                |
+| `h` `l`               | files list ⇄ code · `g` `G` first / last finding                                                              |
+| `?` `q`               | help · back / quit                                                                                            |
+
+Model, provider, effort and depth apply to the _next_ ask, proposal or re-check. While
+a review runs, `m` `P` `E` `D` `S` change the next run instead and `r` retries with
+them; finished files are cached, so a retry only pays for what is left.
 
 ## Tokens: what a review costs, and how to control it
 

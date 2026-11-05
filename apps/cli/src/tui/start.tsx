@@ -3,9 +3,12 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import {
+  addedLines,
   agentRebaser,
+  diffPath,
   type FixContext,
   type ProviderRun,
+  parseUnifiedDiff,
   readAtRevision,
   resolveScope,
   runReview,
@@ -114,6 +117,20 @@ export async function makeSession(
 ): Promise<ReviewSession> {
   const providers = loadProviders(ctx.paths);
   const review = await store.reviews.get(reviewId);
+  // The code the findings are about, shown in place; works without a provider.
+  const scope = review
+    ? await resolveScope({
+        cwd: root,
+        spec: review.scope,
+        ignore: config.ignore,
+        maxFileTokens: config.maxFileTokens,
+      }).catch(() => undefined)
+    : undefined;
+  const read = async (p: string) =>
+    scope ? readAtRevision(scope, p) : readFileSync(join(root, p), "utf8");
+  const added = new Map(
+    parseUnifiedDiff(scope?.diff ?? "").map((f) => [diffPath(f), addedLines(f)]),
+  );
   let fixContext: FixContext | undefined;
   let recheck: ((file: string) => Promise<string>) | undefined;
   let rebase;
@@ -123,18 +140,12 @@ export async function makeSession(
     const holder = {
       run: { profile: evaluator, adapter: adapterFor(ctx, evaluator) } as ProviderRun,
     };
-    const scope = await resolveScope({
-      cwd: root,
-      spec: review.scope,
-      ignore: config.ignore,
-      maxFileTokens: config.maxFileTokens,
-    }).catch(() => undefined);
     fixContext = {
       store,
       provider: holder.run,
       root,
       config,
-      read: async (p) => (scope ? readAtRevision(scope, p) : readFileSync(join(root, p), "utf8")),
+      read,
     };
     rebase = (...args: Parameters<ReturnType<typeof agentRebaser>>) =>
       agentRebaser(holder.run, root, config)(...args);
@@ -164,6 +175,14 @@ export async function makeSession(
     root,
     reviewId,
     editor: opts.editor ?? terminalEditor(ctx.env),
+    code: {
+      read: async (p) => {
+        const text = await read(p);
+        if (text === undefined) throw new Error(`cannot read ${p}`);
+        return text;
+      },
+      added: (f) => added.get(f) ?? new Set<number>(),
+    },
     backupRoot: join(ctx.paths.cache, "backups"),
     verifyCommands: config.verify.commands,
     ...(fixContext ? { fixContext } : {}),

@@ -38,7 +38,9 @@ export function useSwitching(opts: {
   onConnect?: () => void;
   /** The choice changed (re-render, rebuild the provider). */
   onChange?: () => void;
-}): { overlay: ReactNode; modal: boolean } {
+  /** Off when the screen opens the pickers itself (through `open`). */
+  hotkeys?: boolean;
+}): { overlay: ReactNode; modal: boolean; open: (key: "m" | "P" | "E" | "D" | "S") => void } {
   const { switcher, active, onNotice } = opts;
   const screen = useScreen();
   const [stage, setStage] = useState<Stage | undefined>();
@@ -46,75 +48,74 @@ export function useSwitching(opts: {
   const changed = (verb: string) => {
     opts.onChange?.();
     const c = switcher!.current();
-    onNotice(`${verb}: ${describeChoice(c)}. S saves it as the default for ${c.provider}.`);
+    const save = (opts.hotkeys ?? true) ? "S saves" : "o then s saves";
+    onNotice(`${verb}: ${describeChoice(c)}. ${save} it as the default for ${c.provider}.`);
   };
 
-  useInput(
-    (input) => {
-      if (!switcher) return;
-      const c = switcher.current();
-      if (input === "m") {
-        void switcher.models().then(({ models, live }) => {
-          if (models.length === 0) return setStage({ kind: "custom-model" });
-          setStage({
-            kind: "model",
-            live,
-            options: [
-              { value: DEFAULT, label: "CLI default", hint: "the agent CLI's own choice" },
-              ...models.map((m) => ({
-                value: m.id,
-                label: m.label,
-                hint: [m.id !== m.label ? m.id : "", m.hint ?? ""].filter(Boolean).join(" · "),
-              })),
-              { value: CUSTOM, label: "Other…", hint: "type a model name" },
-            ],
-          });
-        });
-      } else if (input === "P") {
+  const trigger = (input: string) => {
+    if (!switcher) return;
+    const c = switcher.current();
+    if (input === "m") {
+      void switcher.models().then(({ models, live }) => {
+        if (models.length === 0) return setStage({ kind: "custom-model" });
         setStage({
-          kind: "provider",
+          kind: "model",
+          live,
           options: [
-            ...switcher.providers().map((p) => ({
-              value: p.name,
-              label: p.name,
-              hint: `${p.type} · ${p.model ?? "default model"}`,
+            { value: DEFAULT, label: "CLI default", hint: "the agent CLI's own choice" },
+            ...models.map((m) => ({
+              value: m.id,
+              label: m.label,
+              hint: [m.id !== m.label ? m.id : "", m.hint ?? ""].filter(Boolean).join(" · "),
             })),
-            ...(opts.onConnect
-              ? [{ value: CONNECT, label: "Connect another provider…", hint: "crit providers add" }]
-              : []),
+            { value: CUSTOM, label: "Other…", hint: "type a model name" },
           ],
         });
-      } else if (input === "E") {
-        void switcher.efforts().then((efforts) => {
-          if (efforts.length === 0)
-            return onNotice(
-              `${c.provider} has no separate effort setting: pick a model instead (m).`,
-            );
-          setStage({
-            kind: "effort",
-            options: [
-              { value: DEFAULT, label: "CLI default" },
-              ...efforts.map((e) => ({ value: e, label: e })),
-            ],
-          });
-        });
-      } else if (input === "D") {
-        setStage({
-          kind: "depth",
-          options: (["quick", "standard", "deep"] as const).map((d) => ({
-            value: d,
-            label: d,
-            hint: DEPTH_HINTS[d],
+      });
+    } else if (input === "P") {
+      setStage({
+        kind: "provider",
+        options: [
+          ...switcher.providers().map((p) => ({
+            value: p.name,
+            label: p.name,
+            hint: `${p.type} · ${p.model ?? "default model"}`,
           })),
+          ...(opts.onConnect
+            ? [{ value: CONNECT, label: "Connect another provider…", hint: "crit providers add" }]
+            : []),
+        ],
+      });
+    } else if (input === "E") {
+      void switcher.efforts().then((efforts) => {
+        if (efforts.length === 0)
+          return onNotice(`${c.provider} has no separate effort setting: pick a model instead.`);
+        setStage({
+          kind: "effort",
+          options: [
+            { value: DEFAULT, label: "CLI default" },
+            ...efforts.map((e) => ({ value: e, label: e })),
+          ],
         });
-      } else if (input === "S") {
-        onNotice(`Saved ${describeChoice(c)} as the default for ${switcher.save()}.`);
-      }
-    },
-    { isActive: active && !stage && Boolean(switcher) },
-  );
+      });
+    } else if (input === "D") {
+      setStage({
+        kind: "depth",
+        options: (["quick", "standard", "deep"] as const).map((d) => ({
+          value: d,
+          label: d,
+          hint: DEPTH_HINTS[d],
+        })),
+      });
+    } else if (input === "S") {
+      onNotice(`Saved ${describeChoice(c)} as the default for ${switcher.save()}.`);
+    }
+  };
+  useInput(trigger, {
+    isActive: (opts.hotkeys ?? true) && active && !stage && Boolean(switcher),
+  });
 
-  if (!stage || !switcher) return { overlay: null, modal: false };
+  if (!stage || !switcher) return { overlay: null, modal: false, open: trigger };
   const close = () => setStage(undefined);
   const c = switcher.current();
   const common = { width: screen.width, height: screen.height, onCancel: close };
@@ -204,5 +205,5 @@ export function useSwitching(opts: {
       );
       break;
   }
-  return { overlay, modal: true };
+  return { overlay, modal: true, open: trigger };
 }

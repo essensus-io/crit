@@ -37,8 +37,13 @@ export type FindingView = {
   messages: Message[];
 };
 
+/** A file's text and which of its lines the reviewed change added. */
+export type CodeInfo = { lines: string[]; added: Set<number> };
+
 export type SessionState = {
   review: Review;
+  /** Code of every file that has a finding, for showing findings in place. */
+  code: Map<string, CodeInfo>;
   items: FindingView[];
   rules: Map<string, RuleRef>;
   /** Keys (`path#Section`) of rules turned off for this repository. */
@@ -65,6 +70,8 @@ export type SessionDeps = {
   recheck?: (file: string) => Promise<string>;
   /** Put text on the clipboard; returns where it went. */
   copy?: (text: string) => string;
+  /** File text at the reviewed revision, and the lines the change added. */
+  code?: { read: (path: string) => Promise<string>; added: (path: string) => Set<number> };
 };
 
 /**
@@ -116,15 +123,36 @@ export class ReviewSession {
       if (user) v.userFix = user;
       return v;
     });
+    await this.loadCode([...new Set(items.map((i) => i.finding.file))]);
     this.state = {
       ...this.state,
       review,
+      code: this.codeCache,
       items,
       rules: new Map((ruleEvent?.rules ?? []).map((r) => [r.id, r])),
       disabledRules: await getDisabledRules(this.deps.store, review.repoId),
     };
     for (const l of this.listeners) l();
     return this.state;
+  }
+
+  private readonly codeCache = new Map<string, CodeInfo>();
+
+  private async loadCode(files: string[]) {
+    const source = this.deps.code;
+    if (!source) return;
+    for (const file of files) {
+      if (this.codeCache.has(file)) continue;
+      try {
+        const text = await source.read(file);
+        this.codeCache.set(file, {
+          lines: text.replace(/\n$/, "").split("\n"),
+          added: source.added(file),
+        });
+      } catch {
+        // a file that cannot be read is shown without its code
+      }
+    }
   }
 
   item(id: string): FindingView | undefined {
@@ -134,6 +162,7 @@ export class ReviewSession {
   /** Wrap a slow action: show `busy`, reload after, surface errors as `error`. */
   private async run<T>(busy: string, fn: () => Promise<T>): Promise<T | undefined> {
     this.set({ busy, error: undefined, notice: undefined });
+    this.codeCache.clear(); // an apply or re-check changes the files
     try {
       const r = await fn();
       await this.load();

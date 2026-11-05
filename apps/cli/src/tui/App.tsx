@@ -1,14 +1,10 @@
 import type { ProposalOutcome } from "@crit/core";
-import { type ReviewEvent, SEVERITY_ORDER, type Severity } from "@crit/schema";
+import type { ReviewEvent } from "@crit/schema";
 import { Box, useApp, useInput } from "ink";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { useScreen } from "./screen.tsx";
-import { Picker } from "./widgets.tsx";
-import type { Switcher } from "./switcher.ts";
-import { useSwitching } from "./useSwitching.tsx";
 import { Choice, TextInput } from "./components.tsx";
-import { DetailScreen } from "./DetailScreen.tsx";
-import { fileTree, type ListFilter, ListScreen, visibleItems } from "./ListScreen.tsx";
+import { fileTree, parseQuery, triage, visibleItems } from "./filter.ts";
+import { HelpOverlay } from "./HelpOverlay.tsx";
 import {
   emptyProgress,
   ProgressScreen,
@@ -18,10 +14,18 @@ import {
   type Selection,
 } from "./ProgressScreen.tsx";
 import { ProposalScreen } from "./ProposalScreen.tsx";
+import { useScreen } from "./screen.tsx";
 import type { ReviewSession } from "./session.ts";
+import { StreamScreen } from "./StreamScreen.tsx";
+import { describeChoice, type Switcher } from "./switcher.ts";
+import { useSwitching } from "./useSwitching.tsx";
+import { Menu, type MenuItem, Picker } from "./widgets.tsx";
 
 type Mode =
   | "none"
+  | "help"
+  | "actions"
+  | "options"
   | "rules"
   | "search"
   | "dismiss"
@@ -31,9 +35,10 @@ type Mode =
   | "reply"
   | "apply";
 
-const SEVERITY_CYCLE: (Severity | undefined)[] = [undefined, ...SEVERITY_ORDER.slice(0, 3)];
-
-/** The interactive review screen: findings list, finding detail, proposal check. */
+/**
+ * The interactive review screen: one stream of code with a card under every
+ * finding. a / d triage, enter expands, `.` and `o` open the menus.
+ */
 export function ReviewApp({
   session,
   onExit,
@@ -57,25 +62,28 @@ export function ReviewApp({
     () => session.state,
   );
   const { width, height } = useScreen();
-  const [screen, setScreen] = useState<"list" | "detail" | "proposal">("list");
-  const [filter, setFilter] = useState<ListFilter>({ tab: "findings" });
+  const [screen, setScreen] = useState<"stream" | "proposal">("stream");
+  const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const [fileCursor, setFileCursor] = useState(0);
-  const [focus, setFocus] = useState<"files" | "findings">("findings");
+  const [focus, setFocus] = useState<"files" | "stream">("stream");
   const [mode, setMode] = useState<Mode>("none");
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [fixTab, setFixTab] = useState<"ai" | "user">("ai");
   const [outcome, setOutcome] = useState<ProposalOutcome | undefined>();
   const [lastInput, setLastInput] = useState<
     { kind: "patch"; patch: string } | { kind: "description"; text: string } | undefined
   >();
 
+  const filter = useMemo(() => parseQuery(query), [query]);
   const items = useMemo(() => visibleItems(state, filter), [state, filter]);
   const current = items[Math.min(cursor, Math.max(0, items.length - 1))];
   const busy = Boolean(state.busy);
   const [, bump] = useState(0);
-  const { overlay, modal } = useSwitching({
+  const switching = useSwitching({
     switcher,
     active: mode === "none" && !busy,
+    hotkeys: false,
     onNotice: (m) => session.notify(m),
     ...(onConnect ? { onConnect } : {}),
     onChange: () => bump((n) => n + 1),
@@ -89,111 +97,92 @@ export function ReviewApp({
     onExit?.();
     app.exit();
   };
-  const openDetail = () => {
-    if (!current) return;
-    setFixTab(current.fix?.author === "user" ? "user" : "ai");
-    setScreen("detail");
-  };
+  const toggleExpanded = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else {
+        next.add(id);
+        setFixTab(current?.fix?.author === "user" ? "user" : "ai");
+      }
+      return next;
+    });
   const showOutcome = (o: ProposalOutcome | undefined) => {
     if (!o) return;
     setOutcome(o);
     setScreen("proposal");
   };
+  const move = (to: number) => setCursor(Math.max(0, Math.min(items.length - 1, to)));
+  const idle = mode === "none" && !switching.modal && !busy;
 
   useInput(
     (input, key) => {
       if (busy) return;
-      if (screen === "list") {
-        if (input === "q") return quit();
-        if (key.tab) {
-          setFilter((f) => ({ ...f, tab: f.tab === "findings" ? "filtered" : "findings" }));
-          setCursor(0);
-          return;
-        }
-        if (key.leftArrow || input === "h") return setFocus("files");
-        if (key.rightArrow || input === "l") return setFocus("findings");
-        if (focus === "files") {
-          const tree = fileTree(state);
-          if (input === "j" || key.downArrow)
-            return setFileCursor((c) => Math.min(c + 1, tree.length - 1));
-          if (input === "k" || key.upArrow) return setFileCursor((c) => Math.max(c - 1, 0));
-          if (key.return || input === " ") {
-            const row = tree[fileCursor];
-            setFilter((f) => {
-              const { file: _f, ...rest } = f;
-              return row?.file ? { ...rest, file: row.file } : rest;
-            });
-            setCursor(0);
-            setFocus("findings");
-          }
-          return;
-        }
-        if (input === "j" || key.downArrow)
-          return setCursor((c) => Math.min(c + 1, Math.max(0, items.length - 1)));
-        if (input === "k" || key.upArrow) return setCursor((c) => Math.max(c - 1, 0));
-        if (input === "g") return setCursor(0);
-        if (input === "G") return setCursor(Math.max(0, items.length - 1));
-        if (input === "/") return setMode("search");
-        if (input === "s") {
-          setFilter((f) => {
-            const next =
-              SEVERITY_CYCLE[(SEVERITY_CYCLE.indexOf(f.severity) + 1) % SEVERITY_CYCLE.length];
-            const { severity: _s, ...rest } = f;
-            return next ? { ...rest, severity: next } : rest;
-          });
-          return;
-        }
-        if (input === "a") return setMode("apply");
-        if (input === "R") return setMode("rules");
-        if (input === "y" && current) return void session.copyPrompt(current.finding.id);
-        if (!current) return;
-        if (key.return) return openDetail();
-        if (input === " ") return void session.toggle(current.finding.id);
-        if (input === "d")
-          return current.finding.status === "dismissed"
-            ? void session.restore(current.finding.id)
-            : setMode("dismiss");
-        if (input === "p") return setMode("propose");
-        return;
-      }
-      if (screen === "detail" && current) {
-        if (key.escape || input === "q") return setScreen("list");
-        if (input === " ") return void session.toggle(current.finding.id);
-        if (input === "n") return setCursor((c) => Math.min(c + 1, items.length - 1));
-        if (input === "N") return setCursor((c) => Math.max(c - 1, 0));
-        if (key.tab || key.leftArrow || key.rightArrow)
-          return setFixTab((t) => (t === "ai" ? "user" : "ai"));
-        if (input === "e") return void session.editFix(current.finding.id);
-        if (input === "p") return setMode("propose");
-        if (input === "?") return setMode("ask");
-        if (input === "d")
-          return current.finding.status === "dismissed"
-            ? void session.restore(current.finding.id)
-            : setMode("dismiss");
-        if (input === "r") return void session.recheck(current.finding.id);
-        if (input === "y") return void session.copyPrompt(current.finding.id);
-        if (input === "R") return setMode("rules");
-        if (input === "u" && current.userFix && !current.userFix.active)
-          return void session.useAnyway(current.userFix.id);
-        if (input === "k" && current.aiFix && !current.aiFix.active)
-          return void session.keepAi(current.finding.id);
-        return;
-      }
+      // A message stays until the next key, then gives the line back to progress.
+      if (state.notice || state.error) session.notify(undefined);
       if (screen === "proposal" && outcome && current) {
-        if (key.escape) return setScreen("detail");
+        if (key.escape || input === "q") return setScreen("stream");
         if (key.return && outcome.evaluation.verdict === "concerns" && !outcome.finalRound)
           return setMode("reply");
         if (input === "u" && outcome.evaluation.verdict !== "accepted") {
-          void session.useAnyway(outcome.fix.id).then(() => setScreen("detail"));
+          void session.useAnyway(outcome.fix.id).then(() => setScreen("stream"));
           return;
         }
         if (input === "k") {
-          void session.keepAi(current.finding.id).then(() => setScreen("detail"));
+          void session.keepAi(current.finding.id).then(() => setScreen("stream"));
           return;
         }
+        return;
       }
+      if (input === "q") return quit();
+      if (input === "?") return setMode("help");
+      if (input === "/") return setMode("search");
+      if (input === "o") return setMode("options");
+      if (key.escape) {
+        if (current && expanded.has(current.finding.id)) return toggleExpanded(current.finding.id);
+        if (query) {
+          setQuery("");
+          return setCursor(0);
+        }
+        return;
+      }
+      if (input === "h" || input === "l") return setFocus(input === "h" ? "files" : "stream");
+      if (focus === "files") {
+        const tree = fileTree(state);
+        if (input === "j" || key.downArrow)
+          return setFileCursor((c) => Math.min(c + 1, tree.length - 1));
+        if (input === "k" || key.upArrow) return setFileCursor((c) => Math.max(c - 1, 0));
+        if (key.return) {
+          const file = tree[fileCursor]?.file;
+          const at = file ? items.findIndex((i) => i.finding.file === file) : -1;
+          if (at >= 0) move(at);
+          setFocus("stream");
+        }
+        return;
+      }
+      if (input === "j" || input === "n") return move(cursor + 1);
+      if (input === "k" || input === "N") return move(cursor - 1);
+      if (input === "g") return move(0);
+      if (input === "G") return move(items.length - 1);
+      if (input === "A") return setMode("apply");
+      if (!current) return;
+      const id = current.finding.id;
+      if (key.return) return toggleExpanded(id);
+      if (key.tab && expanded.has(id)) return setFixTab((t) => (t === "ai" ? "user" : "ai"));
+      if (input === "y") return void session.copyPrompt(id);
+      if (input === ".") return setMode("actions");
+      if (input === "a") {
+        if (triage(current) === "dismissed") return void session.restore(id);
+        if (!current.fix && !current.finding.selected) {
+          session.notify("There is no fix to accept yet. Describe or write one:");
+          return setMode("propose");
+        }
+        return void session.toggle(id);
+      }
+      if (input === "d")
+        return triage(current) === "dismissed" ? void session.restore(id) : setMode("dismiss");
     },
-    { isActive: mode === "none" && !modal },
+    { isActive: mode === "none" && !switching.modal },
   );
 
   const done = () => setMode("none");
@@ -202,13 +191,10 @@ export function ReviewApp({
     prompt = (
       <TextInput
         label="/"
-        initial={filter.search ?? ""}
+        initial={query}
         onCancel={done}
         onSubmit={(v) => {
-          setFilter((f) => {
-            const { search: _s, ...rest } = f;
-            return v ? { ...rest, search: v } : rest;
-          });
+          setQuery(v.trim());
           setCursor(0);
           done();
         }}
@@ -274,7 +260,10 @@ export function ReviewApp({
         onCancel={done}
         onSubmit={(q) => {
           done();
-          if (q.trim()) void session.ask(current.finding.id, q.trim());
+          if (q.trim()) {
+            setExpanded((prev) => new Set(prev).add(current.finding.id));
+            void session.ask(current.finding.id, q.trim());
+          }
         }}
       />
     );
@@ -302,11 +291,15 @@ export function ReviewApp({
     ).length;
     prompt = (
       <Choice
-        label={`Apply ${n} checked fix${n === 1 ? "" : "es"}:`}
-        options={[
-          ["y", "to the working tree"],
-          ["b", "to a new branch"],
-        ]}
+        label={n === 0 ? "Nothing accepted yet." : `Apply ${n} accepted fix${n === 1 ? "" : "es"}:`}
+        options={
+          n === 0
+            ? []
+            : [
+                ["y", "to the working tree"],
+                ["b", "to a new branch"],
+              ]
+        }
         onCancel={done}
         onPick={(k) => {
           done();
@@ -316,6 +309,72 @@ export function ReviewApp({
     );
   }
 
+  if (mode === "help") return <HelpOverlay width={width} height={height} onClose={done} />;
+  if (mode === "actions" && current) {
+    const items2: MenuItem[] = [
+      { key: "p", label: "Propose a different fix", hint: "in $EDITOR or in words" },
+      ...(current.fix ? [{ key: "e", label: "Edit the fix in $EDITOR" }] : []),
+      { key: "w", label: "Ask a question about this finding" },
+      { key: "r", label: "Re-check this file", hint: "runs the reviewer again on it" },
+      { key: "y", label: "Copy as a prompt for another agent" },
+      ...(current.userFix && !current.userFix.active
+        ? [{ key: "u", label: "Use my fix instead of the AI's" }]
+        : []),
+      ...(current.aiFix && !current.aiFix.active ? [{ key: "k", label: "Keep the AI's fix" }] : []),
+      ...(outcome ? [{ key: "v", label: "View the last proposal check" }] : []),
+    ];
+    const id = current.finding.id;
+    return (
+      <Menu
+        title={`actions · ${current.finding.title}`}
+        items={items2}
+        width={width}
+        height={height}
+        onCancel={done}
+        onPick={(k) => {
+          done();
+          if (k === "p") setMode("propose");
+          else if (k === "e") void session.editFix(id);
+          else if (k === "w") setMode("ask");
+          else if (k === "r") void session.recheck(id);
+          else if (k === "y") session.copyPrompt(id);
+          else if (k === "u" && current.userFix) void session.useAnyway(current.userFix.id);
+          else if (k === "k") void session.keepAi(id);
+          else if (k === "v" && outcome) setScreen("proposal");
+        }}
+      />
+    );
+  }
+  if (mode === "options") {
+    const c = switcher?.current();
+    const opts2: MenuItem[] = [
+      ...(switcher && c
+        ? [
+            { key: "m", label: "Model", hint: c.model ?? "CLI default" },
+            { key: "p", label: "Provider", hint: c.provider },
+            { key: "e", label: "Reasoning effort", hint: c.effort ?? "CLI default" },
+            { key: "d", label: "Review depth", hint: c.depth },
+            { key: "s", label: "Save this as the default", hint: describeChoice(c) },
+          ]
+        : []),
+      { key: "r", label: "Rules", hint: "turn rules on or off" },
+    ];
+    return (
+      <Menu
+        title="options · used by the next ask, proposal or re-check"
+        items={opts2}
+        width={width}
+        height={height}
+        onCancel={done}
+        onPick={(k) => {
+          done();
+          if (k === "r") return setMode("rules");
+          const key = { m: "m", p: "P", e: "E", d: "D", s: "S" }[k] as "m" | "P" | "E" | "D" | "S";
+          switching.open(key);
+        }}
+      />
+    );
+  }
   if (mode === "rules") {
     const rows = session.ruleRows();
     return (
@@ -337,36 +396,29 @@ export function ReviewApp({
       />
     );
   }
-  if (overlay) return overlay;
+  if (switching.overlay) return switching.overlay;
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
-      {screen === "list" || !current ? (
-        <ListScreen
+      {screen === "stream" || !current || !outcome ? (
+        <StreamScreen
           state={state}
+          items={items}
           filter={filter}
+          query={query}
           cursor={cursor}
+          expanded={expanded}
+          fixTab={fixTab}
           fileCursor={fileCursor}
           focus={focus}
           width={width}
           height={height}
           prompt={prompt}
-          {...(switcher ? { choice: switcher.current() } : {})}
-        />
-      ) : screen === "detail" ? (
-        <DetailScreen
-          state={state}
-          item={current}
-          fixTab={fixTab}
-          width={width}
-          height={height}
-          prompt={prompt}
-          position={`${Math.min(cursor, items.length - 1) + 1}/${items.length}`}
-          {...(switcher ? { choice: switcher.current() } : {})}
+          idle={idle}
         />
       ) : (
         <ProposalScreen
           state={state}
-          outcome={outcome!}
+          outcome={outcome}
           width={width}
           height={height}
           input={prompt}

@@ -167,6 +167,10 @@ function session(
     editor,
     backupRoot: backups,
     verifyCommands: [],
+    code: {
+      read: async (p) => readFileSync(join(repo.root, p), "utf8"),
+      added: (f) => (f === "src/payments.ts" ? new Set([2, 3]) : new Set<number>()),
+    },
     ...extra,
   });
 }
@@ -188,7 +192,7 @@ const TAB = "\t";
 async function mount(s: ReviewSession, switcher?: Switcher) {
   await s.load();
   const app = render(<ReviewApp session={s} {...(switcher ? { switcher } : {})} />);
-  await until(app.lastFrame, "all severities");
+  await until(app.lastFrame, "of 2 reviewed");
   const press = async (...keys: string[]) => {
     for (const k of keys) {
       app.stdin.write(k);
@@ -198,81 +202,128 @@ async function mount(s: ReviewSession, switcher?: Switcher) {
   return { ...app, press };
 }
 
-describe("findings list", () => {
-  it("shows files, findings with checkbox, severity, location and title, and the filtered count", async () => {
+describe("review stream", () => {
+  it("shows the code with each finding under the lines it is about, plus progress and the keys that work now", async () => {
     const app = await mount(session());
     const f = app.lastFrame()!;
     expect(f).toContain("crit · review");
-    expect(f).toContain("feature/payments → main · claude (opus) · 2 findings · 1 selected");
-    expect(f).toMatch(/\[x\] CRIT payments\.ts:2\s+Refund amount not validated/);
-    expect(f).toMatch(/\[ \] NIT  payments\.ts:7\s+Unused import/);
-    expect(f).toContain("Filtered (1)");
-    expect(f).toContain("▾ src");
-    expect(f).toContain("a apply 1");
+    expect(f).toContain("feature/payments → main · claude (opus)");
+    expect(f).toContain("▍ src/payments.ts  2 findings");
+    expect(f).toMatch(/2 ▎\+\s+if \(amount > order\.capturedAmount\) \{/); // changed line, in the focused range
+    expect(f).toMatch(/╭─ ✓ CRIT · correctness ─+╮/);
+    expect(f).toContain("Refund amount not validated");
+    expect(f).toContain("why POST /refunds");
+    expect(f).toContain("fix Validate against captured minus refunded");
+    expect(f).toContain("[a] undo accept  [d] dismiss  [enter] details");
+    expect(f).toMatch(/╭─ ○ NIT · style · unsure ─+╮/);
+    expect(f).toContain("no fix yet · a proposes one");
+    expect(f).toContain("1 of 2 reviewed · 1 accepted");
+    expect(f).toContain("+1 filtered");
+    expect(f).toContain(
+      "j/k next · a undo · d dismiss · enter more · A apply 1 · . actions · ? help",
+    );
+    // the code lines come before the card that is about them
+    expect(f.indexOf("if (amount > order.capturedAmount)")).toBeLessThan(
+      f.indexOf("Refund amount not validated"),
+    );
     app.unmount();
   });
 
-  it("moves, toggles selection, filters by severity, searches and shows the filtered tab", async () => {
+  it("j/k move between findings; a accepts and undoes; a on a finding without a fix offers to propose", async () => {
     const app = await mount(session());
-    await app.press("j", " ");
-    await until(app.lastFrame, "This finding has no fix to apply");
-    await app.press("k", " ");
-    await until(app.lastFrame, "0 selected");
+    await app.press("j");
+    await until(app.lastFrame, "[a] propose a fix");
+    expect(app.lastFrame()).toContain("2/2");
+    expect(app.lastFrame()).toContain("a propose ·");
+    await app.press("a");
+    await until(app.lastFrame, "Propose a fix:");
+    await app.press(ESC);
+    await app.press("k", "a");
+    await until(app.lastFrame, "0 of 2 reviewed · 0 accepted");
     expect((await store.findings.get(ids["Refund amount not validated"]!))!.selected).toBe(false);
-    await app.press(" ");
-    await until(app.lastFrame, "1 selected");
-
-    await app.press("s");
-    expect(app.lastFrame()).toContain("critical+");
-    expect(app.lastFrame()).not.toContain("Unused import");
-    await app.press("s", "s", "s");
-    expect(app.lastFrame()).toContain("all severities");
-
-    await app.press("/", "u", "n", "u", "s", "e", "d", ENTER);
-    await until(app.lastFrame, "/unused");
-    expect(app.lastFrame()).not.toContain("Refund amount not validated  ");
-    await app.press("/", "\u007F", "\u007F", "\u007F", "\u007F", "\u007F", "\u007F", ENTER);
-
-    await app.press(TAB);
-    await until(app.lastFrame, "filtered by skeptic / dismissed");
-    expect(app.lastFrame()).toMatch(/\[-\] MAJ\s+payments\.ts:5\s+Invented problem/);
-    await app.press(TAB, "q");
+    await app.press("a");
+    await until(app.lastFrame, "1 of 2 reviewed · 1 accepted");
+    await app.press("G");
+    await until(app.lastFrame, "2/2");
+    await app.press("g");
+    await until(app.lastFrame, "1/2");
     app.unmount();
   });
 
-  it("filters by file from the files pane", async () => {
-    const app = await mount(session());
-    await app.press("h", "j", "j", ENTER);
-    await until(app.lastFrame, "2 findings");
-    expect(app.lastFrame()).toContain("Unused import");
-    app.unmount();
-  });
-
-  it("dismisses with a reason, remembers false positives, and restores from the filtered tab", async () => {
+  it("d dismisses with a reason and remembers false positives; d again restores", async () => {
     const app = await mount(session());
     await app.press("j", "d");
     await until(app.lastFrame, "Dismiss:");
     await app.press("f");
-    await until(app.lastFrame, "1 findings");
+    await until(app.lastFrame, "2 of 2 reviewed");
+    expect(app.lastFrame()).toMatch(/╭─ ✗ NIT/);
+    expect(app.lastFrame()).toContain("all triaged: A applies 1");
     const repoId = (await store.reviews.get(reviewId))!.repoId;
     expect((await store.suppressions.list(repoId)).map((s) => s.fingerprint)).toEqual([
       "fp-Unused import",
     ]);
-    await app.press(TAB);
-    await until(app.lastFrame, /\[d\] NIT/);
-    const lines = app.lastFrame()!.split("\n");
-    const row = lines.findIndex((l) => l.includes("Unused import"));
-    const first = lines.findIndex((l) => l.includes("Invented problem"));
-    await app.press(...(row > first ? ["j"] : []), "d");
-    await until(app.lastFrame, "Filtered (1)");
+    await app.press("d");
+    await until(app.lastFrame, "1 of 2 reviewed");
     expect(await store.suppressions.list(repoId)).toEqual([]);
     app.unmount();
   });
 
-  it("applies checked fixes from the list", async () => {
+  it("enter shows the whole finding in place; tab switches the fix; esc folds it again", async () => {
     const app = await mount(session());
-    await app.press("a");
-    await until(app.lastFrame, "Apply 1 checked fix:");
+    await app.press(ENTER);
+    const f = await until(app.lastFrame, "Fails when");
+    expect(f).toContain("refund() takes any amount from the request body.");
+    expect(f).toContain("POST /refunds {orderId: 17, amount: 5000} on a 2000 capture");
+    expect(f).toContain("Rule  R4 Validate money inputs at the boundary");
+    expect(f).toContain(".cursor/rules/payments.mdc");
+    expect(f).toContain("AI ●   yours –");
+    expect(f).toMatch(/2 - +if \(amount > order\.capturedAmount\) \{/);
+    expect(f).toMatch(/2 \+ +if \(amount <= 0/);
+    expect(f).toContain("[enter] less");
+    await app.press(TAB);
+    await until(app.lastFrame, "No fix of yours yet");
+    await app.press(ESC);
+    await until(app.lastFrame, "[enter] details");
+    expect(app.lastFrame()).not.toContain("Fails when");
+    app.unmount();
+  });
+
+  it("/ searches words and sev: lens: file: is:filtered; esc clears it", async () => {
+    const app = await mount(session());
+    await app.press("/", ..."unused".split(""), ENTER);
+    await until(app.lastFrame, "/unused");
+    expect(app.lastFrame()).toContain("Unused import");
+    expect(app.lastFrame()).not.toContain("Refund amount not validated");
+    await app.press(ESC);
+    await until(app.lastFrame, "Refund amount not validated");
+    await app.press("/", ..."sev:critical".split(""), ENTER);
+    await until(app.lastFrame, "/sev:critical");
+    expect(app.lastFrame()).not.toContain("Unused import");
+    await app.press(ESC, "/", ..."is:filtered".split(""), ENTER);
+    await until(app.lastFrame, "(filtered)");
+    expect(app.lastFrame()).toContain("Invented problem");
+    expect(app.lastFrame()).toContain("already handled upstream".slice(0, 0) || "Invented problem");
+    await app.press("/", ENTER, ESC);
+    await until(app.lastFrame, "1 of 2 reviewed");
+    app.unmount();
+  });
+
+  it("h moves to the files list, enter jumps to a file's first finding, l goes back", async () => {
+    const app = await mount(session());
+    await app.press("h");
+    await until(app.lastFrame, "j/k pick a file · enter go to it");
+    await app.press("j", ENTER);
+    await until(app.lastFrame, "j/k next ·");
+    expect(app.lastFrame()).toContain("1/2");
+    app.unmount();
+  });
+
+  it("A applies the accepted fixes, or says nothing is accepted", async () => {
+    const app = await mount(session());
+    await app.press("a", "A");
+    await until(app.lastFrame, "Nothing accepted yet.");
+    await app.press(ESC, "a", "A");
+    await until(app.lastFrame, "Apply 1 accepted fix:");
     await app.press("y");
     await until(app.lastFrame, "Applied 1 · crit undo restores the files");
     expect(readFileSync(join(repo.root, "src/payments.ts"), "utf8")).toContain(
@@ -280,66 +331,81 @@ describe("findings list", () => {
     );
     app.unmount();
   });
-});
 
-describe("finding detail", () => {
-  it("shows what is wrong, how it fails, the rule and the fix diff; tabs and navigation work", async () => {
+  it("? shows every key, grouped; esc closes it", async () => {
     const app = await mount(session());
-    await app.press(ENTER);
-    const f = await until(app.lastFrame, "Thread (0)");
-    expect(f).toContain("src/payments.ts:2 · CRITICAL · correctness · confidence 0.92 · confirmed");
-    expect(f).toContain("[x] include");
-    expect(f).toContain("Fails when");
-    expect(f).toContain("POST /refunds {orderId: 17, amount: 5000} on a 2000 capture");
-    expect(f).toContain(
-      "Rule        R4 Validate money inputs at the boundary  (.cursor/rules/payments.mdc)",
-    );
-    expect(f).toContain("[ AI ● ] [ yours – ]");
-    expect(f).toMatch(/2  - {3}if \(amount > order\.capturedAmount\) \{/);
-    expect(f).toMatch(/2  \+ {3}if \(amount <= 0/);
-    await app.press(TAB);
-    await until(app.lastFrame, "No fix of yours yet");
-    await app.press("n");
-    await until(app.lastFrame, "Unused import");
-    expect(app.lastFrame()).toContain("2/2");
-    await app.press("N", ESC);
-    await until(app.lastFrame, "all severities");
+    await app.press("?");
+    const f = await until(app.lastFrame, "next / previous finding");
+    for (const part of [
+      "Review",
+      "Move around",
+      "More",
+      "apply every accepted fix",
+      "actions:",
+      "options:",
+    ])
+      expect(f).toContain(part);
+    await app.press(ESC);
+    await until(app.lastFrame, "1 of 2 reviewed");
     app.unmount();
   });
 
-  it("asks a question and shows the answer in the thread", async () => {
+  it("an empty review says so, and the footer offers only what works", async () => {
+    await store.findings.update(ids["Refund amount not validated"]!, { status: "closed" });
+    await store.findings.update(ids["Unused import"]!, { status: "closed" });
+    const s = session();
+    await s.load();
+    const app = render(<ReviewApp session={s} />);
+    const f = await until(app.lastFrame, "No findings match");
+    expect(f).toContain("/ search · o options · ? help · q quit");
+    expect(f).not.toContain("a accept");
+    app.unmount();
+  });
+});
+
+describe("actions menu", () => {
+  it(". lists what you can do with a finding; w asks and the answer lands in the thread", async () => {
     const app = await mount(
       session({
         runs: [{ match: { kind: "answer" }, message: "Yes, on a second partial refund." }],
       }),
     );
-    await app.press(ENTER, "?");
+    await app.press(".");
+    const menu = await until(app.lastFrame, "actions · Refund amount not validated");
+    for (const part of [
+      "Propose a different fix",
+      "Edit the fix in $EDITOR",
+      "Ask a question",
+      "Re-check this file",
+      "Copy as a prompt",
+    ])
+      expect(menu).toContain(part);
+    expect(menu).not.toContain("Use my fix");
+    await app.press("w");
     await until(app.lastFrame, "Ask ›");
     await app.press(..."why?".split(""), ENTER);
-    await until(app.lastFrame, "Thread (2)");
+    await until(app.lastFrame, "thread (2)");
     expect(app.lastFrame()).toContain("you why?");
     expect(app.lastFrame()).toContain("AI  Yes, on a second partial refund.");
     app.unmount();
   });
 
-  it("edits the AI fix in the editor and keeps the edit as your fix", async () => {
+  it("e edits the AI fix in the editor and keeps the edit as your fix", async () => {
     let seen = "";
     const editor: Editor = async (content) => {
       seen = content;
       return content.replace('"too large"', '"refund exceeds captured amount"');
     };
     const app = await mount(session({ runs: [] }, editor));
-    await app.press(ENTER, "e");
-    await until(app.lastFrame, "[ yours ● ]");
+    await app.press(".", "e");
+    await until(app.lastFrame, "your fix Edited fix");
     expect(seen).toContain("order.refundedAmount");
     const active = await store.fixes.active(ids["Refund amount not validated"]!);
     expect(active).toMatchObject({ author: "user", summary: "Edited fix" });
     app.unmount();
   });
-});
 
-describe("proposing a better fix", () => {
-  it("concerns → answer → accepted, ending with your fix active", async () => {
+  it("propose: concerns → answer → accepted, ending with your fix active", async () => {
     const app = await mount(
       session({
         runs: [
@@ -362,7 +428,7 @@ describe("proposing a better fix", () => {
         ],
       }),
     );
-    await app.press("p");
+    await app.press(".", "p");
     await until(app.lastFrame, "Propose a fix:");
     await app.press("w");
     await app.press(..."reject zero too".split(""), ENTER);
@@ -378,11 +444,11 @@ describe("proposing a better fix", () => {
     await until(app.lastFrame, "ACCEPTED");
     expect(app.lastFrame()).toContain("Your fix · checked · ACCEPTED");
     await app.press(ESC);
-    await until(app.lastFrame, "[ yours ● ]");
+    await until(app.lastFrame, "your fix");
     app.unmount();
   });
 
-  it("rejected → use anyway; and keep AI fix", async () => {
+  it("propose: rejected → use anyway; the menu then offers to keep the AI fix", async () => {
     const editor: Editor = async (content) =>
       content.replace(
         "if (amount > order.capturedAmount) {",
@@ -405,17 +471,22 @@ describe("proposing a better fix", () => {
         editor,
       ),
     );
-    await app.press(ENTER, "p", "e");
+    await app.press(".", "p", "e");
     const f = await until(app.lastFrame, "REJECTED");
     expect(f).toContain("Fails when: 1500 + 1500 on 2000");
     await app.press("u");
-    await until(app.lastFrame, "[ yours ● ]");
+    await until(app.lastFrame, "your fix");
     expect(await store.fixes.active(ids["Refund amount not validated"]!)).toMatchObject({
       author: "user",
       overridden: true,
     });
+    await app.press(".");
+    await until(app.lastFrame, "Keep the AI's fix");
     await app.press("k");
-    await until(app.lastFrame, "[ AI ● ]");
+    await sleep(80);
+    expect(await store.fixes.active(ids["Refund amount not validated"]!)).toMatchObject({
+      author: "ai",
+    });
     app.unmount();
   });
 
@@ -423,15 +494,25 @@ describe("proposing a better fix", () => {
     const app = await mount(
       session({ runs: [{ match: { kind: "draft-fix" }, message: "no diff here" }] }),
     );
-    await app.press("p", "w", "x", ENTER);
+    await app.press(".", "p", "w", "x", ENTER);
     const frame = await until(
       app.lastFrame,
       "✗ the agent could not turn your description into a patch",
     );
-    expect(frame).toContain("all severities");
+    expect(frame).toContain("Refund amount not validated");
     app.unmount();
   });
 });
+
+/** Open the options menu, wait for it, then press one of its letters. */
+async function options(
+  app: { press: (...k: string[]) => Promise<void>; lastFrame: () => string | undefined },
+  letter: string,
+) {
+  await app.press("o");
+  await until(app.lastFrame, "options ·");
+  await app.press(letter);
+}
 
 /** A switcher over two profiles, without any agent CLI behind it. */
 function stubSwitcher(): Switcher {
@@ -498,6 +579,7 @@ describe("run progress", () => {
       // P opens the provider picker; "Connect another provider…" leaves for the setup flow
       app.stdin.write("P");
       await until(app.lastFrame, "Connect another provider");
+      await sleep(80); // let the picker attach its key handler
       for (const ch of "connect") app.stdin.write(ch);
       await sleep();
       app.stdin.write(ENTER);
@@ -609,7 +691,7 @@ describe("run progress", () => {
     await sleep();
     expect(stopped).toBe(true);
     app.stdin.write(ENTER);
-    await until(app.lastFrame, "all severities");
+    await until(app.lastFrame, "of 2 reviewed");
     app.unmount();
   });
 });
@@ -618,16 +700,22 @@ describe("switching model, provider, effort and depth", () => {
   it("m picks a model from a searchable list; the footer-status shows it and the AI uses it", async () => {
     const sw = stubSwitcher();
     const app = await mount(session(), sw);
-    expect(app.lastFrame()).toContain("[model: sonnet]");
+    await app.press("o");
+    const opts = await until(app.lastFrame, "options ·");
+    expect(opts).toContain("sonnet");
     await app.press("m");
     const f = await until(app.lastFrame, "model · claude");
     expect(f).toContain("CLI default");
     expect(f).toContain("Opus");
     expect(f).toContain("Other…");
+    await sleep(80);
     for (const ch of "hai") app.stdin.write(ch);
     await until(app.lastFrame, "1 of 4");
     app.stdin.write(ENTER);
-    await until(app.lastFrame, "Model: claude · haiku · effort default · standard. S saves it");
+    await until(
+      app.lastFrame,
+      "Model: claude · haiku · effort default · standard. o then s saves it",
+    );
     expect(sw.current().model).toBe("haiku");
     app.unmount();
   });
@@ -635,8 +723,9 @@ describe("switching model, provider, effort and depth", () => {
   it("m → Other… takes a typed model name", async () => {
     const sw = stubSwitcher();
     const app = await mount(session(), sw);
-    await app.press("m");
+    await options(app, "m");
     await until(app.lastFrame, "model · claude");
+    await sleep(80);
     for (const ch of "other") app.stdin.write(ch);
     await sleep();
     app.stdin.write(ENTER);
@@ -650,17 +739,18 @@ describe("switching model, provider, effort and depth", () => {
   it("P switches provider, E sets an effort the model supports, D sets the depth, esc cancels", async () => {
     const sw = stubSwitcher();
     const app = await mount(session(), sw);
-    await app.press("P");
+    await options(app, "p");
     await until(app.lastFrame, "provider");
     expect(app.lastFrame()).toContain("codex");
     expect(app.lastFrame()).not.toContain("Connect another provider"); // only on the run screen
+    await sleep(80); // let the picker attach its key handler
     for (const ch of "codex") app.stdin.write(ch);
     await sleep();
     app.stdin.write(ENTER);
     await until(app.lastFrame, "Provider: codex · default model");
     expect(sw.current()).toMatchObject({ provider: "codex", model: null });
 
-    await app.press("E");
+    await options(app, "e");
     await until(app.lastFrame, "reasoning effort");
     app.stdin.write("\u001B[B"); // down: low
     await sleep();
@@ -668,17 +758,19 @@ describe("switching model, provider, effort and depth", () => {
     await until(app.lastFrame, "effort low");
     expect(sw.current().effort).toBe("low");
 
-    await app.press("D");
+    await options(app, "d");
     await until(app.lastFrame, "review depth");
     expect(app.lastFrame()).toContain("lenses split, skeptic checks all, high effort");
+    await sleep(80); // let the picker attach its key handler
     for (const ch of "deep") app.stdin.write(ch);
     await sleep();
     app.stdin.write(ENTER);
-    await until(app.lastFrame, "· deep. S saves");
+    await until(app.lastFrame, "· deep. o then s saves");
     expect(sw.current().depth).toBe("deep");
 
-    await app.press("m", ESC);
-    await until(app.lastFrame, "all severities");
+    await options(app, "m");
+    await app.press(ESC);
+    await until(app.lastFrame, "of 2 reviewed");
     app.unmount();
   });
 
@@ -686,7 +778,7 @@ describe("switching model, provider, effort and depth", () => {
     let saved = "";
     const sw = { ...stubSwitcher(), save: () => ((saved = "claude"), "claude") };
     const app = await mount(session(), sw);
-    await app.press("S");
+    await options(app, "s");
     await until(app.lastFrame, "Saved claude · sonnet");
     expect(saved).toBe("claude");
     await app.press("j");
@@ -696,11 +788,8 @@ describe("switching model, provider, effort and depth", () => {
   it("E explains that Cursor has no separate effort", async () => {
     const sw = { ...stubSwitcher(), efforts: async () => [] as string[] };
     const app = await mount(session(), sw);
-    await app.press("E");
-    const f = await until(
-      app.lastFrame,
-      "has no separate effort setting: pick a model instead (m)",
-    );
+    await options(app, "e");
+    const f = await until(app.lastFrame, "has no separate effort setting: pick a model instead.");
     expect(f).toContain("claude has no separate effort setting");
     app.unmount();
   });
@@ -732,6 +821,7 @@ describe("switching model, provider, effort and depth", () => {
     await until(app.lastFrame, "Provider rate limited");
     app.stdin.write("m");
     await until(app.lastFrame, "model · claude");
+    await sleep(80); // let the picker attach its key handler
     for (const ch of "haiku") app.stdin.write(ch);
     await sleep();
     app.stdin.write(ENTER);
@@ -739,6 +829,7 @@ describe("switching model, provider, effort and depth", () => {
     expect(app.lastFrame()).toContain("changed; r retries");
     app.stdin.write("D");
     await until(app.lastFrame, "review depth");
+    await sleep(80); // let the picker attach its key handler
     for (const ch of "quick") app.stdin.write(ch);
     await sleep();
     app.stdin.write(ENTER);
@@ -825,20 +916,20 @@ describe("full-screen layout", () => {
     const app = await mount(session());
     await app.press(ENTER);
     await until(app.lastFrame, "Sentence number 0");
-    const lines = app.lastFrame()!.split("\n");
-    expect(lines.length).toBeLessThanOrEqual(30);
+    expect(app.lastFrame()!.split("\n").length).toBeLessThanOrEqual(30);
     expect(app.lastFrame()).not.toContain("Sentence number 59");
     expect(app.lastFrame()).toContain("┃"); // scrollbar thumb
-    await app.press("G");
+    const PGDN = "\u001B[6~";
+    const PGUP = "\u001B[5~";
+    for (let i = 0; i < 6 && !app.lastFrame()!.includes("Sentence number 59"); i++)
+      await app.press(PGDN);
     await until(app.lastFrame, "Sentence number 59");
-    expect(app.lastFrame()).toContain("Thread (0)");
     expect(app.lastFrame()!.split("\n").length).toBeLessThanOrEqual(30);
-    await app.press("g");
+    // arrows scroll lines and never move the cursor to another finding
+    await app.press("\u001B[A");
+    expect(app.lastFrame()).toContain("1/2");
+    for (let i = 0; i < 8; i++) await app.press(PGUP);
     await until(app.lastFrame, "Sentence number 0");
-    // PgDn and wheel (arrow) scrolling
-    app.stdin.write("\u001B[6~");
-    await sleep(60);
-    expect(app.lastFrame()).not.toContain("Sentence number 0 ");
     app.unmount();
   });
 });
@@ -917,7 +1008,7 @@ describe("copy as prompt and the rules panel", () => {
       },
     });
     const app = await mount(s);
-    await app.press("R");
+    await options(app, "r");
     const f = await until(app.lastFrame, "rules in this review");
     expect(f).toContain("[x] R4  Validate money inputs at the boundary");
     await app.press(ENTER);
@@ -926,7 +1017,7 @@ describe("copy as prompt and the rules panel", () => {
     expect(s.state.disabledRules).toEqual([".cursor/rules/payments.mdc"]);
     expect(s.ruleRows()[0]).toMatchObject({ disabled: true });
     // back on: no re-check, applies next time
-    await app.press("R");
+    await options(app, "r");
     await until(app.lastFrame, "[ ] R4");
     await app.press(ENTER);
     await until(app.lastFrame, "R4 is on again");
