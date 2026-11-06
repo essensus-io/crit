@@ -1107,7 +1107,7 @@ describe("re-run the review", () => {
     app.stdin.write("R");
     await until(
       app.lastFrame,
-      "Re-run the review of feature/payments → main? Unchanged files come from the cache.",
+      "Re-run the review of feature/payments → main? Every file is reviewed again, without the cache.",
     );
     await sleep(80);
     app.stdin.write(ESC);

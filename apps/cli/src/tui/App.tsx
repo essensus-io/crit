@@ -358,15 +358,12 @@ export function ReviewApp({
   if (mode === "rerun" && onRerun)
     prompt = (
       <Choice
-        label={`Re-run the review of ${state.review.scopeLabel}? Unchanged files come from the cache.`}
-        options={[
-          ["y", "yes, re-run"],
-          ["f", "fresh: review every file again"],
-        ]}
+        label={`Re-run the review of ${state.review.scopeLabel}? Every file is reviewed again, without the cache.`}
+        options={[["y", "yes, re-run"]]}
         onCancel={done}
-        onPick={(k) => {
+        onPick={() => {
           done();
-          onRerun(k === "f");
+          onRerun(true);
           app.exit();
         }}
       />
