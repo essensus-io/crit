@@ -33,7 +33,7 @@ function fitKeys(keys: [string, string][], width: number): [string, string][] {
   const size = (ks: [string, string][]) =>
     ks.reduce((n, [k, l], i) => n + (i ? 3 : 0) + k.length + l.length + 1, 1);
   const out = [...keys];
-  for (const drop of ["enter", "d", "i", "x"])
+  for (const drop of ["enter", "d", "i", "x", "?", "R"])
     if (size(out) > width) {
       const at = out.findIndex(([k]) => k === drop);
       if (at >= 0) out.splice(at, 1);
@@ -68,6 +68,8 @@ export function StreamScreen(props: {
   idle: boolean;
   /** Show the re-run hint. */
   canRerun?: boolean;
+  /** q goes back to the start screen (instead of quitting). */
+  canGoBack?: boolean;
 }) {
   const { state, items, width, height } = props;
   const review = state.review;
@@ -115,15 +117,16 @@ export function StreamScreen(props: {
   const keys: [string, string][] = !current
     ? [
         ["/", "search"],
+        ...(props.canRerun ? ([["R", "re-run review"]] as [string, string][]) : []),
         ["o", "options"],
         ["?", "help"],
-        ["q", "quit"],
+        ["q", props.canGoBack ? "start screen" : "quit"],
       ]
     : props.focus === "files"
       ? [
           ["j/k", "previous / next file"],
           ["enter", "back to the code"],
-          ["?", "help"],
+          ["q", props.canGoBack ? "start screen" : "quit"],
         ]
       : fitKeys(
           [
@@ -136,6 +139,8 @@ export function StreamScreen(props: {
             ...(p.applicable > 0
               ? ([["A", `apply all ${p.applicable}`]] as [string, string][])
               : []),
+            ...(props.canRerun ? ([["R", "re-run"]] as [string, string][]) : []),
+            ["q", props.canGoBack ? "start screen" : "quit"],
             ["?", "help"],
           ],
           width,

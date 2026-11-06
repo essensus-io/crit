@@ -484,6 +484,7 @@ export function ReviewApp({
           prompt={prompt}
           idle={idle}
           canRerun={Boolean(onRerun)}
+          canGoBack={Boolean(onBack)}
         />
       ) : (
         <ProposalScreen

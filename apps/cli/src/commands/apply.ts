@@ -143,10 +143,13 @@ export async function openCommand(
       root,
       review.id,
       resolveConfig(loadUserConfig(ctx.paths), loadProjectConfig(root)),
+      { home: true },
     );
-    if (!rerun || rerun === "home") return EXIT.ok;
-    // "Re-run": the same scope with whatever provider, model, effort and depth was picked.
+    if (!rerun) return EXIT.ok;
     const { argsFromScope, runReviewCommand } = await import("./review.ts");
+    // q: back to the start screen.
+    if (rerun === "home") return runReviewCommand(ctx, { _: [] });
+    // "Re-run": the same scope with whatever provider, model, effort and depth was picked.
     return runReviewCommand(ctx, {
       ...argsFromScope(review.scope),
       ...(rerun.provider ? { provider: rerun.provider } : {}),

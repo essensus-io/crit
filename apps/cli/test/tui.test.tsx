@@ -221,7 +221,7 @@ describe("review stream", () => {
     expect(f).toContain("1 of 2 reviewed · 1 accepted");
     expect(f).toContain("+1 filtered");
     expect(f).toContain(
-      "j/k next · a uncheck · i tell the AI · x apply this · d skip · enter more · A apply all 1 · ? help",
+      "j/k next · a uncheck · i tell the AI · x apply this · d skip · A apply all 1 · q quit · ? help",
     );
     // the code lines come before the card that is about them
     expect(f.indexOf("if (amount > order.capturedAmount)")).toBeLessThan(
