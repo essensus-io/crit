@@ -79,6 +79,16 @@ export function patchLines(patch: string, w: number): Line[] {
   });
 }
 
+/** Checkbox (agree with the fix) and title. */
+function titleLine(item: FindingView, w: number): Line {
+  const tri = triage(item);
+  const box = tri === "accepted" ? "[x]" : tri === "pending" && item.fix ? "[ ]" : "   ";
+  return [
+    { t: `${box} `, color: tri === "accepted" ? T.mint : T.gray, bold: true },
+    { t: clip(item.finding.title, w - 4), bold: true },
+  ];
+}
+
 /** What the card says inside its border (without the border). */
 export function cardBody(item: FindingView, state: SessionState, o: CardOptions): Line[] {
   const f = item.finding;
@@ -87,7 +97,7 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
   const fixSummary = item.fix?.summary;
 
   if (!o.expanded) {
-    out.push([{ t: clip(f.title, w), bold: true }]);
+    out.push(titleLine(item, w));
     const why = (f.failureScenario ?? f.explanation).replace(/\s+/g, " ").trim();
     out.push([{ t: "why ", dim: true }, { t: clip(why, w - 4) }]);
     out.push(
@@ -98,10 +108,10 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
               { t: item.fix?.author === "user" ? "your fix " : "fix ", dim: true },
               { t: clip(fixSummary, w - 9) },
             ]
-          : [{ t: "no fix yet · press a to get one", dim: true }],
+          : [{ t: "no fix yet · i tells the AI what it should be", dim: true }],
     );
   } else {
-    out.push([{ t: clip(f.title, w), bold: true }]);
+    out.push(titleLine(item, w));
     out.push(...wrapped(f.explanation, w));
     if (f.failureScenario) {
       out.push([{ t: "Fails when", dim: true }]);
@@ -187,16 +197,19 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
         ? [["d", "restore"]]
         : state2 === "applied"
           ? [["enter", o.expanded ? "less" : "details"]]
-          : [
-              ...(state2 === "accepted"
-                ? ([
-                    ["a", "undo"],
-                    ["A", "apply now"],
-                  ] as [string, string][])
-                : ([["a", item.fix ? "accept fix" : "get a fix"]] as [string, string][])),
-              ["d", "dismiss"],
-              ["enter", o.expanded ? "less" : "details"],
-            ];
+          : item.fix
+            ? [
+                ["a", state2 === "accepted" ? "uncheck" : "agree"],
+                ["i", "tell the AI"],
+                ["x", "apply this"],
+                ["d", "skip"],
+                ["enter", o.expanded ? "less" : "details"],
+              ]
+            : [
+                ["i", "tell the AI the fix"],
+                ["d", "dismiss"],
+                ["enter", o.expanded ? "less" : "details"],
+              ];
     // Drop hints from the end until they fit the card.
     const size = (ks: [string, string][]) =>
       ks.reduce((n, [k, l], i) => n + (i ? 2 : 0) + k.length + l.length + 3, 0);

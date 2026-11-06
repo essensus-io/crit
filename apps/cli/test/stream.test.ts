@@ -166,7 +166,9 @@ describe("buildStream", () => {
       "AI ●",
       "Do the thing",
       "+ added",
-      "[a] accept fix",
+      "[a] agree",
+      "[i] tell the AI",
+      "[x] apply this",
       "[enter] less",
     ])
       expect(body).toContain(part);
@@ -199,6 +201,40 @@ describe("filters", () => {
     expect(visibleItems(st, parseQuery("is:filtered")).map((v) => v.finding.id)).toEqual(["r"]);
     expect(visibleItems(st, parseQuery("sev:major")).map((v) => v.finding.id)).toEqual(["a", "c"]);
     expect(visibleItems(st, parseQuery("file:0.ts")).map((v) => v.finding.id)).toEqual(["m"]);
+  });
+
+  it("has:fix and is:pending narrow the list to the fixes still waiting on you", () => {
+    const withFix = (id: string, over: Partial<Finding> = {}) => {
+      const v = view(id, 1, 1, over);
+      v.fix = {
+        id: `fx-${id}`,
+        findingId: id,
+        author: "ai",
+        summary: "s",
+        patch: "p",
+        active: true,
+        overridden: false,
+        createdAt: 0,
+      } as FindingView["fix"];
+      return v;
+    };
+    const st = {
+      items: [
+        withFix("a"),
+        withFix("b", { selected: true }),
+        view("c", 1),
+        withFix("d", { status: "dismissed" }),
+      ],
+    } as unknown as SessionState;
+    expect(parseQuery("has:fix is:pending")).toEqual({
+      tab: "findings",
+      hasFix: true,
+      pending: true,
+    });
+    const ids = (q: string) => visibleItems(st, parseQuery(q)).map((v) => v.finding.id);
+    expect(ids("has:fix")).toEqual(["a", "b", "d"]);
+    expect(ids("is:pending")).toEqual(["a", "c"]);
+    expect(ids("has:fix is:pending")).toEqual(["a"]);
   });
 
   it("triage reads pending, accepted, dismissed and applied from a finding", () => {

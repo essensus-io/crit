@@ -28,6 +28,19 @@ function Row({ line }: { line: Line }) {
   );
 }
 
+/** Drop the least important hints, in this order, until the line fits. */
+function fitKeys(keys: [string, string][], width: number): [string, string][] {
+  const size = (ks: [string, string][]) =>
+    ks.reduce((n, [k, l], i) => n + (i ? 3 : 0) + k.length + l.length + 1, 1);
+  const out = [...keys];
+  for (const drop of ["enter", "d", "i", "x"])
+    if (size(out) > width) {
+      const at = out.findIndex(([k]) => k === drop);
+      if (at >= 0) out.splice(at, 1);
+    }
+  return out;
+}
+
 /** What is left to do, for the line under the panels. */
 export function progressOf(items: FindingView[]) {
   const live = items.filter((i) => triage(i) !== "applied");
@@ -47,7 +60,6 @@ export function StreamScreen(props: {
   cursor: number;
   expanded: ReadonlySet<string>;
   fixTab: "ai" | "user";
-  fileCursor: number;
   focus: "files" | "stream";
   width: number;
   height: number;
@@ -71,7 +83,12 @@ export function StreamScreen(props: {
   const panelH = Math.max(5, height - 5);
   const rows = panelH - 2;
   const innerW = rightW - 4;
-  const tree = fileCursorRows(state);
+  const tree = fileTree(state);
+  // the files list follows the finding you are on, so it always shows where you are
+  const fileCursor = Math.max(
+    0,
+    tree.findIndex((r) => r.file !== undefined && r.file === current?.finding.file),
+  );
 
   const drafting = useMemo(() => new Set(state.drafting), [state.drafting]);
   const tick = useTick(150, drafting.size > 0);
@@ -93,10 +110,7 @@ export function StreamScreen(props: {
   );
   const span = current ? stream.card.get(current.finding.id) : undefined;
   const lines = stream.rows.map((r, i) => <Row key={i} line={r.line} />);
-  const fstart = Math.max(
-    0,
-    Math.min(props.fileCursor - Math.floor(rows / 2), tree.length - (rows - 1)),
-  );
+  const fstart = Math.max(0, Math.min(fileCursor - Math.floor(rows / 2), tree.length - (rows - 1)));
 
   const keys: [string, string][] = !current
     ? [
@@ -107,20 +121,25 @@ export function StreamScreen(props: {
       ]
     : props.focus === "files"
       ? [
-          ["j/k", "pick a file"],
-          ["enter", "go to it"],
-          ["l", "back to code"],
+          ["j/k", "previous / next file"],
+          ["enter", "back to the code"],
           ["?", "help"],
         ]
-      : [
-          ["j/k", "next"],
-          ["a", current.fix ? (current.finding.selected ? "undo" : "accept") : "get a fix"],
-          ["d", triage(current) === "dismissed" ? "restore" : "dismiss"],
-          ["enter", props.expanded.has(current.finding.id) ? "less" : "more"],
-          ...(p.applicable > 0 ? ([["A", `apply ${p.applicable}`]] as [string, string][]) : []),
-          [".", "actions"],
-          ["?", "help"],
-        ];
+      : fitKeys(
+          [
+            ["j/k", "next"],
+            ["a", current.fix ? (current.finding.selected ? "uncheck" : "agree") : "get a fix"],
+            ["i", "tell the AI"],
+            ["x", "apply this"],
+            ["d", triage(current) === "dismissed" ? "restore" : "skip"],
+            ["enter", props.expanded.has(current.finding.id) ? "less" : "more"],
+            ...(p.applicable > 0
+              ? ([["A", `apply all ${p.applicable}`]] as [string, string][])
+              : []),
+            ["?", "help"],
+          ],
+          width,
+        );
 
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
@@ -151,7 +170,7 @@ export function StreamScreen(props: {
               <Text
                 key={r.key}
                 wrap="truncate"
-                {...(props.focus === "files" && i === props.fileCursor ? { inverse: true } : {})}
+                {...(props.focus === "files" && i === fileCursor ? { inverse: true } : {})}
                 {...(here ? { color: T.cyan } : {})}
               >
                 {truncate(r.label, leftW - 9).padEnd(leftW - 8)}
@@ -226,5 +245,3 @@ export function StreamScreen(props: {
     </Box>
   );
 }
-
-const fileCursorRows = fileTree;

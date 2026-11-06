@@ -10,6 +10,10 @@ export type ListFilter = {
   /** Substring of the file path. */
   file?: string;
   search?: string;
+  /** Only findings that have a proposed fix. */
+  hasFix?: boolean;
+  /** Only findings you have not ticked, skipped or applied yet. */
+  pending?: boolean;
 };
 
 /** Findings the skeptic rejected, or that a re-check closed: out of the way, not gone. */
@@ -41,6 +45,8 @@ export function parseQuery(query: string): ListFilter {
     else if (k === "lens" && v) f.lens = v as Lens;
     else if (k === "file" && v) f.file = v;
     else if (k === "is" && v === "filtered") f.tab = "filtered";
+    else if (k === "is" && v === "pending") f.pending = true;
+    else if (k === "has" && v === "fix") f.hasFix = true;
     else words.push(tok);
   }
   if (words.length) f.search = words.join(" ");
@@ -58,6 +64,8 @@ export function visibleItems(state: SessionState, f: ListFilter): FindingView[] 
         SEVERITY_ORDER.indexOf(v.finding.severity) <= SEVERITY_ORDER.indexOf(f.severity),
     )
     .filter((v) => !f.lens || v.finding.category === f.lens)
+    .filter((v) => !f.hasFix || Boolean(v.fix))
+    .filter((v) => !f.pending || triage(v) === "pending")
     .filter((v) => !f.file || v.finding.file.toLowerCase().includes(f.file.toLowerCase()))
     .filter(
       (v) =>

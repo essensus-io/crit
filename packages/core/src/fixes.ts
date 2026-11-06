@@ -230,13 +230,15 @@ async function draftFromDescription(
  * with `git apply --check`, stored as the AI's fix. There is no second model
  * pass judging it; the user reviews the diff and accepts it.
  */
-export async function draftAiFix(ctx: FixContext, finding: Finding): Promise<Fix> {
-  const patch = await runDraft(
-    ctx,
-    finding,
-    "Write the smallest change that fixes this finding. Do not refactor or touch unrelated code.",
-    "this finding",
-  );
+export async function draftAiFix(
+  ctx: FixContext,
+  finding: Finding,
+  opts: { instruction?: string; from?: Fix } = {},
+): Promise<Fix> {
+  const instruction = opts.instruction?.trim()
+    ? `${opts.from ? `For reference, the current fix is:\n\`\`\`diff\n${opts.from.patch}\`\`\`\n` : ""}The user asks for this fix: ${opts.instruction.trim()}\nWrite exactly that, as a unified diff against the file as shown below (not against the current fix).`
+    : "Write the smallest change that fixes this finding. Do not refactor or touch unrelated code.";
+  const patch = await runDraft(ctx, finding, instruction, "this finding");
   const check = await checkPatch(ctx.root, patch);
   if (!check.ok) throw new FixError(`the drafted fix does not apply: ${check.error}`);
   const fix: Fix = {
@@ -244,7 +246,10 @@ export async function draftAiFix(ctx: FixContext, finding: Finding): Promise<Fix
     findingId: finding.id,
     author: "ai",
     patch: check.patch,
-    summary: `Fix: ${finding.title}`.slice(0, 120),
+    summary: (opts.instruction?.trim()
+      ? `As you asked: ${opts.instruction.trim().split("\n")[0]}`
+      : `Fix: ${finding.title}`
+    ).slice(0, 120),
     overridden: false,
     active: true,
     createdAt: Date.now(),

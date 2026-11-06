@@ -34,6 +34,8 @@ export type ProgressState = {
 
 export type RunRecovery =
   | { kind: "provider" }
+  /** Back to the start screen. */
+  | { kind: "home" }
   | { kind: "budget"; maxShards: number }
   /** Run again with what the user picked on the run screen. */
   | {

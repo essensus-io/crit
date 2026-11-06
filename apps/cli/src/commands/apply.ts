@@ -144,7 +144,7 @@ export async function openCommand(
       review.id,
       resolveConfig(loadUserConfig(ctx.paths), loadProjectConfig(root)),
     );
-    if (!rerun) return EXIT.ok;
+    if (!rerun || rerun === "home") return EXIT.ok;
     // "Re-run": the same scope with whatever provider, model, effort and depth was picked.
     const { argsFromScope, runReviewCommand } = await import("./review.ts");
     return runReviewCommand(ctx, {

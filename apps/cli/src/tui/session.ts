@@ -200,7 +200,7 @@ export class ReviewSession {
    * screen stays usable, the card shows progress, and a notice says when it is
    * ready. A few at a time, so a burst of requests cannot flood the agent.
    */
-  draftFix(id: string) {
+  draftFix(id: string, instruction?: string) {
     const it = this.item(id);
     if (!it) return;
     if (this.draftingIds.has(id)) return this.notify("Already writing a fix for this one.");
@@ -215,9 +215,14 @@ export class ReviewSession {
     this.draftingIds.add(id);
     this.set({ drafting: [...this.draftingIds], notice: undefined, error: undefined });
     const { finding } = it;
-    void draftAiFix(ctx, finding).then(
+    void draftAiFix(ctx, finding, {
+      ...(instruction ? { instruction } : {}),
+      ...(it.fix ? { from: it.fix } : {}),
+    }).then(
       async () => {
         this.draftingIds.delete(id);
+        // a new fix is a new proposal: the old agreement does not carry over
+        if (instruction) await this.deps.store.findings.update(id, { selected: false });
         await this.load().catch(() => undefined);
         this.set({ notice: `Fix ready for “${finding.title}”. Press a on it to accept.` });
       },
@@ -341,7 +346,10 @@ export class ReviewSession {
     return this.propose(id, { kind: "patch", patch });
   }
 
-  apply(target: ApplyTarget = { kind: "worktree" }): Promise<ApplyResult | undefined> {
+  apply(
+    target: ApplyTarget = { kind: "worktree" },
+    only?: string[],
+  ): Promise<ApplyResult | undefined> {
     return this.run("Applying fixes…", async () => {
       const r = await applyFixes({
         store: this.deps.store,
@@ -349,6 +357,7 @@ export class ReviewSession {
         root: this.deps.root,
         target,
         backupRoot: this.deps.backupRoot,
+        ...(only ? { only } : {}),
         ...(this.deps.verifyCommands.length ? { verifyCommands: this.deps.verifyCommands } : {}),
         ...(this.deps.rebase ? { rebase: this.deps.rebase } : {}),
       });
@@ -364,6 +373,17 @@ export class ReviewSession {
       }
       return r;
     });
+  }
+
+  /** Apply just this finding's fix to the working tree, whether or not it is ticked. */
+  async applyOne(id: string) {
+    const it = this.item(id);
+    if (!it) return;
+    if (!it.fix) return this.notify("This finding has no fix to apply yet.");
+    if (it.finding.status !== "open") return this.notify("This one is already dealt with.");
+    await this.deps.store.findings.update(id, { selected: true });
+    await this.load();
+    return this.apply({ kind: "worktree" }, [id]);
   }
 
   /** Re-run review for one file and replace this review's open findings on it with the fresh ones. */

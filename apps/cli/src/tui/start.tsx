@@ -19,6 +19,7 @@ import {
   type ProvidersFile,
   type ResolvedConfig,
   type ReviewEvent,
+  type ScopeSpec,
   shortId,
 } from "@crit/schema";
 import { listHistory, loadProviders, type SqliteStore } from "@crit/store";
@@ -27,6 +28,13 @@ import type { ReactElement } from "react";
 import { type CliContext, sessionsDir } from "../context.ts";
 import { adapterFor } from "../setup.ts";
 import { ReviewApp, RunApp } from "./App.tsx";
+import {
+  type Estimate,
+  HomeApp,
+  type HomeChoice,
+  type HomeInfo,
+  type RecentReview,
+} from "./HomeScreen.tsx";
 import type { RunRecovery } from "./ProgressScreen.tsx";
 import { Screen } from "./screen.tsx";
 import { type Editor, ReviewSession } from "./session.ts";
@@ -207,13 +215,44 @@ export async function makeSession(
 }
 
 /** `crit open` in a terminal: the review screen for a saved review. */
+/** The start screen. Nothing runs until the user picks something and presses enter. */
+export async function homeTui(
+  ctx: CliContext,
+  config: ResolvedConfig,
+  props: {
+    info: HomeInfo;
+    recent: RecentReview[];
+    initialSpec?: ScopeSpec;
+    initialChoice: Partial<Choice> & { provider: string };
+    estimate: (spec: ScopeSpec) => Promise<Estimate>;
+  },
+): Promise<HomeChoice> {
+  let result: HomeChoice = { kind: "quit" };
+  const switcher = makeSwitcher(ctx, config, props.initialChoice);
+  await renderFullScreen(
+    <HomeApp
+      info={props.info}
+      recent={props.recent}
+      initialSpec={props.initialSpec}
+      switcher={switcher}
+      estimate={props.estimate}
+      onDone={(choice) => {
+        result = choice;
+      }}
+    />,
+  );
+  return result;
+}
+
+/** `crit open` in a terminal: the review screen for a saved review. With `home`, q goes back to the start screen. */
 export async function openTui(
   ctx: CliContext,
   store: SqliteStore,
   root: string,
   reviewId: string,
   config: ResolvedConfig,
-): Promise<Choice | undefined> {
+  opts: { home?: boolean } = {},
+): Promise<Choice | "home" | undefined> {
   const review = await store.reviews.get(reviewId);
   const switcher = review ? makeSwitcher(ctx, config, { provider: review.provider }) : undefined;
   const session = await makeSession(
@@ -225,10 +264,18 @@ export async function openTui(
     switcher ? { switcher } : {},
   );
   let rerun: Choice | undefined;
+  let wentHome = false;
   await renderFullScreen(
     <ReviewApp
       session={session}
       {...(switcher ? { switcher } : {})}
+      {...(opts.home
+        ? {
+            onBack: () => {
+              wentHome = true;
+            },
+          }
+        : {})}
       onRerun={() => {
         rerun = switcher?.current() ?? {
           provider: "",
@@ -239,6 +286,7 @@ export async function openTui(
       }}
     />,
   );
+  if (wentHome) return "home";
   if (rerun) return rerun;
   const line = await summaryLine(store, reviewId);
   if (line) ctx.out(line);

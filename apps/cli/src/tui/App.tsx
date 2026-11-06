@@ -3,7 +3,7 @@ import type { ReviewEvent } from "@crit/schema";
 import { Box, useApp, useInput } from "ink";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Choice, TextInput } from "./components.tsx";
-import { fileTree, parseQuery, triage, visibleItems } from "./filter.ts";
+import { parseQuery, triage, visibleItems } from "./filter.ts";
 import { HelpOverlay } from "./HelpOverlay.tsx";
 import {
   emptyProgress,
@@ -34,6 +34,7 @@ type Mode =
   | "ask"
   | "reply"
   | "apply"
+  | "instruct"
   | "rerun";
 
 /**
@@ -46,6 +47,7 @@ export function ReviewApp({
   switcher,
   onConnect,
   onRerun,
+  onBack,
 }: {
   session: ReviewSession;
   onExit?: () => void;
@@ -53,6 +55,8 @@ export function ReviewApp({
   onConnect?: () => void;
   /** Leave and review the same scope again; unchanged files come from the cache. */
   onRerun?: () => void;
+  /** Go back to the start screen. When set, q goes back instead of quitting. */
+  onBack?: () => void;
 }) {
   const app = useApp();
   useEffect(() => {
@@ -69,7 +73,6 @@ export function ReviewApp({
   const [screen, setScreen] = useState<"stream" | "proposal">("stream");
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
-  const [fileCursor, setFileCursor] = useState(0);
   const [focus, setFocus] = useState<"files" | "stream">("stream");
   const [mode, setMode] = useState<Mode>("none");
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
@@ -113,6 +116,19 @@ export function ReviewApp({
     onExit?.();
     app.exit();
   };
+  const back = () => {
+    onBack?.();
+    app.exit();
+  };
+  const files = useMemo(() => [...new Set(items.map((i) => i.finding.file))], [items]);
+  // Moving between files jumps to the first finding of the next or previous one.
+  const moveFile = (delta: number) => {
+    if (!current) return;
+    const at = files.indexOf(current.finding.file);
+    const target = files[Math.max(0, Math.min(files.length - 1, at + delta))];
+    const first = items.findIndex((i) => i.finding.file === target);
+    if (first >= 0) setCursor(first);
+  };
   const toggleExpanded = (id: string) =>
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -150,7 +166,7 @@ export function ReviewApp({
         }
         return;
       }
-      if (input === "q") return quit();
+      if (input === "q") return onBack ? back() : quit();
       if (input === "?") return setMode("help");
       if (input === "/") return setMode("search");
       if (input === "o") return setMode("options");
@@ -163,37 +179,34 @@ export function ReviewApp({
         }
         return;
       }
-      if (input === "h" || input === "l") return setFocus(input === "h" ? "files" : "stream");
+      if (input === "h" || key.leftArrow) return setFocus("files");
+      if (input === "l" || key.rightArrow) return setFocus("stream");
       if (focus === "files") {
-        const tree = fileTree(state);
-        if (input === "j" || key.downArrow)
-          return setFileCursor((c) => Math.min(c + 1, tree.length - 1));
-        if (input === "k" || key.upArrow) return setFileCursor((c) => Math.max(c - 1, 0));
-        if (key.return) {
-          const file = tree[fileCursor]?.file;
-          const at = file ? items.findIndex((i) => i.finding.file === file) : -1;
-          if (at >= 0) move(at);
-          setFocus("stream");
-        }
+        if (key.escape || key.return) return setFocus("stream");
+        if (input === "j" || key.downArrow) return moveFile(1);
+        if (input === "k" || key.upArrow) return moveFile(-1);
         return;
       }
       if (input === "j" || input === "n") return move(cursor + 1);
       if (input === "k" || input === "N") return move(cursor - 1);
+      if (input === "]") return moveFile(1);
+      if (input === "[") return moveFile(-1);
       if (input === "g") return move(0);
       if (input === "G") return move(items.length - 1);
       if (input === "A") return setMode("apply");
       if (!current) return;
       const id = current.finding.id;
+      if (key.tab && key.shift) return moveFile(-1);
+      if (key.tab)
+        return expanded.has(id) ? setFixTab((t) => (t === "ai" ? "user" : "ai")) : moveFile(1);
       if (key.return) return toggleExpanded(id);
-      if (key.tab && expanded.has(id)) return setFixTab((t) => (t === "ai" ? "user" : "ai"));
       if (input === "y") return void session.copyPrompt(id);
       if (input === ".") return setMode("actions");
-      if (input === "a") {
+      if (input === "i") return setMode("instruct");
+      if (input === "x") return void session.applyOne(id);
+      if (input === "a" || input === " ") {
         if (triage(current) === "dismissed") return void session.restore(id);
-        if (!current.fix && !current.finding.selected) {
-          session.notify("This finding has no fix yet. Have the AI write one, or write your own:");
-          return setMode("propose");
-        }
+        if (!current.fix && !current.finding.selected) return setMode("instruct");
         return void session.toggle(id);
       }
       if (input === "d")
@@ -214,6 +227,21 @@ export function ReviewApp({
           setQuery(v.trim());
           setCursor(0);
           done();
+        }}
+      />
+    );
+  if (mode === "instruct" && current)
+    prompt = (
+      <TextInput
+        label={
+          current.fix
+            ? "Tell the AI how the fix should change ›"
+            : "No fix yet. What should the fix do? (enter alone: let the AI decide) ›"
+        }
+        onCancel={done}
+        onSubmit={(text) => {
+          done();
+          session.draftFix(current.finding.id, text.trim() || undefined);
         }}
       />
     );
@@ -239,21 +267,14 @@ export function ReviewApp({
   if (mode === "propose" && current)
     prompt = (
       <Choice
-        label="Get a fix:"
+        label="Propose a fix:"
         options={[
-          ["a", "let the AI write it"],
           ["w", "describe it in words"],
           ["e", "write it in $EDITOR"],
         ]}
         onCancel={done}
         onPick={(k) => {
           if (k === "w") return setMode("describe");
-          if (k === "a") {
-            // In the background: keep reviewing; the card shows when the fix is ready.
-            done();
-            session.draftFix(current.finding.id);
-            return;
-          }
           done();
           void session.proposeFromEditor(current.finding.id).then((o) => {
             if (o && lastInput === undefined) setLastInput({ kind: "patch", patch: o.fix.patch });
@@ -457,7 +478,6 @@ export function ReviewApp({
           cursor={cursor}
           expanded={expanded}
           fixTab={fixTab}
-          fileCursor={fileCursor}
           focus={focus}
           width={width}
           height={height}
@@ -577,7 +597,10 @@ export function RunApp(props: {
         {...(props.onExit ? { onExit: props.onExit } : {})}
         {...(props.switcher ? { switcher: props.switcher } : {})}
         {...(props.onRecover
-          ? { onRerun: () => props.onRecover!({ kind: "retry", ...selection }) }
+          ? {
+              onRerun: () => props.onRecover!({ kind: "retry", ...selection }),
+              onBack: () => props.onRecover!({ kind: "home" }),
+            }
           : {})}
       />
     );

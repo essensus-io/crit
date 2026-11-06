@@ -24,8 +24,10 @@ crit review             # first run walks you through connecting a provider
 ## Use
 
 ```sh
-crit review                      # the current branch against its nearest base branch
-crit review --staged             # staged changes
+crit                             # the start screen: pick what to review, see the cost, press enter
+crit review                      # the same; reviews never start by themselves
+crit review --now                # skip the start screen and review straight away
+crit review --staged             # staged changes (the start screen opens with it selected)
 crit review --commit HEAD~1      # one commit
 crit review src/billing          # paths, folders, globs (add --diff for changed files only)
 crit review --all                # the whole project (asks first)
@@ -35,6 +37,15 @@ crit open                        # reopen the latest saved review
 crit apply / crit undo           # apply all checked fixes / undo the last apply
 crit history                     # browse, compare (--compare a b), rm, prune --older-than 90d
 ```
+
+### The start screen
+
+Running `crit` in a terminal opens the start screen. Pick a scope (this branch against
+its base, staged changes, the last commit, the whole project, or paths you type), see
+how many files, runs and tokens it would cost, and press `enter` to start. Past
+reviews of the repository are listed on the right (`tab`, then `enter` reopens one).
+`o` changes the model, provider, effort and depth. When a review is finished, `q`
+brings you back here; `q` again quits.
 
 ### The screen
 
@@ -47,21 +58,24 @@ right now; press `?` for all of them.
 It runs on the terminal's alternate screen: your terminal's own scrollback is
 untouched and comes back when you leave, and only the panels inside crit scroll.
 
-| Key                   | Does                                                                                                                                                          |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `j` `k`               | next / previous finding                                                                                                                                       |
-| `a`                   | accept the fix (again to undo); on a finding without a fix, get one: the AI writes it in the background while you keep reviewing, or you describe or write it |
-| `d`                   | dismiss with a reason, remembered as a false positive (again to restore)                                                                                      |
-| `enter`               | show or hide the full explanation, fix and thread in place                                                                                                    |
-| `A`                   | apply every accepted fix (then `enter` for the working tree, or `b` for a new branch): accepting stages a fix, `A` writes the accepted ones to your files     |
-| `R`                   | re-run the review of this scope (unchanged files come from the cache, so only changed files cost tokens)                                                      |
-| `↑` `↓` `PgUp` `PgDn` | scroll the code (the mouse wheel too)                                                                                                                         |
-| `/`                   | search: words, `sev:major`, `lens:security`, `file:cart`, `is:filtered`                                                                                       |
-| `.`                   | actions: propose a fix, edit it in `$EDITOR`, ask a question, re-check the file, copy as a prompt, use my fix                                                 |
-| `o`                   | options: model, provider, reasoning effort, depth, save as default, rules on/off                                                                              |
-| `y`                   | copy the finding as a prompt for another agent                                                                                                                |
-| `h` `l`               | files list ⇄ code · `g` `G` first / last finding                                                                                                              |
-| `?` `q`               | help · back / quit                                                                                                                                            |
+| Key                   | Does                                                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `j` `k`               | next / previous finding                                                                                                         |
+| `a` `space`           | agree with the fix: tick the box (again to untick). Unticked fixes are left alone                                               |
+| `d`                   | skip: dismiss with a reason, remembered as a false positive (again to restore)                                                  |
+| `enter`               | show or hide the full explanation, fix and thread in place                                                                      |
+| `i`                   | tell the AI what the fix should be: it rewrites it in the background (enter alone: let it decide)                               |
+| `x`                   | apply just this fix now                                                                                                         |
+| `A`                   | apply every ticked fix (then `enter` for the working tree, or `b` for a new branch)                                             |
+| `R`                   | re-run the review of this scope (unchanged files come from the cache, so only changed files cost tokens)                        |
+| `↑` `↓` `PgUp` `PgDn` | scroll the code (the mouse wheel too)                                                                                           |
+| `/`                   | search: words, `sev:major`, `lens:security`, `file:cart`, `has:fix`, `is:pending`, `is:filtered`                                |
+| `.`                   | actions: propose a fix, edit it in `$EDITOR`, ask a question, re-check the file, copy as a prompt, use my fix                   |
+| `o`                   | options: model, provider, reasoning effort, depth, save as default, rules on/off                                                |
+| `y`                   | copy the finding as a prompt for another agent                                                                                  |
+| `tab` `]` `[`         | next / previous file (`h` `l` or the arrows switch between the files list and the code; in the list `j` `k` jump between files) |
+| `g` `G`               | first / last finding                                                                                                            |
+| `?` `q`               | help · back to the start screen (quit when opened with `crit open`)                                                             |
 
 Model, provider, effort and depth apply to the _next_ ask, proposal or re-check. While
 a review runs, `m` `P` `E` `D` `S` change the next run instead and `r` retries with

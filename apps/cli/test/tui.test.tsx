@@ -189,10 +189,10 @@ const ENTER = "\r";
 const ESC = "\u001B";
 const TAB = "\t";
 
-async function mount(s: ReviewSession, switcher?: Switcher) {
+async function mount(s: ReviewSession, switcher?: Switcher, ready = "of 2 reviewed") {
   await s.load();
   const app = render(<ReviewApp session={s} {...(switcher ? { switcher } : {})} />);
-  await until(app.lastFrame, "of 2 reviewed");
+  await until(app.lastFrame, ready);
   const press = async (...keys: string[]) => {
     for (const k of keys) {
       app.stdin.write(k);
@@ -214,13 +214,14 @@ describe("review stream", () => {
     expect(f).toContain("Refund amount not validated");
     expect(f).toContain("why POST /refunds");
     expect(f).toContain("fix Validate against captured minus refunded");
-    expect(f).toContain("[a] undo  [A] apply now  [d] dismiss");
+    expect(f).toContain("[x] Refund amount not validated"); // ticked: you agree with the fix
+    expect(f).toContain("[a] uncheck  [i] tell the AI  [x] apply this");
     expect(f).toMatch(/╭─ ○ NIT · style · unsure ─+╮/);
-    expect(f).toContain("no fix yet · press a to get one");
+    expect(f).toContain("no fix yet · i tells the AI what it should be");
     expect(f).toContain("1 of 2 reviewed · 1 accepted");
     expect(f).toContain("+1 filtered");
     expect(f).toContain(
-      "j/k next · a undo · d dismiss · enter more · A apply 1 · . actions · ? help",
+      "j/k next · a uncheck · i tell the AI · x apply this · d skip · enter more · A apply all 1 · ? help",
     );
     // the code lines come before the card that is about them
     expect(f.indexOf("if (amount > order.capturedAmount)")).toBeLessThan(
@@ -232,11 +233,11 @@ describe("review stream", () => {
   it("j/k move between findings; a accepts and undoes; a on a finding without a fix offers to propose", async () => {
     const app = await mount(session());
     await app.press("j");
-    await until(app.lastFrame, "[a] get a fix");
+    await until(app.lastFrame, "[i] tell the AI the fix");
     expect(app.lastFrame()).toContain("2/2");
     expect(app.lastFrame()).toContain("a get a fix ·");
     await app.press("a");
-    await until(app.lastFrame, "Get a fix:");
+    await until(app.lastFrame, "No fix yet. What should the fix do?");
     await app.press(ESC);
     await app.press("k", "a");
     await until(app.lastFrame, "0 of 2 reviewed · 0 accepted");
@@ -257,15 +258,15 @@ describe("review stream", () => {
       }),
     );
     await app.press("j", "a");
-    await until(app.lastFrame, "Get a fix:");
-    expect(app.lastFrame()).toContain("a let the AI write it");
-    await app.press("a");
+    await until(app.lastFrame, "No fix yet. What should the fix do?");
+    await sleep(80);
+    await app.press(ENTER); // empty: let the AI decide
     // no blocking screen: the stream stays, and the fix lands without any check round
     const f = await until(app.lastFrame, "Fix ready for “Unused import”");
     expect(f).not.toContain("ACCEPTED");
     expect(f).toContain("AI ●"); // the card opened on its fix
     expect(f).toContain("Fix: Unused import");
-    expect(f).toContain("[a] accept fix");
+    expect(f).toContain("[a] agree");
     await app.press("a");
     await until(app.lastFrame, "2 of 2 reviewed · 2 accepted");
     expect(await store.fixes.active(ids["Unused import"]!)).toMatchObject({ author: "ai" });
@@ -285,13 +286,17 @@ describe("review stream", () => {
       }),
     );
     await app.press("j", "a");
-    await until(app.lastFrame, "Get a fix:");
-    await app.press("a");
+    await until(app.lastFrame, "No fix yet. What should the fix do?");
+    await sleep(80);
+    await app.press(ENTER);
     const f = await until(app.lastFrame, /writing a fix…/);
     expect(f).toMatch(/[|/\\-] writing a fix…/);
     expect(f).toMatch(/writing 1 fix/);
     // still usable: move, and ask for the same fix again
-    await app.press("k", "j", "a", "a");
+    await app.press("k", "j", "i");
+    await until(app.lastFrame, "What should the fix do?");
+    await sleep(80);
+    await app.press(ENTER);
     await until(app.lastFrame, "Already writing a fix for this one.");
     await until(app.lastFrame, "Fix ready for “Unused import”", 10_000);
     expect(app.lastFrame()).not.toMatch(/writing a fix…/);
@@ -341,7 +346,7 @@ describe("review stream", () => {
     await app.press(TAB);
     await until(app.lastFrame, "No fix of yours yet");
     await app.press(ESC);
-    await until(app.lastFrame, "[enter] details");
+    await until(app.lastFrame, "[a] uncheck");
     expect(app.lastFrame()).not.toContain("Fails when");
     app.unmount();
   });
@@ -369,7 +374,7 @@ describe("review stream", () => {
   it("h moves to the files list, enter jumps to a file's first finding, l goes back", async () => {
     const app = await mount(session());
     await app.press("h");
-    await until(app.lastFrame, "j/k pick a file · enter go to it");
+    await until(app.lastFrame, "j/k previous / next file · enter back to the code");
     await app.press("j", ENTER);
     await until(app.lastFrame, "j/k next ·");
     expect(app.lastFrame()).toContain("1/2");
@@ -398,7 +403,7 @@ describe("review stream", () => {
       "Review",
       "Move around",
       "More",
-      "apply every accepted fix",
+      "apply every ticked fix",
       "actions:",
       "options:",
     ])
@@ -487,7 +492,7 @@ describe("actions menu", () => {
       }),
     );
     await app.press(".", "p");
-    await until(app.lastFrame, "Get a fix:");
+    await until(app.lastFrame, "Propose a fix:");
     await app.press("w");
     await app.press(..."reject zero too".split(""), ENTER);
     const f = await until(app.lastFrame, "CONCERNS");
@@ -1130,5 +1135,149 @@ describe("re-run the review", () => {
     await until(app.lastFrame, "options ·");
     expect(app.lastFrame()).not.toContain("Re-run this review");
     app.unmount();
+  });
+});
+
+/** A second and third finding in other files, so there is somewhere to navigate to. */
+async function addFiles() {
+  const base = (await store.findings.get(ids["Unused import"]!))!;
+  for (const [file, title] of [
+    ["src/cart.ts", "Cart total ignores coupons"],
+    ["src/user.ts", "Password logged in clear text"],
+  ] as const) {
+    const f = await store.findings.create({
+      ...base,
+      id: newId(),
+      fingerprint: `fp-${title}`,
+      file,
+      title,
+      severity: "major",
+      range: { start: 1, end: 1 },
+    });
+    ids[title] = f.id;
+  }
+}
+
+describe("moving between files", () => {
+  // files sort by name: cart.ts, payments.ts (two findings), user.ts
+  it("] and [ and tab jump to the next and previous file's first finding", async () => {
+    await addFiles();
+    const app = await mount(session(), undefined, "of 4 reviewed");
+    await until(app.lastFrame, "src/cart.ts  1/4");
+    await app.press("]");
+    await until(app.lastFrame, "src/payments.ts  2/4");
+    expect(app.lastFrame()).toContain("Refund amount not validated");
+    await app.press(TAB);
+    await until(app.lastFrame, "src/user.ts  4/4");
+    await app.press("]");
+    expect(app.lastFrame()).toContain("src/user.ts  4/4"); // stops at the last file
+    await app.press("[");
+    await until(app.lastFrame, "src/payments.ts  2/4");
+    await app.press("[");
+    await until(app.lastFrame, "src/cart.ts  1/4");
+    app.unmount();
+  });
+
+  it("in the files list j/k jump between files at once, and the list follows where you are", async () => {
+    await addFiles();
+    const app = await mount(session(), undefined, "of 4 reviewed");
+    await app.press("h");
+    await until(app.lastFrame, "j/k previous / next file");
+    await app.press("j");
+    await until(app.lastFrame, "src/payments.ts  2/4"); // no enter needed
+    await app.press("j");
+    await until(app.lastFrame, "src/user.ts  4/4");
+    await app.press("k", "k");
+    await until(app.lastFrame, "src/cart.ts  1/4");
+    await app.press("\u001B[C"); // right arrow: back to the code
+    await until(app.lastFrame, "j/k next ·");
+    await app.press("\u001B[D"); // left arrow: files list
+    await until(app.lastFrame, "j/k previous / next file");
+    await app.press(ENTER);
+    const f = await until(app.lastFrame, "j/k next ·");
+    expect(f).toContain("src/cart.ts  1/4"); // still on the file you jumped to
+    app.unmount();
+  });
+});
+
+describe("going through the fixes", () => {
+  it("shows a checkbox for the fix you agree with, and a to tick or untick it", async () => {
+    const app = await mount(session());
+    expect(app.lastFrame()).toContain("[x] Refund amount not validated");
+    await app.press("a");
+    await until(app.lastFrame, "[ ] Refund amount not validated");
+    expect(app.lastFrame()).toContain("[a] agree");
+    await app.press(" ");
+    await until(app.lastFrame, "[x] Refund amount not validated");
+    app.unmount();
+  });
+
+  it("i tells the AI how the fix should change; the new fix replaces the old one and unticks it", async () => {
+    const app = await mount(
+      session({
+        runs: [{ match: { kind: "draft-fix" }, message: `\`\`\`diff\n${USER_PATCH}\`\`\`` }],
+      }),
+    );
+    await app.press("i");
+    await until(app.lastFrame, "Tell the AI how the fix should change");
+    await sleep(80);
+    await app.press(..."use a guard clause".split(""), ENTER);
+    await until(app.lastFrame, "Fix ready for “Refund amount not validated”");
+    const fix = await store.fixes.active(ids["Refund amount not validated"]!);
+    expect(fix).toMatchObject({ author: "ai", summary: "As you asked: use a guard clause" });
+    expect((await store.findings.get(ids["Refund amount not validated"]!))!.selected).toBe(false);
+    expect(app.lastFrame()).toContain("[ ] Refund amount not validated");
+    app.unmount();
+  });
+
+  it("x applies just this fix, leaving the other agreed fixes alone", async () => {
+    // a second agreed fix, so there is something to leave alone
+    await store.findings.update(ids["Unused import"]!, { selected: true });
+    await store.fixes.create({
+      id: newId(),
+      findingId: ids["Unused import"]!,
+      author: "ai",
+      patch:
+        '--- a/src/payments.ts\n+++ b/src/payments.ts\n@@ -6,2 +6,1 @@\n }\n-import { unused } from "./x";\n+\n',
+      summary: "Remove the import",
+      overridden: false,
+      active: true,
+      createdAt: Date.now(),
+    });
+    const app = await mount(session());
+    await app.press("x");
+    await until(app.lastFrame, "Applied 1 · crit undo restores the files");
+    expect(readFileSync(join(repo.root, "src/payments.ts"), "utf8")).toContain(
+      "order.refundedAmount",
+    );
+    expect(readFileSync(join(repo.root, "src/payments.ts"), "utf8")).toContain("import { unused }");
+    expect((await store.findings.get(ids["Refund amount not validated"]!))!.status).toBe("applied");
+    expect((await store.findings.get(ids["Unused import"]!))!.status).toBe("open");
+    app.unmount();
+  });
+
+  it("x on a finding without a fix says so instead of doing nothing", async () => {
+    const app = await mount(session());
+    await app.press("j", "x");
+    await until(app.lastFrame, "This finding has no fix to apply yet.");
+    expect(readFileSync(join(repo.root, "src/payments.ts"), "utf8")).toBe(CODE); // nothing changed
+    expect(await store.findings.get(ids["Unused import"]!)).toMatchObject({
+      status: "open",
+      selected: false, // and nothing got ticked or dismissed
+    });
+    app.unmount();
+  });
+
+  it("q goes back to the start screen when there is one, and quits otherwise", async () => {
+    const s = session();
+    await s.load();
+    let went = 0;
+    const withBack = render(<ReviewApp session={s} onBack={() => went++} />);
+    await until(withBack.lastFrame, "of 2 reviewed");
+    await sleep(80);
+    withBack.stdin.write("q");
+    await sleep(150);
+    expect(went).toBe(1);
+    withBack.unmount();
   });
 });
