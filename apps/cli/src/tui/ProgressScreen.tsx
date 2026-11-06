@@ -512,9 +512,9 @@ export function ProgressScreen({
             : []),
           ...(progress.done ? ([["r", "retry"]] as [string, string][]) : []),
           ["m", "model"],
-          ["P", "provider"],
-          ["E", "effort"],
-          ["D", "depth"],
+          ["p", "provider"],
+          ["e", "effort"],
+          ["d", "depth"],
         ]}
       />
     </Box>

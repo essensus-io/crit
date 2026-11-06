@@ -221,7 +221,7 @@ describe("review stream", () => {
     expect(f).toContain("1 of 2 reviewed · 1 accepted");
     expect(f).toContain("+1 filtered");
     expect(f).toContain(
-      "j/k next · a uncheck · i tell the AI · x apply this · d skip · A apply all 1 · q quit · ? help",
+      "j/k next · a uncheck · i tell the AI · x apply this · d skip · p apply all 1 · q quit · ? help",
     );
     // the code lines come before the card that is about them
     expect(f.indexOf("if (amount > order.capturedAmount)")).toBeLessThan(
@@ -244,7 +244,7 @@ describe("review stream", () => {
     expect((await store.findings.get(ids["Refund amount not validated"]!))!.selected).toBe(false);
     await app.press("a");
     await until(app.lastFrame, "1 of 2 reviewed · 1 accepted");
-    await app.press("G");
+    await app.press("j");
     await until(app.lastFrame, "2/2");
     await app.press("g");
     await until(app.lastFrame, "1/2");
@@ -303,9 +303,9 @@ describe("review stream", () => {
     app.unmount();
   });
 
-  it("A then Enter applies the accepted fixes to the working tree", async () => {
+  it("p then Enter applies the accepted fixes to the working tree", async () => {
     const app = await mount(session());
-    await app.press("A");
+    await app.press("p");
     await until(app.lastFrame, "Apply 1 accepted fix:");
     expect(app.lastFrame()).toContain("(enter)");
     await app.press(ENTER);
@@ -320,7 +320,7 @@ describe("review stream", () => {
     await app.press("f");
     await until(app.lastFrame, "2 of 2 reviewed");
     expect(app.lastFrame()).toMatch(/╭─ ✗ NIT/);
-    expect(app.lastFrame()).toContain("all triaged: A applies 1");
+    expect(app.lastFrame()).toContain("all triaged: p applies 1");
     const repoId = (await store.reviews.get(reviewId))!.repoId;
     expect((await store.suppressions.list(repoId)).map((s) => s.fingerprint)).toEqual([
       "fp-Unused import",
@@ -381,11 +381,11 @@ describe("review stream", () => {
     app.unmount();
   });
 
-  it("A applies the accepted fixes, or says nothing is accepted", async () => {
+  it("p applies the accepted fixes, or says nothing is accepted", async () => {
     const app = await mount(session());
-    await app.press("a", "A");
+    await app.press("a", "p");
     await until(app.lastFrame, "Nothing accepted yet.");
-    await app.press(ESC, "a", "A");
+    await app.press(ESC, "a", "p");
     await until(app.lastFrame, "Apply 1 accepted fix:");
     await app.press("y");
     await until(app.lastFrame, "Applied 1 · crit undo restores the files");
@@ -640,7 +640,7 @@ describe("run progress", () => {
       emit({ type: "review-done", reviewId: "r", findings: [], durationMs: 1 });
       await until(app.lastFrame, "Provider rate limited");
       // P opens the provider picker; "Connect another provider…" leaves for the setup flow
-      app.stdin.write("P");
+      app.stdin.write("p");
       await until(app.lastFrame, "Connect another provider");
       await sleep(80); // let the picker attach its key handler
       for (const ch of "connect") app.stdin.write(ch);
@@ -895,7 +895,7 @@ describe("switching model, provider, effort and depth", () => {
     app.stdin.write(ENTER);
     await until(app.lastFrame, "next run");
     expect(app.lastFrame()).toContain("changed; r retries");
-    app.stdin.write("D");
+    app.stdin.write("d");
     await until(app.lastFrame, "review depth");
     await sleep(80); // let the picker attach its key handler
     for (const ch of "quick") app.stdin.write(ch);
@@ -1102,9 +1102,9 @@ describe("re-run the review", () => {
     let reran = 0;
     const app = render(<ReviewApp session={s} onRerun={() => reran++} />);
     const f = await until(app.lastFrame, "of 2 reviewed");
-    expect(f).toContain("R re-run review");
+    expect(f).toContain("r re-run review");
     await sleep(80);
-    app.stdin.write("R");
+    app.stdin.write("r");
     await until(
       app.lastFrame,
       "Re-run the review of feature/payments → main? Every file is reviewed again, without the cache.",
@@ -1128,7 +1128,7 @@ describe("re-run the review", () => {
   it("without a re-run handler (history) there is no hint and R does nothing", async () => {
     const app = await mount(session());
     expect(app.lastFrame()).not.toContain("re-run");
-    await app.press("R");
+    await app.press("r");
     await sleep(60);
     expect(app.lastFrame()).not.toContain("Re-run the review");
     await app.press("o");

@@ -66,8 +66,8 @@ untouched and comes back when you leave, and only the panels inside crit scroll.
 | `enter`               | show or hide the full explanation, fix and thread in place                                                                      |
 | `i`                   | tell the AI what the fix should be: it rewrites it in the background (enter alone: let it decide)                               |
 | `x`                   | apply just this fix now                                                                                                         |
-| `A`                   | apply every ticked fix (then `enter` for the working tree, or `b` for a new branch)                                             |
-| `R`                   | re-run the review of this scope (unchanged files come from the cache, so only changed files cost tokens)                        |
+| `p`                   | apply every ticked fix (then `enter` for the working tree, or `b` for a new branch)                                             |
+| `r`                   | re-run the review of this scope, reviewing every file again (no cache)                                                          |
 | `↑` `↓` `PgUp` `PgDn` | scroll the code (the mouse wheel too)                                                                                           |
 | `/`                   | search: words, `sev:major`, `lens:security`, `file:cart`, `has:fix`, `is:pending`, `is:filtered`                                |
 | `.`                   | actions: propose a fix, edit it in `$EDITOR`, ask a question, re-check the file, copy as a prompt, use my fix                   |

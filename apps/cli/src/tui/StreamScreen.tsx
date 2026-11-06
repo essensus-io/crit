@@ -33,7 +33,7 @@ function fitKeys(keys: [string, string][], width: number): [string, string][] {
   const size = (ks: [string, string][]) =>
     ks.reduce((n, [k, l], i) => n + (i ? 3 : 0) + k.length + l.length + 1, 1);
   const out = [...keys];
-  for (const drop of ["enter", "d", "i", "x", "?", "R"])
+  for (const drop of ["enter", "d", "i", "x", "?", "r"])
     if (size(out) > width) {
       const at = out.findIndex(([k]) => k === drop);
       if (at >= 0) out.splice(at, 1);
@@ -117,7 +117,7 @@ export function StreamScreen(props: {
   const keys: [string, string][] = !current
     ? [
         ["/", "search"],
-        ...(props.canRerun ? ([["R", "re-run review"]] as [string, string][]) : []),
+        ...(props.canRerun ? ([["r", "re-run review"]] as [string, string][]) : []),
         ["o", "options"],
         ["?", "help"],
         ["q", props.canGoBack ? "start screen" : "quit"],
@@ -137,9 +137,9 @@ export function StreamScreen(props: {
             ["d", triage(current) === "dismissed" ? "restore" : "skip"],
             ["enter", props.expanded.has(current.finding.id) ? "less" : "more"],
             ...(p.applicable > 0
-              ? ([["A", `apply all ${p.applicable}`]] as [string, string][])
+              ? ([["p", `apply all ${p.applicable}`]] as [string, string][])
               : []),
-            ...(props.canRerun ? ([["R", "re-run"]] as [string, string][]) : []),
+            ...(props.canRerun ? ([["r", "re-run"]] as [string, string][]) : []),
             ["q", props.canGoBack ? "start screen" : "quit"],
             ["?", "help"],
           ],
@@ -235,11 +235,11 @@ export function StreamScreen(props: {
               color={T.orange}
             >{`  ·  ${spin} writing ${drafting.size} fix${drafting.size === 1 ? "" : "es"}`}</Text>
           ) : null}
-          {props.canRerun ? <Text dimColor>{"  ·  R re-run review"}</Text> : null}
+          {props.canRerun ? <Text dimColor>{"  ·  r re-run review"}</Text> : null}
           {p.total > 0 && p.reviewed === p.total ? (
             <Text dimColor>
               {p.applicable > 0
-                ? `  ·  all triaged: A applies ${p.applicable}`
+                ? `  ·  all triaged: p applies ${p.applicable}`
                 : "  ·  all triaged: q to finish"}
             </Text>
           ) : null}

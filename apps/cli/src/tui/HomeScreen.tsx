@@ -129,7 +129,8 @@ export function HomeApp(props: {
   };
 
   useInput(
-    (input, key) => {
+    (typed, key) => {
+      const input = typed.toLowerCase();
       setNotice(undefined);
       if (input === "q" || key.escape) return finish({ kind: "quit" });
       if (input === "o") return setMode("options");
@@ -173,9 +174,7 @@ export function HomeApp(props: {
         onCancel={() => setMode("none")}
         onPick={(k) => {
           setMode("none");
-          switching.open(
-            { m: "m", p: "P", e: "E", d: "D", s: "S" }[k] as "m" | "P" | "E" | "D" | "S",
-          );
+          switching.open(k as "m" | "p" | "e" | "d" | "s");
         }}
       />
     );

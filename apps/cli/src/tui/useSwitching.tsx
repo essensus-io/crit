@@ -40,7 +40,7 @@ export function useSwitching(opts: {
   onChange?: () => void;
   /** Off when the screen opens the pickers itself (through `open`). */
   hotkeys?: boolean;
-}): { overlay: ReactNode; modal: boolean; open: (key: "m" | "P" | "E" | "D" | "S") => void } {
+}): { overlay: ReactNode; modal: boolean; open: (key: "m" | "p" | "e" | "d" | "s") => void } {
   const { switcher, active, onNotice } = opts;
   const screen = useScreen();
   const [stage, setStage] = useState<Stage | undefined>();
@@ -52,8 +52,9 @@ export function useSwitching(opts: {
     onNotice(`${verb}: ${describeChoice(c)}. ${save} it as the default for ${c.provider}.`);
   };
 
-  const trigger = (input: string) => {
+  const trigger = (typed: string) => {
     if (!switcher) return;
+    const input = typed.toLowerCase();
     const c = switcher.current();
     if (input === "m") {
       void switcher.models().then(({ models, live }) => {
@@ -72,7 +73,7 @@ export function useSwitching(opts: {
           ],
         });
       });
-    } else if (input === "P") {
+    } else if (input === "p") {
       setStage({
         kind: "provider",
         options: [
@@ -86,7 +87,7 @@ export function useSwitching(opts: {
             : []),
         ],
       });
-    } else if (input === "E") {
+    } else if (input === "e") {
       void switcher.efforts().then((efforts) => {
         if (efforts.length === 0)
           return onNotice(`${c.provider} has no separate effort setting: pick a model instead.`);
@@ -98,7 +99,7 @@ export function useSwitching(opts: {
           ],
         });
       });
-    } else if (input === "D") {
+    } else if (input === "d") {
       setStage({
         kind: "depth",
         options: (["quick", "standard", "deep"] as const).map((d) => ({
@@ -107,7 +108,7 @@ export function useSwitching(opts: {
           hint: DEPTH_HINTS[d],
         })),
       });
-    } else if (input === "S") {
+    } else if (input === "s") {
       onNotice(`Saved ${describeChoice(c)} as the default for ${switcher.save()}.`);
     }
   };

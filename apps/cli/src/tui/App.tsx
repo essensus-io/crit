@@ -148,7 +148,8 @@ export function ReviewApp({
   const idle = mode === "none" && !switching.modal && !busy;
 
   useInput(
-    (input, key) => {
+    (typed, key) => {
+      const input = typed.toLowerCase();
       if (busy) return;
       // A message stays until the next key, then gives the line back to progress.
       if (state.notice || state.error) session.notify(undefined);
@@ -170,7 +171,7 @@ export function ReviewApp({
       if (input === "?") return setMode("help");
       if (input === "/") return setMode("search");
       if (input === "o") return setMode("options");
-      if (input === "R" && onRerun) return setMode("rerun");
+      if (input === "r" && onRerun) return setMode("rerun");
       if (key.escape) {
         if (current && expanded.has(current.finding.id)) return toggleExpanded(current.finding.id);
         if (query) {
@@ -188,12 +189,11 @@ export function ReviewApp({
         return;
       }
       if (input === "j" || input === "n") return move(cursor + 1);
-      if (input === "k" || input === "N") return move(cursor - 1);
+      if (input === "k") return move(cursor - 1);
       if (input === "]") return moveFile(1);
       if (input === "[") return moveFile(-1);
       if (input === "g") return move(0);
-      if (input === "G") return move(items.length - 1);
-      if (input === "A") return setMode("apply");
+      if (input === "p") return setMode("apply");
       if (!current) return;
       const id = current.finding.id;
       if (key.tab && key.shift) return moveFile(-1);
@@ -439,7 +439,7 @@ export function ReviewApp({
           done();
           if (k === "r") return setMode("rules");
           if (k === "n") return setMode("rerun");
-          const key = { m: "m", p: "P", e: "E", d: "D", s: "S" }[k] as "m" | "P" | "E" | "D" | "S";
+          const key = k as "m" | "p" | "e" | "d" | "s";
           switching.open(key);
         }}
       />
@@ -568,7 +568,8 @@ export function RunApp(props: {
   });
 
   useInput(
-    (input, key) => {
+    (typed, key) => {
+      const input = typed.toLowerCase();
       if (input === "r" && progress.done && props.onRecover) {
         props.onRecover({ kind: "retry", ...selection });
         app.exit();
