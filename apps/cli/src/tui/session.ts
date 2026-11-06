@@ -7,6 +7,7 @@ import {
   askAboutFinding,
   diffFromEdit,
   dismissFinding,
+  draftAiFix,
   type FixContext,
   getDisabledRules,
   keepAiFix,
@@ -25,6 +26,9 @@ import type { SqliteStore } from "@crit/store";
 import { copyToClipboard } from "../clipboard.ts";
 import type { Tok } from "./highlight.ts";
 import { findingPrompt } from "./prompt.ts";
+
+/** Fixes written at the same time. */
+const MAX_DRAFTS = 3;
 
 export type RuleRef = { id: string; title: string; path: string; section?: string };
 
@@ -54,6 +58,8 @@ export type SessionState = {
   rules: Map<string, RuleRef>;
   /** Keys (`path#Section`) of rules turned off for this repository. */
   disabledRules: string[];
+  /** Findings the AI is writing a fix for right now (in the background). */
+  drafting: string[];
   busy?: string;
   notice?: string;
   error?: string;
@@ -137,12 +143,14 @@ export class ReviewSession {
       items,
       rules: new Map((ruleEvent?.rules ?? []).map((r) => [r.id, r])),
       disabledRules: await getDisabledRules(this.deps.store, review.repoId),
+      drafting: [...this.draftingIds],
     };
     for (const l of this.listeners) l();
     return this.state;
   }
 
   private readonly codeCache = new Map<string, CodeInfo>();
+  private readonly draftingIds = new Set<string>();
 
   private async loadCode(files: string[]) {
     const source = this.deps.code;
@@ -185,6 +193,40 @@ export class ReviewSession {
     if (!this.deps.fixContext)
       throw new Error("no provider configured for AI actions (crit providers add)");
     return this.deps.fixContext;
+  }
+
+  /**
+   * Have the AI write a fix for a finding that has none, in the background: the
+   * screen stays usable, the card shows progress, and a notice says when it is
+   * ready. A few at a time, so a burst of requests cannot flood the agent.
+   */
+  draftFix(id: string) {
+    const it = this.item(id);
+    if (!it) return;
+    if (this.draftingIds.has(id)) return this.notify("Already writing a fix for this one.");
+    if (this.draftingIds.size >= MAX_DRAFTS)
+      return this.notify(`${MAX_DRAFTS} fixes are being written; wait for one to finish.`);
+    let ctx: FixContext;
+    try {
+      ctx = this.needAi();
+    } catch (err) {
+      return this.set({ error: (err as Error).message });
+    }
+    this.draftingIds.add(id);
+    this.set({ drafting: [...this.draftingIds], notice: undefined, error: undefined });
+    const { finding } = it;
+    void draftAiFix(ctx, finding).then(
+      async () => {
+        this.draftingIds.delete(id);
+        await this.load().catch(() => undefined);
+        this.set({ notice: `Fix ready for “${finding.title}”. Press a on it to accept.` });
+      },
+      async (err: Error) => {
+        this.draftingIds.delete(id);
+        await this.load().catch(() => undefined);
+        this.set({ error: `Could not write a fix for “${finding.title}”: ${err.message}` });
+      },
+    );
   }
 
   notify(notice: string | undefined) {

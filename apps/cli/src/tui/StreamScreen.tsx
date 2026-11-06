@@ -6,8 +6,8 @@ import { Footer, Status } from "./components.tsx";
 import { fileTree, type ListFilter, triage } from "./filter.ts";
 import type { FindingView, SessionState } from "./session.ts";
 import { buildStream } from "./stream.ts";
-import { T } from "./theme.ts";
-import { Panel, truncate, Viewport } from "./widgets.tsx";
+import { SPINNER, T } from "./theme.ts";
+import { Panel, truncate, useTick, Viewport } from "./widgets.tsx";
 
 /** A row of styled segments as one terminal line. */
 function Row({ line }: { line: Line }) {
@@ -73,6 +73,9 @@ export function StreamScreen(props: {
   const innerW = rightW - 4;
   const tree = fileCursorRows(state);
 
+  const drafting = useMemo(() => new Set(state.drafting), [state.drafting]);
+  const tick = useTick(150, drafting.size > 0);
+  const spin = drafting.size ? SPINNER[tick % SPINNER.length] : undefined;
   const stream = useMemo(
     () =>
       buildStream({
@@ -83,8 +86,10 @@ export function StreamScreen(props: {
         expanded: props.expanded,
         fixTab: props.fixTab,
         width: innerW - 1, // the scrollbar takes the last column
+        drafting,
+        ...(spin ? { spin } : {}),
       }),
-    [items, state, current?.finding.id, props.expanded, props.fixTab, innerW],
+    [items, state, current?.finding.id, props.expanded, props.fixTab, innerW, drafting, spin],
   );
   const span = current ? stream.card.get(current.finding.id) : undefined;
   const lines = stream.rows.map((r, i) => <Row key={i} line={r.line} />);
@@ -201,6 +206,11 @@ export function StreamScreen(props: {
           <Text color={T.mint}>{`${p.reviewed} of ${p.total} reviewed`}</Text>
           <Text dimColor> · </Text>
           <Text color={T.orange}>{`${p.accepted} accepted`}</Text>
+          {drafting.size ? (
+            <Text
+              color={T.orange}
+            >{`  ·  ${spin} writing ${drafting.size} fix${drafting.size === 1 ? "" : "es"}`}</Text>
+          ) : null}
           {props.canRerun ? <Text dimColor>{"  ·  R re-run review"}</Text> : null}
           {p.total > 0 && p.reviewed === p.total ? (
             <Text dimColor>

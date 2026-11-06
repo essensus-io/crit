@@ -250,25 +250,61 @@ describe("review stream", () => {
     app.unmount();
   });
 
-  it("a on a finding without a fix lets the AI write one; the card then offers to apply it", async () => {
+  it("a on a finding without a fix has the AI write one in the background; you keep working and the card opens when it is ready", async () => {
     const app = await mount(
       session({
-        runs: [
-          { match: { kind: "draft-fix" }, message: `\`\`\`diff\n${USER_PATCH}\`\`\`` },
-          {
-            match: { kind: "evaluate-fix" },
-            message: JSON.stringify({ verdict: "accepted", reason: "Looks right." }),
-          },
-        ],
+        runs: [{ match: { kind: "draft-fix" }, message: `\`\`\`diff\n${USER_PATCH}\`\`\`` }],
       }),
     );
     await app.press("j", "a");
     await until(app.lastFrame, "Get a fix:");
     expect(app.lastFrame()).toContain("a let the AI write it");
     await app.press("a");
-    await until(app.lastFrame, "ACCEPTED");
-    await app.press(ESC);
-    await until(app.lastFrame, "[a] undo  [A] apply now");
+    // no blocking screen: the stream stays, and the fix lands without any check round
+    const f = await until(app.lastFrame, "Fix ready for “Unused import”");
+    expect(f).not.toContain("ACCEPTED");
+    expect(f).toContain("AI ●"); // the card opened on its fix
+    expect(f).toContain("Fix: Unused import");
+    expect(f).toContain("[a] accept fix");
+    await app.press("a");
+    await until(app.lastFrame, "2 of 2 reviewed · 2 accepted");
+    expect(await store.fixes.active(ids["Unused import"]!)).toMatchObject({ author: "ai" });
+    app.unmount();
+  });
+
+  it("while a fix is being written the card shows it and the keys still work; asking again is refused", async () => {
+    const app = await mount(
+      session({
+        runs: [
+          {
+            match: { kind: "draft-fix" },
+            delayMs: 700,
+            message: `\`\`\`diff\n${USER_PATCH}\`\`\``,
+          },
+        ],
+      }),
+    );
+    await app.press("j", "a");
+    await until(app.lastFrame, "Get a fix:");
+    await app.press("a");
+    const f = await until(app.lastFrame, /writing a fix…/);
+    expect(f).toMatch(/[|/\\-] writing a fix…/);
+    expect(f).toMatch(/writing 1 fix/);
+    // still usable: move, and ask for the same fix again
+    await app.press("k", "j", "a", "a");
+    await until(app.lastFrame, "Already writing a fix for this one.");
+    await until(app.lastFrame, "Fix ready for “Unused import”", 10_000);
+    expect(app.lastFrame()).not.toMatch(/writing a fix…/);
+    app.unmount();
+  });
+
+  it("A then Enter applies the accepted fixes to the working tree", async () => {
+    const app = await mount(session());
+    await app.press("A");
+    await until(app.lastFrame, "Apply 1 accepted fix:");
+    expect(app.lastFrame()).toContain("(enter)");
+    await app.press(ENTER);
+    await until(app.lastFrame, "Applied 1 · crit undo restores the files");
     app.unmount();
   });
 
@@ -763,6 +799,7 @@ describe("switching model, provider, effort and depth", () => {
     const app = await mount(session(), sw);
     await options(app, "p");
     await until(app.lastFrame, "provider");
+    await sleep(100);
     expect(app.lastFrame()).toContain("codex");
     expect(app.lastFrame()).not.toContain("Connect another provider"); // only on the run screen
     await sleep(80); // let the picker attach its key handler
@@ -774,14 +811,16 @@ describe("switching model, provider, effort and depth", () => {
 
     await options(app, "e");
     await until(app.lastFrame, "reasoning effort");
+    await sleep(100);
     app.stdin.write("\u001B[B"); // down: low
-    await sleep();
+    await sleep(100);
     app.stdin.write(ENTER);
     await until(app.lastFrame, "effort low");
     expect(sw.current().effort).toBe("low");
 
     await options(app, "d");
     await until(app.lastFrame, "review depth");
+    await sleep(100);
     expect(app.lastFrame()).toContain("lenses split, skeptic checks all, high effort");
     await sleep(80); // let the picker attach its key handler
     for (const ch of "deep") app.stdin.write(ch);
@@ -791,6 +830,8 @@ describe("switching model, provider, effort and depth", () => {
     expect(sw.current().depth).toBe("deep");
 
     await options(app, "m");
+    await until(app.lastFrame, "model · codex"); // the model list loads asynchronously
+    await sleep(100);
     await app.press(ESC);
     await until(app.lastFrame, "of 2 reviewed");
     app.unmount();

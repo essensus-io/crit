@@ -14,6 +14,7 @@ import {
   keepAiFix,
   MAX_PROPOSAL_ROUNDS,
   patchedContent,
+  draftAiFix,
   proposeFix,
   restoreFinding,
   saveEditedFix,
@@ -349,5 +350,46 @@ describe("edit, ask, dismiss", () => {
     expect(restored.status).toBe("open");
     expect(restored.dismissReason).toBeUndefined();
     expect(await store.suppressions.list(repoId)).toEqual([]);
+  });
+});
+
+describe("draftAiFix", () => {
+  it("is one short, cheap call with a trimmed prompt, and stores the result as the AI's active fix", async () => {
+    const ctx = ctxWith({
+      runs: [{ match: { kind: "draft-fix" }, message: `\`\`\`diff\n${USER_PATCH}\`\`\`` }],
+    });
+    ctx.provider.profile.fastModel = "tiny";
+    const fix = await draftAiFix(ctx, finding);
+    expect(fix).toMatchObject({ author: "ai", active: true, summary: `Fix: ${finding.title}` });
+    expect(fix.evaluation).toBeUndefined(); // no second model pass judging it
+    expect(await ctx.store.fixes.active(finding.id)).toMatchObject({ id: fix.id });
+    expect(ctx.fake.calls).toHaveLength(1);
+    const task = ctx.fake.calls[0]!.task;
+    expect(task).toMatchObject({ kind: "draft-fix", access: "none", effort: "low", model: "tiny" });
+    expect(task.prompt).toContain("lines 1-");
+    expect(task.prompt).toContain("Write the smallest change that fixes this finding.");
+  });
+
+  it("shows only the lines around the finding, not the whole file", async () => {
+    const big = Array.from({ length: 500 }, (_, i) => `line ${i + 1}`).join("\n");
+    const ctx = ctxWith({ runs: [{ match: { kind: "draft-fix" }, message: "no diff" }] });
+    ctx.read = async () => big;
+    await expect(draftAiFix(ctx, { ...finding, range: { start: 250, end: 251 } })).rejects.toThrow(
+      /could not turn this finding into a patch/,
+    );
+    const prompt = ctx.fake.calls[0]!.task.prompt;
+    expect(prompt).toContain("lines 210-291 of 500");
+    expect(prompt).toContain("line 250");
+    expect(prompt).not.toContain("line 100\n");
+    expect(prompt).not.toContain("line 400\n");
+  });
+
+  it("rejects a patch that does not apply, and falls back to the main model without a fast one", async () => {
+    const bad = "--- a/src/pay.ts\n+++ b/src/pay.ts\n@@ -1,1 +1,1 @@\n-nothing like this\n+x\n";
+    const ctx = ctxWith({
+      runs: [{ match: { kind: "draft-fix" }, message: `\`\`\`diff\n${bad}\`\`\`` }],
+    });
+    await expect(draftAiFix(ctx, finding)).rejects.toThrow(/drafted fix does not apply/);
+    expect(ctx.fake.calls[0]!.task.model).toBe("m1");
   });
 });

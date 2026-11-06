@@ -97,6 +97,18 @@ export function ReviewApp({
     if (cursor >= items.length && items.length > 0) setCursor(items.length - 1);
   }, [items.length, cursor]);
 
+  // A fix that finishes while you are on its finding opens the card: that diff is what you approve.
+  const wasDrafting = useRef<string[]>([]);
+  useEffect(() => {
+    const finished = wasDrafting.current.filter((id) => !state.drafting.includes(id));
+    wasDrafting.current = state.drafting;
+    const here = current?.finding.id;
+    if (here && finished.includes(here) && current?.aiFix) {
+      setFixTab("ai");
+      setExpanded((prev) => new Set(prev).add(here));
+    }
+  }, [state.drafting, current]);
+
   const quit = () => {
     onExit?.();
     app.exit();
@@ -237,16 +249,9 @@ export function ReviewApp({
         onPick={(k) => {
           if (k === "w") return setMode("describe");
           if (k === "a") {
+            // In the background: keep reviewing; the card shows when the fix is ready.
             done();
-            const f = current.finding;
-            const input = {
-              kind: "description" as const,
-              text: `Fix this review finding: ${f.title}. ${f.explanation}${f.failureScenario ? ` It fails when: ${f.failureScenario}` : ""}`,
-            };
-            void session.propose(f.id, input).then((o) => {
-              if (o) setLastInput({ kind: "patch", patch: o.fix.patch });
-              showOutcome(o);
-            });
+            session.draftFix(current.finding.id);
             return;
           }
           done();
@@ -310,6 +315,7 @@ export function ReviewApp({
     ).length;
     prompt = (
       <Choice
+        enterPicksFirst
         label={n === 0 ? "Nothing accepted yet." : `Apply ${n} accepted fix${n === 1 ? "" : "es"}:`}
         options={
           n === 0

@@ -26,6 +26,9 @@ export type StreamInput = {
   expanded: ReadonlySet<string>;
   fixTab: "ai" | "user";
   width: number;
+  /** Findings a fix is being written for, and the spinner frame to show on them. */
+  drafting?: ReadonlySet<string>;
+  spin?: string;
 };
 
 /**
@@ -34,7 +37,7 @@ export type StreamInput = {
  * and each finding as a card right under the lines it is about.
  */
 export function buildStream(input: StreamInput): Stream {
-  const { items, state, code, current, expanded, fixTab, width } = input;
+  const { items, state, code, current, expanded, fixTab, width, drafting, spin } = input;
   const rows: StreamRow[] = [];
   const card = new Map<string, { from: number; to: number }>();
   const cardWidth = Math.max(24, width - 2);
@@ -46,6 +49,7 @@ export function buildStream(input: StreamInput): Stream {
       focused: id === current,
       expanded: expanded.has(id),
       fixTab,
+      ...(drafting?.has(id) ? { drafting: spin ?? "…" } : {}),
     });
     const from = rows.length;
     for (const line of lines)

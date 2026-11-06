@@ -27,6 +27,8 @@ export type CardOptions = {
   focused: boolean;
   expanded: boolean;
   fixTab: "ai" | "user";
+  /** A fix is being written: show this spinner frame in place of the fix line. */
+  drafting?: string;
 };
 
 /** Wrap a whole line into rows no wider than `w`, keeping one style. */
@@ -89,12 +91,14 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
     const why = (f.failureScenario ?? f.explanation).replace(/\s+/g, " ").trim();
     out.push([{ t: "why ", dim: true }, { t: clip(why, w - 4) }]);
     out.push(
-      fixSummary
-        ? [
-            { t: item.fix?.author === "user" ? "your fix " : "fix ", dim: true },
-            { t: clip(fixSummary, w - 9) },
-          ]
-        : [{ t: "no fix yet · press a to get one", dim: true }],
+      o.drafting
+        ? [{ t: `${o.drafting} writing a fix…`, color: T.orange }]
+        : fixSummary
+          ? [
+              { t: item.fix?.author === "user" ? "your fix " : "fix ", dim: true },
+              { t: clip(fixSummary, w - 9) },
+            ]
+          : [{ t: "no fix yet · press a to get one", dim: true }],
     );
   } else {
     out.push([{ t: clip(f.title, w), bold: true }]);
@@ -197,13 +201,14 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
     const size = (ks: [string, string][]) =>
       ks.reduce((n, [k, l], i) => n + (i ? 2 : 0) + k.length + l.length + 3, 0);
     while (keys.length > 2 && size(keys) > w) keys.pop();
-    out.push(
-      keys.flatMap(([k, label], i): Seg[] => [
-        ...(i ? [{ t: "  ", dim: true }] : []),
-        { t: `[${k}]`, bold: true, color: T.cyan },
-        { t: ` ${label}`, dim: true },
-      ]),
-    );
+    const hint = keys.flatMap(([k, label], i): Seg[] => [
+      ...(i ? [{ t: "  ", dim: true }] : []),
+      { t: `[${k}]`, bold: true, color: T.cyan },
+      { t: ` ${label}`, dim: true },
+    ]);
+    // An expanded card can be taller than the screen: keep the keys at its top, in view.
+    if (o.expanded) out.splice(1, 0, hint);
+    else out.push(hint);
   }
   return out;
 }

@@ -160,30 +160,96 @@ export type FixContext = {
   read: (path: string) => Promise<string | undefined>;
 };
 
-async function draftFromDescription(
+/** Lines of context on each side of the finding that a drafting agent is shown. */
+const DRAFT_CONTEXT = 40;
+
+/**
+ * Ask the agent for a patch. Only the lines around the finding go in the prompt
+ * (not the whole file), the cheap model is used, and the agent gets no tools:
+ * one short turn instead of a long exploration.
+ */
+async function runDraft(
   ctx: FixContext,
   finding: Finding,
-  text: string,
+  instruction: string,
+  subject: string,
 ): Promise<string> {
   const content = (await ctx.read(finding.file)) ?? "";
+  const lines = content.split("\n");
+  const from = Math.max(1, finding.range.start - DRAFT_CONTEXT);
+  const to = Math.min(lines.length, finding.range.end + DRAFT_CONTEXT);
+  const { profile } = ctx.provider;
+  const model = profile.fastModel ?? profile.model;
   const out = await runAgent(
     ctx.provider.adapter,
     {
       kind: "draft-fix",
       cwd: ctx.root,
       systemPrompt: DRAFT_FIX_SYSTEM,
-      prompt: `Finding: ${finding.title} (${finding.file}:${finding.range.start}-${finding.range.end})\n${finding.explanation}\n\nThe user describes the fix they want:\n${text}\n\nFile ${finding.file}:\n\`\`\`\n${content}\n\`\`\`\n\nWrite exactly that fix as a unified diff.`,
+      prompt: `Finding: ${finding.title} (${finding.file}:${finding.range.start}-${finding.range.end})
+${finding.explanation}${finding.failureScenario ? `\nFails when: ${finding.failureScenario}` : ""}
+
+${instruction}
+
+${finding.file}, lines ${from}-${to} of ${lines.length} (hunk line numbers are for the whole file):
+\`\`\`
+${lines.slice(from - 1, to).join("\n")}
+\`\`\`
+
+Reply with the unified diff only.`,
       timeoutMs: ctx.config.review.timeoutMinutes * 60_000,
-      ...(ctx.provider.profile.model ? { model: ctx.provider.profile.model } : {}),
+      access: "none",
+      effort: "low",
+      ...(model ? { model } : {}),
     },
     new AbortController().signal,
   );
   const patch = out.message ? extractDiff(out.message) : undefined;
   if (!patch)
     throw new FixError(
-      `the agent could not turn your description into a patch${out.errors.length ? `: ${out.errors[0]}` : ""}`,
+      `the agent could not turn ${subject} into a patch${out.errors.length ? `: ${out.errors[0]}` : ""}`,
     );
   return patch;
+}
+
+async function draftFromDescription(
+  ctx: FixContext,
+  finding: Finding,
+  text: string,
+): Promise<string> {
+  return runDraft(
+    ctx,
+    finding,
+    `The user describes the fix they want:\n${text}\n\nWrite exactly that fix.`,
+    "your description",
+  );
+}
+
+/**
+ * Have the AI write a fix for a finding that has none: one short call, checked
+ * with `git apply --check`, stored as the AI's fix. There is no second model
+ * pass judging it; the user reviews the diff and accepts it.
+ */
+export async function draftAiFix(ctx: FixContext, finding: Finding): Promise<Fix> {
+  const patch = await runDraft(
+    ctx,
+    finding,
+    "Write the smallest change that fixes this finding. Do not refactor or touch unrelated code.",
+    "this finding",
+  );
+  const check = await checkPatch(ctx.root, patch);
+  if (!check.ok) throw new FixError(`the drafted fix does not apply: ${check.error}`);
+  const fix: Fix = {
+    id: newId(),
+    findingId: finding.id,
+    author: "ai",
+    patch: check.patch,
+    summary: `Fix: ${finding.title}`.slice(0, 120),
+    overridden: false,
+    active: true,
+    createdAt: Date.now(),
+  };
+  return ctx.store.fixes.create(fix);
 }
 
 async function evaluate(
