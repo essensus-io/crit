@@ -252,7 +252,7 @@ export async function openTui(
   reviewId: string,
   config: ResolvedConfig,
   opts: { home?: boolean } = {},
-): Promise<Choice | "home" | undefined> {
+): Promise<(Choice & { fresh?: boolean }) | "home" | undefined> {
   const review = await store.reviews.get(reviewId);
   const switcher = review ? makeSwitcher(ctx, config, { provider: review.provider }) : undefined;
   const session = await makeSession(
@@ -263,7 +263,7 @@ export async function openTui(
     config,
     switcher ? { switcher } : {},
   );
-  let rerun: Choice | undefined;
+  let rerun: (Choice & { fresh?: boolean }) | undefined;
   let wentHome = false;
   await renderFullScreen(
     <ReviewApp
@@ -276,12 +276,15 @@ export async function openTui(
             },
           }
         : {})}
-      onRerun={() => {
-        rerun = switcher?.current() ?? {
-          provider: "",
-          model: null,
-          effort: null,
-          depth: config.depth,
+      onRerun={(fresh) => {
+        rerun = {
+          ...(switcher?.current() ?? {
+            provider: "",
+            model: null,
+            effort: null,
+            depth: config.depth,
+          }),
+          ...(fresh ? { fresh } : {}),
         };
       }}
     />,

@@ -471,7 +471,7 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
         ...(recovery.model !== undefined ? { model: recovery.model ?? "default" } : {}),
         ...(recovery.effort !== undefined ? { effort: recovery.effort ?? "default" } : {}),
         ...(recovery.depth ? { depth: recovery.depth } : {}),
-        cache: true,
+        cache: !recovery.fresh,
       });
     if (recovery?.kind === "home") return runReviewCommand(ctx, withoutNow(args));
     if (recovery?.kind === "provider") {

@@ -44,6 +44,8 @@ export type RunRecovery =
       model?: string | null;
       effort?: string | null;
       depth?: string;
+      /** Review every file again instead of reusing the last result. */
+      fresh?: boolean;
     };
 
 export const emptyProgress = (): ProgressState => ({

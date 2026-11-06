@@ -54,7 +54,7 @@ export function ReviewApp({
   switcher?: Switcher;
   onConnect?: () => void;
   /** Leave and review the same scope again; unchanged files come from the cache. */
-  onRerun?: () => void;
+  onRerun?: (fresh: boolean) => void;
   /** Go back to the start screen. When set, q goes back instead of quitting. */
   onBack?: () => void;
 }) {
@@ -359,11 +359,14 @@ export function ReviewApp({
     prompt = (
       <Choice
         label={`Re-run the review of ${state.review.scopeLabel}? Unchanged files come from the cache.`}
-        options={[["y", "yes, re-run"]]}
+        options={[
+          ["y", "yes, re-run"],
+          ["f", "fresh: review every file again"],
+        ]}
         onCancel={done}
-        onPick={() => {
+        onPick={(k) => {
           done();
-          onRerun();
+          onRerun(k === "f");
           app.exit();
         }}
       />
@@ -599,7 +602,8 @@ export function RunApp(props: {
         {...(props.switcher ? { switcher: props.switcher } : {})}
         {...(props.onRecover
           ? {
-              onRerun: () => props.onRecover!({ kind: "retry", ...selection }),
+              onRerun: (fresh) =>
+                props.onRecover!({ kind: "retry", ...selection, ...(fresh ? { fresh } : {}) }),
               onBack: () => props.onRecover!({ kind: "home" }),
             }
           : {})}

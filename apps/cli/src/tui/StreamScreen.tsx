@@ -197,7 +197,7 @@ export function StreamScreen(props: {
           {items.length === 0 ? (
             <Text dimColor>
               {state.items.length === 0
-                ? "No findings. Nothing to review."
+                ? "No findings. Files unchanged since an earlier review reuse its result, and findings you marked won't fix stay hidden. Press R, then f, to review every file again."
                 : props.filter.tab === "filtered"
                   ? "Nothing filtered."
                   : "No findings match. Clear the search with / and enter."}

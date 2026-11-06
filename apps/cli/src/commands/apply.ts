@@ -156,7 +156,7 @@ export async function openCommand(
       ...(rerun.model ? { model: rerun.model } : {}),
       ...(rerun.effort ? { effort: rerun.effort } : {}),
       depth: rerun.depth,
-      cache: true,
+      cache: !rerun.fresh,
     });
   }
   ctx.out(textReport(await exportReview(store, review.id), { color: ctx.color }));
