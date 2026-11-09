@@ -12,7 +12,11 @@ import { ReviewView } from "@/views/review/review-view.tsx";
 import { RunView } from "@/views/run/run-view.tsx";
 import { emptyProgress, reduceProgress } from "@/features/run-progress/lib/progress-state.ts";
 import { ProgressView } from "@/views/run/progress-view.tsx";
-import { ReviewSession, type SessionDeps } from "@/features/review-session/model/session.ts";
+import {
+  createReviewSession,
+  type ReviewSession,
+  type SessionDeps,
+} from "@/features/review-session/model/session.ts";
 import type { Editor } from "@/shared/lib/terminal-editor.ts";
 import type { Choice, Switcher } from "@/features/model-switching/lib/create-switcher.ts";
 
@@ -162,7 +166,7 @@ function session(
     config: { review: DEFAULT_CONFIG.review, verify: { commands: [] } },
     read: async (p) => readFileSync(join(repo.root, p), "utf8"),
   };
-  return new ReviewSession({
+  return createReviewSession({
     store,
     root: repo.root,
     reviewId,

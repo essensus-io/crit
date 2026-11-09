@@ -16,7 +16,10 @@ import { type ProvidersFile, type ResolvedConfig } from "@crit/schema";
 import { loadProviders, type SqliteStore } from "@crit/store";
 import { type CliContext, sessionsDir } from "@/shared/lib/cli-context.ts";
 import { adapterFor } from "@/features/provider-setup/lib/adapter-for.ts";
-import { ReviewSession } from "@/features/review-session/model/session.ts";
+import {
+  createReviewSession,
+  type ReviewSession,
+} from "@/features/review-session/model/session.ts";
 import { type Choice, type Switcher } from "@/features/model-switching/lib/create-switcher.ts";
 import { type Editor, terminalEditor } from "@/shared/lib/terminal-editor.ts";
 
@@ -87,7 +90,7 @@ export async function makeSession(
       config.depth = c.depth;
     });
   }
-  const session = new ReviewSession({
+  const session = createReviewSession({
     store,
     root,
     reviewId,

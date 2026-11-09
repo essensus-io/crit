@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { outcomeOf } from "@/features/review-history/lib/history-labels.ts";
 import { parseAge, parseSince } from "@/features/review-history/lib/parse-age.ts";
 import { HistoryView, previousOf } from "@/views/history/history-view.tsx";
-import { ReviewSession } from "@/features/review-session/model/session.ts";
+import { createReviewSession } from "@/features/review-session/model/session.ts";
 import { fakeProvidersJson, type TestEnv, testContext } from "./helpers.ts";
 
 const FILE = ["const a = 1;", "const b = 2;", "const c = 3;", "const d = 4;"].join("\n") + "\n";
@@ -178,7 +178,7 @@ describe("history screen", () => {
           },
           remove: async (row) => void (removed = row.review.id),
           open: async (row) => {
-            const s = new ReviewSession({
+            const s = createReviewSession({
               store,
               root: repo.root,
               reviewId: row.review.id,

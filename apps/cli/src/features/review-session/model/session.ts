@@ -73,28 +73,25 @@ export type SessionDeps = {
   code?: { read: (path: string) => Promise<string>; added: (path: string) => Set<number> };
 };
 
-export class ReviewSession {
-  state!: SessionState;
-  private readonly listeners = new Set<() => void>();
-  suspend: ((fn: () => Promise<void>) => Promise<void>) | undefined;
-  private readonly deps: SessionDeps;
+export const createReviewSession = (deps: SessionDeps) => {
+  let state!: SessionState;
+  let suspend: ((fn: () => Promise<void>) => Promise<void>) | undefined;
+  const listeners = new Set<() => void>();
+  const codeCache = new Map<string, CodeInfo>();
+  const draftingIds = new Set<string>();
 
-  constructor(deps: SessionDeps) {
-    this.deps = deps;
-  }
+  const subscribe = (fn: () => void): (() => void) => {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  };
 
-  subscribe(fn: () => void): () => void {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
-  }
+  const set = (patch: Partial<SessionState>) => {
+    state = { ...state, ...patch };
+    for (const l of listeners) l();
+  };
 
-  private set(patch: Partial<SessionState>) {
-    this.state = { ...this.state, ...patch };
-    for (const l of this.listeners) l();
-  }
-
-  async load(): Promise<SessionState> {
-    const { store, reviewId } = this.deps;
+  const load = async (): Promise<SessionState> => {
+    const { store, reviewId } = deps;
     const review = await store.reviews.get(reviewId);
     if (!review) throw new Error(`crit: review ${reviewId} not found`);
     const findings = await store.findings.listByReview(reviewId);
@@ -129,224 +126,216 @@ export class ReviewSession {
       if (user) v.userFix = user;
       return v;
     });
-    await this.loadCode([...new Set(items.map((i) => i.finding.file))]);
-    this.state = {
-      ...this.state,
+    await loadCode([...new Set(items.map((i) => i.finding.file))]);
+    state = {
+      ...state,
       review,
-      code: this.codeCache,
+      code: codeCache,
       items,
       rules: new Map((ruleEvent?.rules ?? []).map((r) => [r.id, r])),
-      disabledRules: await getDisabledRules(this.deps.store, review.repoId),
-      drafting: [...this.draftingIds],
+      disabledRules: await getDisabledRules(deps.store, review.repoId),
+      drafting: [...draftingIds],
       omitted,
     };
-    for (const l of this.listeners) l();
-    return this.state;
-  }
+    for (const l of listeners) l();
+    return state;
+  };
 
-  private readonly codeCache = new Map<string, CodeInfo>();
-  private readonly draftingIds = new Set<string>();
-
-  private async loadCode(files: string[]) {
-    const source = this.deps.code;
+  const loadCode = async (files: string[]) => {
+    const source = deps.code;
     if (!source) return;
     for (const file of files) {
-      if (this.codeCache.has(file)) continue;
+      if (codeCache.has(file)) continue;
       try {
         const text = await source.read(file);
-        this.codeCache.set(file, {
+        codeCache.set(file, {
           lines: text.replace(/\n$/, "").split("\n"),
           added: source.added(file),
         });
       } catch {}
     }
-  }
+  };
 
-  item(id: string): FindingView | undefined {
-    return this.state.items.find((i) => i.finding.id === id);
-  }
+  const item = (id: string): FindingView | undefined => {
+    return state.items.find((i) => i.finding.id === id);
+  };
 
-  private async run<T>(busy: string, fn: () => Promise<T>): Promise<T | undefined> {
-    this.set({ busy, error: undefined, notice: undefined });
-    this.codeCache.clear();
+  const run = async <T>(busy: string, fn: () => Promise<T>): Promise<T | undefined> => {
+    set({ busy, error: undefined, notice: undefined });
+    codeCache.clear();
     try {
       const r = await fn();
-      await this.load();
-      this.set({ busy: undefined });
+      await load();
+      set({ busy: undefined });
       return r;
     } catch (err) {
-      await this.load().catch(() => undefined);
-      this.set({ busy: undefined, error: (err as Error).message });
+      await load().catch(() => undefined);
+      set({ busy: undefined, error: (err as Error).message });
       return undefined;
     }
-  }
+  };
 
-  private needAi(): FixContext {
-    if (!this.deps.fixContext)
+  const needAi = (): FixContext => {
+    if (!deps.fixContext)
       throw new Error("no provider configured for AI actions (crit providers add)");
-    return this.deps.fixContext;
-  }
+    return deps.fixContext;
+  };
 
-  draftFix(id: string, instruction?: string) {
-    const it = this.item(id);
+  const draftFix = (id: string, instruction?: string) => {
+    const it = item(id);
     if (!it) return;
-    if (this.draftingIds.has(id)) return this.notify("Already writing a fix for this one.");
-    if (this.draftingIds.size >= MAX_DRAFTS)
-      return this.notify(`${MAX_DRAFTS} fixes are being written; wait for one to finish.`);
+    if (draftingIds.has(id)) return notify("Already writing a fix for this one.");
+    if (draftingIds.size >= MAX_DRAFTS)
+      return notify(`${MAX_DRAFTS} fixes are being written; wait for one to finish.`);
     let ctx: FixContext;
     try {
-      ctx = this.needAi();
+      ctx = needAi();
     } catch (err) {
-      return this.set({ error: (err as Error).message });
+      return set({ error: (err as Error).message });
     }
-    this.draftingIds.add(id);
-    this.set({ drafting: [...this.draftingIds], notice: undefined, error: undefined });
+    draftingIds.add(id);
+    set({ drafting: [...draftingIds], notice: undefined, error: undefined });
     const { finding } = it;
     void draftAiFix(ctx, finding, {
       ...(instruction ? { instruction } : {}),
       ...(it.fix ? { from: it.fix } : {}),
     }).then(
       async () => {
-        this.draftingIds.delete(id);
-        if (instruction) await this.deps.store.findings.update(id, { selected: false });
-        await this.load().catch(() => undefined);
-        this.set({ notice: `Fix ready for “${finding.title}”. Space checks it.` });
+        draftingIds.delete(id);
+        if (instruction) await deps.store.findings.update(id, { selected: false });
+        await load().catch(() => undefined);
+        set({ notice: `Fix ready for “${finding.title}”. Space checks it.` });
       },
       async (err: Error) => {
-        this.draftingIds.delete(id);
-        await this.load().catch(() => undefined);
-        this.set({ error: `Could not write a fix for “${finding.title}”: ${err.message}` });
+        draftingIds.delete(id);
+        await load().catch(() => undefined);
+        set({ error: `Could not write a fix for “${finding.title}”: ${err.message}` });
       },
     );
-  }
+  };
 
-  notify(notice: string | undefined) {
-    this.set({ notice, error: undefined });
-  }
+  const notify = (notice: string | undefined) => {
+    set({ notice, error: undefined });
+  };
 
-  async toggle(id: string) {
-    const it = this.item(id);
+  const toggle = async (id: string) => {
+    const it = item(id);
     if (!it) return;
     if (!it.fix && !it.finding.selected) {
-      this.set({ notice: "This finding has no fix to apply. Press i to tell the AI the fix." });
+      set({ notice: "This finding has no fix to apply. Press i to tell the AI the fix." });
       return;
     }
     const selected = !it.finding.selected;
-    this.set({
-      items: this.state.items.map((v) =>
+    set({
+      items: state.items.map((v) =>
         v.finding.id === id ? { ...v, finding: { ...v.finding, selected } } : v,
       ),
     });
-    await this.deps.store.findings.update(id, { selected });
-  }
+    await deps.store.findings.update(id, { selected });
+  };
 
-  dismiss(id: string, reason: DismissReason) {
-    return this.run("Dismissing…", () =>
-      dismissFinding(this.deps.store, this.item(id)!.finding, reason),
-    );
-  }
+  const dismiss = (id: string, reason: DismissReason) => {
+    return run("Dismissing…", () => dismissFinding(deps.store, item(id)!.finding, reason));
+  };
 
-  restore(id: string) {
-    return this.run("Restoring…", () => restoreFinding(this.deps.store, this.item(id)!.finding));
-  }
+  const restore = (id: string) => {
+    return run("Restoring…", () => restoreFinding(deps.store, item(id)!.finding));
+  };
 
-  propose(id: string, input: ProposalInput, answer?: string): Promise<ProposalOutcome | undefined> {
-    return this.run(
+  const propose = (
+    id: string,
+    input: ProposalInput,
+    answer?: string,
+  ): Promise<ProposalOutcome | undefined> => {
+    return run(
       input.kind === "description" ? "Drafting and checking your fix…" : "Checking your fix…",
       async () => {
-        const out = await proposeFix(
-          this.needAi(),
-          this.item(id)!.finding,
-          input,
-          answer ? { answer } : {},
-        );
-        if (out.fix.active) await this.deps.store.findings.update(id, { selected: true });
+        const out = await proposeFix(needAi(), item(id)!.finding, input, answer ? { answer } : {});
+        if (out.fix.active) await deps.store.findings.update(id, { selected: true });
         return out;
       },
     );
-  }
+  };
 
-  useAnyway(fixId: string) {
-    return this.run("Using your fix…", async () => {
-      const fix = await useFixAnyway(this.deps.store, fixId);
-      await this.deps.store.findings.update(fix.findingId, { selected: true });
+  const useAnyway = (fixId: string) => {
+    return run("Using your fix…", async () => {
+      const fix = await useFixAnyway(deps.store, fixId);
+      await deps.store.findings.update(fix.findingId, { selected: true });
     });
-  }
+  };
 
-  keepAi(id: string) {
-    return this.run("Switching to the AI fix…", () => keepAiFix(this.deps.store, id));
-  }
+  const keepAi = (id: string) => {
+    return run("Switching to the AI fix…", () => keepAiFix(deps.store, id));
+  };
 
-  ask(id: string, question: string) {
-    return this.run("Asking the agent…", () =>
-      askAboutFinding(this.needAi(), this.item(id)!.finding, question),
-    );
-  }
+  const ask = (id: string, question: string) => {
+    return run("Asking the agent…", () => askAboutFinding(needAi(), item(id)!.finding, question));
+  };
 
-  private async withTerminal<T>(fn: () => Promise<T>): Promise<T> {
-    if (!this.suspend) return fn();
+  const withTerminal = async <T>(fn: () => Promise<T>): Promise<T> => {
+    if (!suspend) return fn();
     let result!: T;
-    await this.suspend(async () => {
+    await suspend(async () => {
       result = await fn();
     });
     return result;
-  }
+  };
 
-  private current(file: string): string {
-    return readFileSync(join(this.deps.root, file), "utf8");
-  }
+  const current = (file: string): string => {
+    return readFileSync(join(deps.root, file), "utf8");
+  };
 
-  async editFix(id: string) {
-    const it = this.item(id)!;
-    const original = this.current(it.finding.file);
+  const editFix = async (id: string) => {
+    const it = item(id)!;
+    const original = current(it.finding.file);
     let start = original;
     try {
       if (it.fix) start = patchedContent(original, it.fix.patch);
     } catch {
       start = original;
     }
-    const edited = await this.withTerminal(() => this.deps.editor(start, it.finding.file));
+    const edited = await withTerminal(() => deps.editor(start, it.finding.file));
     if (edited === undefined || edited === start) {
-      this.notify("No changes.");
+      notify("No changes.");
       return;
     }
     const patch = diffFromEdit(it.finding.file, original, edited);
     if (!patch) {
-      this.notify("Your edit matches the current file; nothing to save.");
+      notify("Your edit matches the current file; nothing to save.");
       return;
     }
-    await this.run("Saving your edit…", async () => {
-      await saveEditedFix(this.deps.store, this.deps.root, it.finding, patch);
-      await this.deps.store.findings.update(id, { selected: true });
+    await run("Saving your edit…", async () => {
+      await saveEditedFix(deps.store, deps.root, it.finding, patch);
+      await deps.store.findings.update(id, { selected: true });
     });
-  }
+  };
 
-  async proposeFromEditor(id: string): Promise<ProposalOutcome | undefined> {
-    const it = this.item(id)!;
-    const original = this.current(it.finding.file);
-    const edited = await this.withTerminal(() => this.deps.editor(original, it.finding.file));
+  const proposeFromEditor = async (id: string): Promise<ProposalOutcome | undefined> => {
+    const it = item(id)!;
+    const original = current(it.finding.file);
+    const edited = await withTerminal(() => deps.editor(original, it.finding.file));
     const patch =
       edited === undefined ? undefined : diffFromEdit(it.finding.file, original, edited);
     if (!patch) {
-      this.notify("No changes; nothing to propose.");
+      notify("No changes; nothing to propose.");
       return undefined;
     }
-    return this.propose(id, { kind: "patch", patch });
-  }
+    return propose(id, { kind: "patch", patch });
+  };
 
-  apply(
+  const apply = (
     target: ApplyTarget = { kind: "worktree" },
     only?: string[],
-  ): Promise<ApplyResult | undefined> {
-    return this.run("Applying fixes…", async () => {
+  ): Promise<ApplyResult | undefined> => {
+    return run("Applying fixes…", async () => {
       const r = await applyFixes({
-        store: this.deps.store,
-        reviewId: this.deps.reviewId,
-        root: this.deps.root,
+        store: deps.store,
+        reviewId: deps.reviewId,
+        root: deps.root,
         target,
-        backupRoot: this.deps.backupRoot,
+        backupRoot: deps.backupRoot,
         ...(only ? { only } : {}),
-        ...(this.deps.verifyCommands.length ? { verifyCommands: this.deps.verifyCommands } : {}),
+        ...(deps.verifyCommands.length ? { verifyCommands: deps.verifyCommands } : {}),
       });
       return r;
     }).then((r) => {
@@ -354,33 +343,33 @@ export class ReviewSession {
         const parts = [`Applied ${r.applied.length}`];
         if (r.skipped.length) parts.push(`skipped ${r.skipped.length}`);
         if (r.verify) parts.push(r.verify.passed ? "verify passed" : "verify FAILED");
-        this.notify(
+        notify(
           `${parts.join(" · ")}${r.branch ? ` → ${r.branch}` : " · crit undo restores the files"}`,
         );
       }
       return r;
     });
-  }
+  };
 
-  async applyOne(id: string) {
-    const it = this.item(id);
+  const applyOne = async (id: string) => {
+    const it = item(id);
     if (!it) return;
-    if (!it.fix) return this.notify("This finding has no fix to apply yet.");
-    if (it.finding.status !== "open") return this.notify("This one is already dealt with.");
-    await this.deps.store.findings.update(id, { selected: true });
-    await this.load();
-    return this.apply({ kind: "worktree" }, [id]);
-  }
+    if (!it.fix) return notify("This finding has no fix to apply yet.");
+    if (it.finding.status !== "open") return notify("This one is already dealt with.");
+    await deps.store.findings.update(id, { selected: true });
+    await load();
+    return apply({ kind: "worktree" }, [id]);
+  };
 
-  recheck(id: string) {
-    const it = this.item(id)!;
-    if (!this.deps.recheck)
-      return Promise.resolve(this.set({ error: "re-check needs a provider (crit providers add)" }));
-    return this.run(`Re-checking ${it.finding.file}…`, () => this.recheckFile(it.finding.file));
-  }
+  const recheck = (id: string) => {
+    const it = item(id)!;
+    if (!deps.recheck)
+      return Promise.resolve(set({ error: "re-check needs a provider (crit providers add)" }));
+    return run(`Re-checking ${it.finding.file}…`, () => recheckFile(it.finding.file));
+  };
 
-  private async recheckFile(file: string) {
-    const { store, reviewId, recheck } = this.deps;
+  const recheckFile = async (file: string) => {
+    const { store, reviewId, recheck } = deps;
     const temp = await recheck!(file);
     for (const f of await store.findings.listByReview(reviewId)) {
       if (f.file === file && f.status === "open")
@@ -390,57 +379,91 @@ export class ReviewSession {
       if (f.file === file) await store.findings.reassign(f.id, reviewId);
     }
     await store.reviews.delete(temp);
-  }
+  };
 
-  copyPrompt(id: string) {
-    const it = this.item(id);
+  const copyPrompt = (id: string) => {
+    const it = item(id);
     if (!it) return;
     const refs = it.finding.ruleIds
-      .map((r) => this.state.rules.get(r))
+      .map((r) => state.rules.get(r))
       .filter((r): r is RuleRef => r !== undefined);
     const text = findingPrompt(it.finding, it.fix, refs);
-    const via = (this.deps.copy ?? copyToClipboard)(text);
-    this.notify(`Copied a prompt for “${it.finding.title}” (${text.length} chars) via ${via}.`);
-  }
+    const via = (deps.copy ?? copyToClipboard)(text);
+    notify(`Copied a prompt for “${it.finding.title}” (${text.length} chars) via ${via}.`);
+  };
 
-  ruleRows() {
-    return [...this.state.rules.values()].map((ref) => {
+  const ruleRows = () => {
+    return [...state.rules.values()].map((ref) => {
       const key = ref.section ? `${ref.path}#${ref.section}` : ref.path;
-      return { ref, key, disabled: this.state.disabledRules.includes(key) };
+      return { ref, key, disabled: state.disabledRules.includes(key) };
     });
-  }
+  };
 
-  async toggleRule(ruleId: string) {
-    const row = this.ruleRows().find((r) => r.ref.id === ruleId);
+  const toggleRule = async (ruleId: string) => {
+    const row = ruleRows().find((r) => r.ref.id === ruleId);
     if (!row) return;
-    const { store, recheck } = this.deps;
+    const { store, recheck } = deps;
     const disable = !row.disabled;
-    await setRuleDisabled(store, this.state.review.repoId, row.key, disable);
+    await setRuleDisabled(store, state.review.repoId, row.key, disable);
     if (!disable) {
-      await this.load();
-      return this.notify(`${row.ref.id} is on again. It applies to the next review or re-check.`);
+      await load();
+      return notify(`${row.ref.id} is on again. It applies to the next review or re-check.`);
     }
     const files = [
       ...new Set(
-        this.state.items
+        state.items
           .filter((i) => i.finding.status === "open" && i.finding.ruleIds.includes(ruleId))
           .map((i) => i.finding.file),
       ),
     ];
     if (!files.length || !recheck) {
-      await this.load();
-      return this.notify(
+      await load();
+      return notify(
         files.length
           ? `${row.ref.id} is off. Connect a provider to re-check ${files.length} file(s).`
           : `${row.ref.id} is off. No open findings cite it.`,
       );
     }
-    await this.run(
+    await run(
       `Re-checking ${files.length} file${files.length === 1 ? "" : "s"} without ${row.ref.id}…`,
       async () => {
-        for (const f of files) await this.recheckFile(f);
+        for (const f of files) await recheckFile(f);
       },
     );
-    this.notify(`${row.ref.id} is off; re-checked ${files.length} file(s).`);
-  }
-}
+    notify(`${row.ref.id} is off; re-checked ${files.length} file(s).`);
+  };
+
+  return {
+    get state() {
+      return state;
+    },
+    get suspend() {
+      return suspend;
+    },
+    set suspend(value) {
+      suspend = value;
+    },
+    subscribe,
+    load,
+    item,
+    draftFix,
+    notify,
+    toggle,
+    dismiss,
+    restore,
+    propose,
+    useAnyway,
+    keepAi,
+    ask,
+    editFix,
+    proposeFromEditor,
+    apply,
+    applyOne,
+    recheck,
+    copyPrompt,
+    ruleRows,
+    toggleRule,
+  };
+};
+
+export type ReviewSession = ReturnType<typeof createReviewSession>;
