@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { FakeAdapter, FakeScript, type FakeScriptInput } from "@crit/providers";
+import {
+  createFakeAdapter,
+  type FakeAdapter,
+  FakeScript,
+  type FakeScriptInput,
+} from "@crit/providers";
 import { DEFAULT_CONFIG, type Finding, type Fix, newId } from "@crit/schema";
 import { openStore, type SqliteStore } from "@crit/store";
 import { createFixtureRepo, type FixtureRepo } from "@crit/testkit";
@@ -114,7 +119,7 @@ function ctxWith(
   script: FakeScriptInput,
   over: Partial<FixContext["config"]> = {},
 ): FixContext & { fake: FakeAdapter } {
-  const fake = new FakeAdapter(FakeScript.parse(script), { model: null });
+  const fake = createFakeAdapter(FakeScript.parse(script), { model: null });
   return {
     fake,
     store,

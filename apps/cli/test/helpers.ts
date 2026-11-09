@@ -2,8 +2,9 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  AdapterRegistry,
-  FakeAdapter,
+  createAdapterRegistry,
+  createFakeAdapter,
+  type FakeAdapter,
   FakeScript,
   type FakeScriptInput,
   fakeFactory,
@@ -47,7 +48,7 @@ export function testContext(
   const prompter = new ScriptedPrompter(opts.answers ?? []);
   let script: FakeScript = FakeScript.parse({ runs: [] });
   const fakes: FakeAdapter[] = [];
-  const registry = new AdapterRegistry().register({
+  const registry = createAdapterRegistry().register({
     ...fakeFactory,
     type: "test-agent",
     label: "Test Agent",
@@ -57,7 +58,7 @@ export function testContext(
     hidden: false,
     ...(opts.models ? { listModels: async () => opts.models! } : {}),
     create: (profile) => {
-      const f = new FakeAdapter(script, profile);
+      const f = createFakeAdapter(script, profile);
       fakes.push(f);
       return {
         type: "test-agent",

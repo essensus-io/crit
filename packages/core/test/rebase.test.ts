@@ -1,4 +1,4 @@
-import { FakeAdapter, FakeScript } from "@crit/providers";
+import { createFakeAdapter, FakeScript } from "@crit/providers";
 import { DEFAULT_CONFIG, type Finding, type Fix } from "@crit/schema";
 import { describe, expect, it } from "vitest";
 import { agentRebaser, extractDiff } from "../src/index.ts";
@@ -16,7 +16,7 @@ describe("extractDiff", () => {
 
 describe("agentRebaser", () => {
   it("asks the agent with the current file and parses its diff", async () => {
-    const fake = new FakeAdapter(
+    const fake = createFakeAdapter(
       FakeScript.parse({
         runs: [
           { match: { kind: "draft-fix" }, message: `\`\`\`diff\n${diff}\`\`\`` },

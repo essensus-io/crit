@@ -15,10 +15,45 @@ except what your agent CLI already sends.
 Requires Node 24+, git, and at least one of `claude`, `codex`, `cursor-agent`
 logged in.
 
+### Internal team setup (macOS / Linux)
+
+With access to this GitHub repository and the GitHub CLI already logged in
+(`gh auth login`), run:
+
 ```sh
-npm i -g @crit/cli      # once published; for now: pnpm build && node apps/cli/dist/index.js
-crit doctor             # which agent CLIs are installed, logged in, and tested
-crit review             # first run walks you through connecting a provider
+gh api -H 'Accept: application/vnd.github.raw+json' repos/ihornovykov/crit/contents/scripts/install.sh | bash
+```
+
+Setup builds the CLI and installs the `crit` command into `~/.local/bin` without
+sudo or publishing anything to npm. pnpm is downloaded automatically at the
+version pinned by this repository. If setup adds a directory to your shell's
+PATH, open a new terminal afterwards. Each person needs their own logged-in agent
+CLI; the first review guides them through provider selection.
+
+Then, from any repository:
+
+```sh
+crit doctor             # check the local setup
+crit review             # connect a provider and open the review screen
+```
+
+Already have a checkout, or prefer Git over SSH instead of the GitHub CLI?
+
+```sh
+git clone git@github.com:ihornovykov/crit.git
+bash crit/scripts/install.sh
+```
+
+Rerun the GitHub setup command to update to the latest `main`. From a local
+checkout, pull the latest changes and rerun `bash scripts/install.sh`. Updates
+preserve each person's provider settings and review history; the installed app
+works even if the checkout is removed. `CRIT_INSTALL_PREFIX` overrides the
+default `~/.local` installation directory.
+
+To remove the command (settings and history are kept):
+
+```sh
+npm uninstall --global --prefix "$HOME/.local" @crit/cli
 ```
 
 ## Use

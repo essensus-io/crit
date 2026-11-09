@@ -6,7 +6,7 @@ import type { AgentEvent, AgentTask, FindingInput } from "@crit/schema";
 import { critPaths, loadProviders, saveProviders } from "@crit/store";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  AdapterRegistry,
+  createAdapterRegistry,
   addProfile,
   commandVersion,
   compareVersions,
@@ -14,7 +14,7 @@ import {
   detectCli,
   detectInstalled,
   emptyProvidersFile,
-  FakeAdapter,
+  createFakeAdapter,
   fakeFactory,
   type FakeScriptInput,
   FakeScript,
@@ -153,7 +153,7 @@ describe("process helpers", () => {
 describe("detection", () => {
   it.skipIf(!posix)("detects known CLIs on PATH with versions", async () => {
     script("claude", "echo '2.1.3 (Claude Code)'");
-    const reg = new AdapterRegistry()
+    const reg = createAdapterRegistry()
       .register({ ...fakeFactory, type: "claude-code", defaultCommand: "claude", hidden: false })
       .register({ ...fakeFactory, type: "cursor", defaultCommand: "cursor-agent", hidden: false });
     const found = await detectInstalled(reg, { PATH: join(dir, "bin") });
@@ -320,7 +320,7 @@ describe("fake provider", () => {
     };
     const sessions = join(dir, "sessions");
     const host = await startSessionHost({ handler, dir: sessions });
-    const fake = new FakeAdapter(
+    const fake = createFakeAdapter(
       FakeScript.parse({
         runs: [
           {
@@ -368,7 +368,7 @@ describe("fake provider", () => {
   });
 
   it("answers skeptic prompts per finding and supports repeat, match and messages", async () => {
-    const fake = new FakeAdapter(
+    const fake = createFakeAdapter(
       FakeScript.parse({
         runs: [
           {
@@ -403,7 +403,7 @@ describe("fake provider", () => {
   });
 
   it("fails clearly when calls need MCP but the task has none", async () => {
-    const fake = new FakeAdapter(
+    const fake = createFakeAdapter(
       FakeScript.parse({ runs: [{ calls: [{ tool: "finish", args: { summary: "x" } }] }] }),
       { model: null },
     );
@@ -413,7 +413,7 @@ describe("fake provider", () => {
   });
 
   it("honours delays and aborts", async () => {
-    const fake = new FakeAdapter(
+    const fake = createFakeAdapter(
       FakeScript.parse({ runs: [{ delayMs: 5000 }, { message: "x" }] }),
       { model: null },
     );
@@ -428,7 +428,7 @@ describe("fake provider", () => {
     expect(events.at(-1)).toEqual({ type: "done", exitCode: 130 });
     const pre = new AbortController();
     pre.abort();
-    const f2 = new FakeAdapter(FakeScript.parse({ runs: [{ delayMs: 5 }] }), { model: null });
+    const f2 = createFakeAdapter(FakeScript.parse({ runs: [{ delayMs: 5 }] }), { model: null });
     await expect(collect(f2.run(task(), pre.signal))).rejects.toThrow("aborted");
   });
 

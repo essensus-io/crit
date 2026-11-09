@@ -4,7 +4,7 @@ import type { AgentEvent, AgentTask, ProviderProfile } from "@crit/schema";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { z } from "zod";
-import type { AdapterEnv, AdapterFactory, ProviderAdapter } from "./adapter.ts";
+import type { AdapterEnv, AdapterFactory } from "./adapter.ts";
 
 export const FakeRun = z.object({
   match: z
@@ -66,74 +66,43 @@ export function findingsInPrompt(prompt: string): { id: string; title: string }[
   }
 }
 
-export class FakeAdapter implements ProviderAdapter {
-  readonly type = "fake";
-  readonly capabilities = {
-    mcp: true,
-    jsonSchemaOutput: true,
-    readOnlyMode: true,
-    nativeContext: [],
-    models: ["fake-small", "fake-large"],
-  };
-  readonly calls: FakeCall[] = [];
-  private readonly consumed = new Set<number>();
+export const createFakeAdapter = (script: FakeScript, profile: Pick<ProviderProfile, "model">) => {
+  const calls: FakeCall[] = [];
+  const consumed = new Set<number>();
 
-  private readonly script: FakeScript;
-  readonly profile: Pick<ProviderProfile, "model">;
-  constructor(script: FakeScript, profile: Pick<ProviderProfile, "model">) {
-    this.script = script;
-    this.profile = profile;
-  }
-
-  static fromFile(path: string, profile: Pick<ProviderProfile, "model">): FakeAdapter {
-    const script = existsSync(path)
-      ? FakeScript.parse(JSON.parse(readFileSync(path, "utf8")))
-      : FakeScript.parse({ loggedIn: false });
-    return new FakeAdapter(script, profile);
-  }
-
-  async detect() {
-    return {
-      installed: true,
-      version: this.script.version,
-      loggedIn: this.script.loggedIn,
-      path: "fake",
-    };
-  }
-
-  private pick(task: AgentTask): FakeRun | undefined {
-    for (const [i, run] of this.script.runs.entries()) {
-      if (this.consumed.has(i)) continue;
-      const m = run.match;
-      if (m?.kind && m.kind !== task.kind) continue;
-      if (m?.promptIncludes && !task.prompt.includes(m.promptIncludes)) continue;
-      if (!run.repeat) this.consumed.add(i);
+  const pick = (task: AgentTask): FakeRun | undefined => {
+    for (const [index, run] of script.runs.entries()) {
+      if (consumed.has(index)) continue;
+      const match = run.match;
+      if (match?.kind && match.kind !== task.kind) continue;
+      if (match?.promptIncludes && !task.prompt.includes(match.promptIncludes)) continue;
+      if (!run.repeat) consumed.add(index);
       return run;
     }
     return undefined;
-  }
+  };
 
-  async *run(task: AgentTask, signal: AbortSignal): AsyncIterable<AgentEvent> {
-    const run = this.pick(task);
-    this.calls.push({ task, run });
-    if (!run) {
+  async function* run(task: AgentTask, signal: AbortSignal): AsyncIterable<AgentEvent> {
+    const scripted = pick(task);
+    calls.push({ task, run: scripted });
+    if (!scripted) {
       yield { type: "error", message: `fake provider: no scripted run for ${task.kind}` };
       yield { type: "done", exitCode: 1 };
       return;
     }
-    if (run.delayMs) await sleep(run.delayMs, signal);
-    for (const e of run.events) yield e as AgentEvent;
+    if (scripted.delayMs) await sleep(scripted.delayMs, signal);
+    for (const event of scripted.events) yield event as AgentEvent;
 
-    if (run.calls.length) {
+    if (scripted.calls.length) {
       if (!task.mcpSession || !task.mcp)
         throw new Error("fake provider: scripted MCP calls but the task has no MCP session");
       const handler = await connectSession(task.mcp.sessionsDir, task.mcpSession);
       const server = createCritMcpServer(handler);
-      const [a, b] = InMemoryTransport.createLinkedPair();
+      const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
       const client = new Client({ name: "fake-agent", version: "0" });
-      await Promise.all([server.connect(a), client.connect(b)]);
+      await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
       try {
-        for (const call of run.calls) {
+        for (const call of scripted.calls) {
           if (signal.aborted) break;
           yield { type: "tool", name: `mcp__crit__${call.tool}` };
           const result = await client.callTool({ name: call.tool, arguments: call.args });
@@ -146,12 +115,15 @@ export class FakeAdapter implements ProviderAdapter {
       }
     }
 
-    let message = run.message;
-    if (run.skeptic) {
-      const verdicts = findingsInPrompt(task.prompt).map((f) => {
-        const hit = Object.entries(run.skeptic!.byTitle).find(([t]) => f.title.includes(t));
-        const verdict = hit?.[1] ?? run.skeptic!.default;
-        return { findingId: f.id, verdict, reason: `fake skeptic: ${verdict}` };
+    let message = scripted.message;
+    if (scripted.skeptic) {
+      const skeptic = scripted.skeptic;
+      const verdicts = findingsInPrompt(task.prompt).map((finding) => {
+        const hit = Object.entries(skeptic.byTitle).find(([title]) =>
+          finding.title.includes(title),
+        );
+        const verdict = hit?.[1] ?? skeptic.default;
+        return { findingId: finding.id, verdict, reason: `fake skeptic: ${verdict}` };
       });
       message = JSON.stringify({ results: verdicts });
     }
@@ -165,9 +137,41 @@ export class FakeAdapter implements ProviderAdapter {
       yield { type: "done", exitCode: 130 };
       return;
     }
-    yield { type: "done", exitCode: run.exitCode };
+    yield { type: "done", exitCode: scripted.exitCode };
   }
-}
+
+  return {
+    type: "fake" as const,
+    capabilities: {
+      mcp: true,
+      jsonSchemaOutput: true,
+      readOnlyMode: true,
+      nativeContext: [],
+      models: ["fake-small", "fake-large"],
+    },
+    calls,
+    profile,
+    detect: async () => ({
+      installed: true,
+      version: script.version,
+      loggedIn: script.loggedIn,
+      path: "fake",
+    }),
+    run,
+  };
+};
+
+export type FakeAdapter = ReturnType<typeof createFakeAdapter>;
+
+export const createFakeAdapterFromFile = (
+  path: string,
+  profile: Pick<ProviderProfile, "model">,
+): FakeAdapter => {
+  const script = existsSync(path)
+    ? FakeScript.parse(JSON.parse(readFileSync(path, "utf8")))
+    : FakeScript.parse({ loggedIn: false });
+  return createFakeAdapter(script, profile);
+};
 
 const instances = new Map<string, FakeAdapter>();
 
@@ -184,7 +188,7 @@ export const fakeFactory: AdapterFactory = {
     const path = env.env.CRIT_FAKE_SCRIPT ?? profile.command;
     let inst = instances.get(path);
     if (!inst) {
-      inst = FakeAdapter.fromFile(path, profile);
+      inst = createFakeAdapterFromFile(path, profile);
       instances.set(path, inst);
     }
     return inst;

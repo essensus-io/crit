@@ -37,33 +37,37 @@ export type AdapterFactory = {
   create(profile: ProviderProfile, env: AdapterEnv): ProviderAdapter;
 };
 
-export class AdapterRegistry {
-  private readonly factories = new Map<string, AdapterFactory>();
+export type AdapterRegistry = {
+  register(factory: AdapterFactory): AdapterRegistry;
+  get(type: string): AdapterFactory | undefined;
+  list(options?: { includeHidden?: boolean }): AdapterFactory[];
+  create(profile: ProviderProfile, env: AdapterEnv): ProviderAdapter;
+};
 
-  register(factory: AdapterFactory): this {
-    this.factories.set(factory.type, factory);
-    return this;
-  }
-
-  get(type: string): AdapterFactory | undefined {
-    return this.factories.get(type);
-  }
-
-  list(opts: { includeHidden?: boolean } = {}): AdapterFactory[] {
-    return [...this.factories.values()].filter((f) => opts.includeHidden || !f.hidden);
-  }
-
-  create(profile: ProviderProfile, env: AdapterEnv): ProviderAdapter {
-    const factory = this.factories.get(profile.type);
-    if (!factory) {
-      const known = this.list({ includeHidden: true })
-        .map((f) => f.type)
-        .join(", ");
-      throw new Error(`crit: no adapter for provider type "${profile.type}" (known: ${known})`);
-    }
-    return factory.create(
-      profile,
-      profile.env ? { ...env, env: { ...env.env, ...profile.env } } : env,
-    );
-  }
-}
+export const createAdapterRegistry = (): AdapterRegistry => {
+  const factories = new Map<string, AdapterFactory>();
+  const registry: AdapterRegistry = {
+    register(factory) {
+      factories.set(factory.type, factory);
+      return registry;
+    },
+    get: (type) => factories.get(type),
+    list: ({ includeHidden = false } = {}) =>
+      [...factories.values()].filter((factory) => includeHidden || !factory.hidden),
+    create(profile, env) {
+      const factory = factories.get(profile.type);
+      if (!factory) {
+        const known = registry
+          .list({ includeHidden: true })
+          .map((candidate) => candidate.type)
+          .join(", ");
+        throw new Error(`crit: no adapter for provider type "${profile.type}" (known: ${known})`);
+      }
+      return factory.create(
+        profile,
+        profile.env ? { ...env, env: { ...env.env, ...profile.env } } : env,
+      );
+    },
+  };
+  return registry;
+};

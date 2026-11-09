@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FixContext } from "@crit/core";
-import { FakeAdapter, FakeScript, type FakeScriptInput } from "@crit/providers";
+import { createFakeAdapter, FakeScript, type FakeScriptInput } from "@crit/providers";
 import { DEFAULT_CONFIG, type Finding, newId, type ReviewEvent, type Shard } from "@crit/schema";
 import { openStore, type SqliteStore } from "@crit/store";
 import { createFixtureRepo, type FixtureRepo } from "@crit/testkit";
@@ -151,7 +151,7 @@ function session(
   editor: Editor = async () => undefined,
   extra: Partial<SessionDeps> = {},
 ) {
-  const fake = new FakeAdapter(FakeScript.parse(script), { model: null });
+  const fake = createFakeAdapter(FakeScript.parse(script), { model: null });
   const fixContext: FixContext = {
     store,
     provider: {

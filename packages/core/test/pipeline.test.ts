@@ -1,7 +1,12 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FakeAdapter, type FakeRunInput, FakeScript, type FakeScriptInput } from "@crit/providers";
+import {
+  createFakeAdapter,
+  type FakeRunInput,
+  FakeScript,
+  type FakeScriptInput,
+} from "@crit/providers";
 import {
   type AgentEvent,
   type AgentTask,
@@ -101,7 +106,7 @@ afterEach(() => {
 });
 
 function fake(script: FakeScriptInput) {
-  return new FakeAdapter(FakeScript.parse(script), { model: null });
+  return createFakeAdapter(FakeScript.parse(script), { model: null });
 }
 
 function options(
