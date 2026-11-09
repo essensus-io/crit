@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CursorAdapter, which } from "../../src/index.ts";
+import { createCursorAdapter, which } from "../../src/index.ts";
 import type { AgentEvent } from "@crit/schema";
 import { createFixtureRepo } from "@crit/testkit";
 
@@ -10,7 +10,7 @@ describe.skipIf(!(process.env.CRIT_LIVE === "1" && which("cursor-agent")))("live
         "export function refund(order: { captured: number }, amount: number) {\n  return { refunded: amount };\n}\n",
     });
     try {
-      const a = new CursorAdapter(
+      const a = createCursorAdapter(
         { name: "cursor", type: "cursor", command: "cursor-agent", model: null, enabled: true },
         { env: process.env, tmpDir: repo.root },
       );

@@ -13,15 +13,15 @@ import type { AgentEvent, AgentTask, ProviderProfile } from "@crit/schema";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   buildClaudeInvocation,
-  ClaudeCodeAdapter,
+  createClaudeCodeAdapter,
   claudeCodeFactory,
-  ClaudeStreamParser,
+  createClaudeStreamParser,
   createDefaultRegistry,
 } from "../src/index.ts";
 
 const FIX = join(import.meta.dirname, "fixtures", "claude-code");
 const replay = (file: string) => {
-  const p = new ClaudeStreamParser("run `claude` once to log in");
+  const p = createClaudeStreamParser("run `claude` once to log in");
   const events = readFileSync(join(FIX, file), "utf8")
     .trim()
     .split("\n")
@@ -109,9 +109,9 @@ describe("Claude Code stream-json contract (recorded transcripts)", () => {
   });
 });
 
-describe("ClaudeStreamParser edge cases", () => {
+describe("Claude stream parser edge cases", () => {
   const parse = (lines: object[], exit = 0, timedOut = false) => {
-    const p = new ClaudeStreamParser("run `claude` once to log in");
+    const p = createClaudeStreamParser("run `claude` once to log in");
     return [...lines.flatMap((l) => p.line(JSON.stringify(l))), ...p.exit(exit, timedOut)];
   };
 
@@ -165,7 +165,7 @@ describe("ClaudeStreamParser edge cases", () => {
   });
 
   it("describes tools and text, ignoring junk lines", () => {
-    const p = new ClaudeStreamParser("hint");
+    const p = createClaudeStreamParser("hint");
     expect(p.line("not json")).toEqual([]);
     expect(p.line(JSON.stringify({ type: "user" }))).toEqual([]);
     const out = p.line(
@@ -196,7 +196,7 @@ describe("ClaudeStreamParser edge cases", () => {
 
   it("explains exits without a result", () => {
     const exit = (stderr: string[], code = 1, timedOut = false) => {
-      const p = new ClaudeStreamParser("run `claude` once to log in");
+      const p = createClaudeStreamParser("run `claude` once to log in");
       p.stderr.push(...stderr);
       return p.exit(code, timedOut);
     };
@@ -319,7 +319,7 @@ describe("buildClaudeInvocation", () => {
   });
 });
 
-describe("ClaudeCodeAdapter", () => {
+describe("Claude Code adapter", () => {
   let dir: string;
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), "crit-claude-"));
@@ -328,7 +328,7 @@ describe("ClaudeCodeAdapter", () => {
 
   it("is registered with read-only capabilities and no native context", () => {
     const a = createDefaultRegistry().create(profile, { env: {}, tmpDir: dir });
-    expect(a).toBeInstanceOf(ClaudeCodeAdapter);
+    expect(a.type).toBe("claude-code");
     expect(a.capabilities).toMatchObject({ mcp: true, readOnlyMode: true, nativeContext: [] });
     expect(claudeCodeFactory.defaultCommand).toBe("claude");
   });
@@ -345,7 +345,7 @@ describe("ClaudeCodeAdapter", () => {
           `process.stdout.write(require('fs').readFileSync(${JSON.stringify(join(FIX, "review.jsonl"))},'utf8'))})\n`,
       );
       chmodSync(bin, 0o755);
-      const a = new ClaudeCodeAdapter(
+      const a = createClaudeCodeAdapter(
         { ...profile, command: bin },
         { env: process.env, tmpDir: dir },
       );
@@ -355,7 +355,7 @@ describe("ClaudeCodeAdapter", () => {
       expect(events.filter((e) => e.type === "tool")).toHaveLength(4);
       expect(readdirSync(dir).filter((f) => f.startsWith("claude-"))).toEqual([]);
 
-      const failing = new ClaudeCodeAdapter(
+      const failing = createClaudeCodeAdapter(
         { ...profile, command: bin },
         { env: process.env, tmpDir: dir },
       );
@@ -374,7 +374,7 @@ describe("ClaudeCodeAdapter", () => {
   );
 
   it.skipIf(process.platform === "win32")("detects a missing CLI", async () => {
-    const a = new ClaudeCodeAdapter(
+    const a = createClaudeCodeAdapter(
       { ...profile, command: join(dir, "nope") },
       { env: { PATH: dir }, tmpDir: dir },
     );

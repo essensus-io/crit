@@ -5,9 +5,9 @@ import type { AgentEvent, AgentTask, ProviderProfile } from "@crit/schema";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   buildCodexInvocation,
-  CodexAdapter,
+  createCodexAdapter,
   codexFactory,
-  CodexStreamParser,
+  createCodexStreamParser,
   createDefaultRegistry,
 } from "../src/index.ts";
 
@@ -29,7 +29,7 @@ const task = (over: Partial<AgentTask> = {}): AgentTask => ({
 });
 
 const parse = (lines: (object | string)[], exit = 0, timedOut = false) => {
-  const p = new CodexStreamParser("run `codex login`");
+  const p = createCodexStreamParser("run `codex login`");
   return [
     ...lines.flatMap((l) => p.line(typeof l === "string" ? l : JSON.stringify(l))),
     ...p.exit(exit, timedOut),
@@ -54,7 +54,7 @@ describe("Codex exec --json contract (recorded transcript)", () => {
   });
 });
 
-describe("CodexStreamParser edge cases", () => {
+describe("Codex stream parser edge cases", () => {
   it("describes shell commands and failed MCP calls, ignoring junk", () => {
     const e = parse([
       {
@@ -112,7 +112,7 @@ describe("CodexStreamParser edge cases", () => {
       { type: "error", message: "codex timed out" },
       { type: "done", exitCode: 124 },
     ]);
-    const p = new CodexStreamParser("hint");
+    const p = createCodexStreamParser("hint");
     p.stderr.push("Error: Not logged in");
     expect(p.exit(1, false)[0]).toEqual({ type: "error", message: "Error: Not logged in (hint)" });
   });
@@ -166,7 +166,7 @@ describe("buildCodexInvocation", () => {
   });
 });
 
-describe("CodexAdapter", () => {
+describe("Codex adapter", () => {
   let dir: string;
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), "crit-codex-"));
@@ -175,7 +175,7 @@ describe("CodexAdapter", () => {
 
   it("is registered with read-only capabilities and the JSON fallback", () => {
     const a = createDefaultRegistry().create(profile, { env: {}, tmpDir: dir });
-    expect(a).toBeInstanceOf(CodexAdapter);
+    expect(a.type).toBe("codex");
     expect(a.capabilities).toMatchObject({ mcp: true, jsonSchemaOutput: true, nativeContext: [] });
     expect(codexFactory.models).toEqual([]);
   });
@@ -190,7 +190,7 @@ describe("CodexAdapter", () => {
           `process.stdout.write(require('fs').readFileSync(${JSON.stringify(join(FIX, "review.jsonl"))},'utf8'))})\n`,
       );
       chmodSync(bin, 0o755);
-      const a = new CodexAdapter({ ...profile, command: bin }, { env: process.env, tmpDir: dir });
+      const a = createCodexAdapter({ ...profile, command: bin }, { env: process.env, tmpDir: dir });
       const events: AgentEvent[] = [];
       for await (const e of a.run(
         task({ cwd: dir, outputSchema: { type: "object" } }),
@@ -199,7 +199,7 @@ describe("CodexAdapter", () => {
         events.push(e);
       expect(events.at(-1)).toEqual({ type: "done", exitCode: 0 });
       expect(readdirSync(dir).filter((f) => f.startsWith("codex-"))).toEqual([]);
-      const missing = new CodexAdapter(
+      const missing = createCodexAdapter(
         { ...profile, command: join(dir, "nope") },
         { env: {}, tmpDir: dir },
       );

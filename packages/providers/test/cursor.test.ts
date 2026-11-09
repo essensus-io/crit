@@ -5,8 +5,8 @@ import type { AgentEvent, AgentTask, ProviderProfile } from "@crit/schema";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   buildCursorInvocation,
-  CursorAdapter,
-  CursorStreamParser,
+  createCursorAdapter,
+  createCursorStreamParser,
   createDefaultRegistry,
 } from "../src/index.ts";
 
@@ -27,7 +27,7 @@ const task = (over: Partial<AgentTask> = {}): AgentTask => ({
   ...over,
 });
 const parse = (lines: (object | string)[], exit = 0, timedOut = false) => {
-  const p = new CursorStreamParser("run `cursor-agent login`");
+  const p = createCursorStreamParser("run `cursor-agent login`");
   return [
     ...lines.flatMap((l) => p.line(typeof l === "string" ? l : JSON.stringify(l))),
     ...p.exit(exit, timedOut),
@@ -54,7 +54,7 @@ describe("cursor-agent stream-json contract (recorded transcript)", () => {
   });
 });
 
-describe("CursorStreamParser edge cases", () => {
+describe("Cursor stream parser edge cases", () => {
   it("describes grep and glob calls and assistant text", () => {
     const e = parse([
       {
@@ -101,7 +101,7 @@ describe("CursorStreamParser edge cases", () => {
       { type: "done", exitCode: 3 },
     ]);
     expect(parse([], 1, true)[0]).toEqual({ type: "error", message: "cursor-agent timed out" });
-    const p = new CursorStreamParser("hint");
+    const p = createCursorStreamParser("hint");
     p.stderr.push("boom");
     expect(p.exit(1, false)[0]).toEqual({ type: "error", message: "cursor: boom" });
   });
@@ -138,7 +138,7 @@ describe("buildCursorInvocation and adapter", () => {
 
   it("uses the JSON fallback and declares the rules Cursor loads itself", () => {
     const a = createDefaultRegistry().create(profile, { env: {}, tmpDir: dir });
-    expect(a).toBeInstanceOf(CursorAdapter);
+    expect(a.type).toBe("cursor");
     expect(a.capabilities).toMatchObject({
       mcp: false,
       readOnlyMode: true,
@@ -156,7 +156,7 @@ describe("buildCursorInvocation and adapter", () => {
       );
       chmodSync(bin, 0o755);
       const events: AgentEvent[] = [];
-      for await (const e of new CursorAdapter(
+      for await (const e of createCursorAdapter(
         { ...profile, command: bin },
         { env: process.env, tmpDir: dir },
       ).run(task({ cwd: dir }), new AbortController().signal))
@@ -164,7 +164,7 @@ describe("buildCursorInvocation and adapter", () => {
       expect(events.at(-1)).toEqual({ type: "done", exitCode: 0 });
       expect(
         (
-          await new CursorAdapter(
+          await createCursorAdapter(
             { ...profile, command: join(dir, "nope") },
             { env: {}, tmpDir: dir },
           ).detect()
