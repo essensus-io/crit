@@ -157,7 +157,13 @@ export function useSwitching(opts: {
           title={`model · ${c.provider}`}
           options={stage.options}
           initial={c.model ?? DEFAULT}
-          note={stage.live ? "from the CLI" : "built-in list"}
+          note={
+            stage.live
+              ? "live list"
+              : switcher.providers().find((p) => p.name === c.provider)?.type === "claude-code"
+                ? "built-in list · with ANTHROPIC_API_KEY set, crit fetches the live one"
+                : "built-in list"
+          }
           onPick={(v) => {
             if (v === CUSTOM) return setStage({ kind: "custom-model" });
             close();

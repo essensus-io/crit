@@ -2,11 +2,12 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentTask } from "@crit/schema";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildClaudeInvocation,
   buildCodexInvocation,
   claudeCodeFactory,
+  claudeModels,
   codexFactory,
   cursorFactory,
   listModels,
@@ -98,10 +99,8 @@ describe("listModels", () => {
         live: false,
       });
       const claude = await listModels(claudeCodeFactory, { command: "claude", env: {} });
-      expect(claude).toEqual({
-        live: false,
-        models: ["opus", "sonnet", "haiku"].map((id) => ({ id, label: id })),
-      });
+      expect(claude.live).toBe(false);
+      expect(claude.models.slice(0, 3).map((m) => m.id)).toEqual(["opus", "sonnet", "haiku"]);
     },
   );
 });
@@ -148,5 +147,55 @@ describe("effort reaches the CLIs", () => {
     expect(
       buildCodexInvocation({ command: "codex", model: null }, task(), "/t").args.join(" "),
     ).not.toContain("model_reasoning_effort");
+  });
+});
+
+describe("claudeModels", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("without an API key the built-in list is used", async () => {
+    expect(await claudeModels({})).toEqual([]);
+    const r = await listModels(claudeCodeFactory, { command: "claude", env: {} });
+    expect(r.live).toBe(false);
+    expect(r.models.map((m) => m.id)).toEqual(expect.arrayContaining(["opus", "sonnet", "haiku"]));
+  });
+
+  it("with an API key it lists the real models, behind the family aliases", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          data: [
+            { id: "claude-opus-5-5", display_name: "Claude Opus 5.5" },
+            { id: "claude-sonnet-5-5", display_name: "Claude Sonnet 5.5" },
+          ],
+        }),
+      ),
+    );
+    const r = await listModels(claudeCodeFactory, {
+      command: "claude",
+      env: { ANTHROPIC_API_KEY: "k" },
+    });
+    expect(r.live).toBe(true);
+    expect(r.models.map((m) => m.id)).toEqual([
+      "opus",
+      "sonnet",
+      "haiku",
+      "claude-opus-5-5",
+      "claude-sonnet-5-5",
+    ]);
+    expect(r.models[3]).toMatchObject({ label: "Claude Opus 5.5" });
+  });
+
+  it("a failing request falls back to the built-in list", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("nope", { status: 401 })),
+    );
+    const r = await listModels(claudeCodeFactory, {
+      command: "claude",
+      env: { ANTHROPIC_API_KEY: "bad" },
+    });
+    expect(r.live).toBe(false);
   });
 });

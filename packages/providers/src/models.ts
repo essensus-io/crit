@@ -85,6 +85,37 @@ async function capture(
   }
 }
 
+/**
+ * Claude Code has no command that lists models. With an API key in the
+ * environment, ask the Models API for the real list (newest first); without one
+ * (a subscription login) the caller falls back to the built-in list.
+ */
+export async function claudeModels(env: NodeJS.ProcessEnv, timeoutMs = 8000): Promise<ModelInfo[]> {
+  const key = env.ANTHROPIC_API_KEY;
+  if (!key) return [];
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/models?limit=100", {
+      headers: { "x-api-key": key, "anthropic-version": "2023-06-01" },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) return [];
+    const body = (await res.json()) as { data?: { id?: string; display_name?: string }[] };
+    const live = (body.data ?? [])
+      .filter((m): m is { id: string; display_name?: string } => Boolean(m.id))
+      .map((m) => ({ id: m.id, label: m.display_name ?? m.id, hint: m.id }));
+    if (live.length === 0) return [];
+    // the aliases follow the newest model of each family, so they come first
+    return [
+      { id: "opus", label: "Opus", hint: "latest Opus" },
+      { id: "sonnet", label: "Sonnet", hint: "latest Sonnet" },
+      { id: "haiku", label: "Haiku", hint: "latest Haiku" },
+      ...live,
+    ];
+  } catch {
+    return [];
+  }
+}
+
 export const codexModels = (command: string, env: NodeJS.ProcessEnv, timeoutMs = 8000) =>
   capture(command, ["debug", "models"], env, timeoutMs).then((out) =>
     out ? parseCodexModels(out) : [],

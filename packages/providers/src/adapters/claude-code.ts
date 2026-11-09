@@ -4,6 +4,7 @@ import { basename, join } from "node:path";
 import type { AgentEvent, AgentTask, ProviderProfile } from "@crit/schema";
 import type { AdapterEnv, AdapterFactory, ProviderAdapter } from "../adapter.ts";
 import { detectCli } from "../detect.ts";
+import { claudeModels } from "../models.ts";
 import { streamProcess } from "../process.ts";
 
 /** Versions the contract tests were recorded against. */
@@ -320,7 +321,19 @@ export const claudeCodeFactory: AdapterFactory = {
   defaultCommand: "claude",
   defaultName: "claude",
   loginHint: "run `claude` once to log in",
-  models: ["opus", "sonnet", "haiku"],
+  // The aliases follow the newest model of each family; the full names pin one.
+  models: [
+    "opus",
+    "sonnet",
+    "haiku",
+    "opusplan",
+    "sonnet[1m]",
+    "claude-fable-5-1",
+    "claude-opus-5-5",
+    "claude-sonnet-5-5",
+    "claude-haiku-5-5",
+  ],
+  listModels: ({ env, timeoutMs }) => claudeModels(env, timeoutMs),
   efforts: ["low", "medium", "high", "xhigh", "max"],
   create: (profile, env) => new ClaudeCodeAdapter(profile, env),
 };
