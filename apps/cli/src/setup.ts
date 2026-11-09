@@ -21,8 +21,8 @@ import {
   askModel,
   CLI_DEFAULT,
   loadModels,
-} from "./features/provider-setup/index.ts";
-import { CliError } from "./shared/lib/index.ts";
+} from "./features/provider-setup/lib/model-picker.ts";
+import { CliError } from "./shared/lib/errors.ts";
 import { colors, duration } from "./ui.ts";
 
 export { CLI_DEFAULT };

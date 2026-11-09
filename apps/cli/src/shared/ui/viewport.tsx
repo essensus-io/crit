@@ -1,6 +1,6 @@
 import { Box, Text, useInput } from "ink";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { T } from "../lib/index.ts";
+import { T } from "../lib/theme.ts";
 type Props = {
   lines: ReactNode[];
   height: number;

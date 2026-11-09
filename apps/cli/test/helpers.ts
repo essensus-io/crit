@@ -12,7 +12,7 @@ import {
 import { critPaths, dbPath, openStore, type SqliteStore } from "@crit/store";
 import type { CliContext } from "../src/context.ts";
 import { runCli, VERSION } from "../src/app/main.ts";
-import { ScriptedPrompter } from "../src/shared/lib/index.ts";
+import { ScriptedPrompter } from "../src/shared/lib/prompter.ts";
 
 export type TestEnv = {
   ctx: CliContext;

@@ -11,7 +11,7 @@ import {
 } from "@crit/store";
 import { defineCommand } from "citty";
 import type { CliContext } from "../context.ts";
-import { CliError, EXIT } from "../shared/lib/index.ts";
+import { CliError, EXIT } from "../shared/lib/errors.ts";
 import { textReport } from "../report.ts";
 import { adapterFor } from "../setup.ts";
 import { colors, duration, plural } from "../ui.ts";
@@ -136,7 +136,7 @@ export async function openCommand(
   const store = ctx.openStore();
   const review = await resolveReview(ctx, store, root, args.review);
   if (ctx.interactive && args.tui !== false) {
-    const { openTui } = await import("../views/review/index.ts");
+    const { openTui } = await import("../views/review/launch-review.tsx");
     const rerun = await openTui(
       ctx,
       store,

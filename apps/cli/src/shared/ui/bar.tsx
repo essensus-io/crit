@@ -1,5 +1,5 @@
 import { Text } from "ink";
-import { T, type Tone } from "../lib/index.ts";
+import { T, type Tone } from "../lib/theme.ts";
 type Props = {
   value: number;
   max: number;

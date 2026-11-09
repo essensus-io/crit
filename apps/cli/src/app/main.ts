@@ -8,8 +8,8 @@ import { providersCommand } from "../commands/providers.ts";
 import { reviewCommand } from "../commands/review.ts";
 import { rulesCommand } from "../commands/rules.ts";
 import type { CliContext } from "../context.ts";
-import { CliError, EXIT } from "../shared/lib/index.ts";
-import { PromptCancelled } from "../shared/lib/index.ts";
+import { CliError, EXIT } from "../shared/lib/errors.ts";
+import { PromptCancelled } from "../shared/lib/prompter.ts";
 import { colors } from "../ui.ts";
 
 export const VERSION = pkg.version;

@@ -1,12 +1,19 @@
 import { formatTokens, type Shard } from "@crit/schema";
 import { Box, Text } from "ink";
 import type { ReactNode } from "react";
-import { Footer } from "../../shared/ui/index.ts";
-import { T, type Tone } from "../../shared/lib/index.ts";
-import { Bar, Panel, Spinner, StatusBar, Viewport } from "../../shared/ui/index.ts";
-import { truncate } from "../../shared/lib/index.ts";
-import { useTick } from "../../shared/hooks/index.ts";
-import { type ProgressState, type Selection } from "../../features/run-progress/index.ts";
+import { Footer } from "../../shared/ui/footer.tsx";
+import { T, type Tone } from "../../shared/lib/theme.ts";
+import { Bar } from "../../shared/ui/bar.tsx";
+import { Panel } from "../../shared/ui/panel.tsx";
+import { Spinner } from "../../shared/ui/spinner.tsx";
+import { StatusBar } from "../../shared/ui/status-bar.tsx";
+import { Viewport } from "../../shared/ui/viewport.tsx";
+import { truncate } from "../../shared/lib/text.ts";
+import { useTick } from "../../shared/hooks/use-tick.ts";
+import {
+  type ProgressState,
+  type Selection,
+} from "../../features/run-progress/lib/progress-state.ts";
 
 const mmss = (ms: number) => {
   const s = Math.max(0, Math.floor(ms / 1000));

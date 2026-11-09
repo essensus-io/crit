@@ -1,13 +1,16 @@
 import { shortId } from "@crit/schema";
 import { type HistoryRow } from "@crit/store";
 import { Box, Text, useApp, useInput } from "ink";
-import { useScreen } from "../../shared/ui/index.ts";
+import { useScreen } from "../../shared/ui/screen.tsx";
 import { useState } from "react";
 import { compareReviews, outcomeOf, tokensLabel, severitySummary } from "../../commands/history.ts";
 import { truncate, when } from "../../ui.ts";
-import { ReviewView } from "../review/index.ts";
-import { Choice, Footer, HRule, TextInput } from "../../shared/ui/index.ts";
-import type { ReviewSession } from "../../features/review-session/index.ts";
+import { ReviewView } from "../review/review-view.tsx";
+import { Choice } from "../../shared/ui/choice.tsx";
+import { Footer } from "../../shared/ui/footer.tsx";
+import { HRule } from "../../shared/ui/hrule.tsx";
+import { TextInput } from "../../shared/ui/text-input.tsx";
+import type { ReviewSession } from "../../features/review-session/model/session.ts";
 
 type Comparison = Awaited<ReturnType<typeof compareReviews>>;
 

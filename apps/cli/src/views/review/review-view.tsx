@@ -1,13 +1,12 @@
 import type { ProposalOutcome } from "@crit/core";
 import { Box, useApp } from "ink";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { type Switcher, useSwitching } from "../../features/model-switching/index.ts";
-import {
-  parseQuery,
-  type ReviewSession,
-  visibleItems,
-} from "../../features/review-session/index.ts";
-import { useScreen } from "../../shared/ui/index.ts";
+import { type Switcher } from "../../features/model-switching/lib/create-switcher.ts";
+import { useSwitching } from "../../features/model-switching/hooks/use-switching.tsx";
+import { parseQuery } from "../../features/review-session/lib/parse-query.ts";
+import { type ReviewSession } from "../../features/review-session/model/session.ts";
+import { visibleItems } from "../../features/review-session/lib/visible-items.ts";
+import { useScreen } from "../../shared/ui/screen.tsx";
 import { ProposalView } from "./proposal-view.tsx";
 import type { ReviewInput, ReviewMode } from "./review-mode.ts";
 import { reviewOverlay } from "./review-overlay.tsx";

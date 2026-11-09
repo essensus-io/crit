@@ -4,8 +4,9 @@ import type {
   FindingView,
   ReviewSession,
   SessionState,
-} from "../../features/review-session/index.ts";
-import { Choice, TextInput } from "../../shared/ui/index.ts";
+} from "../../features/review-session/model/session.ts";
+import { Choice } from "../../shared/ui/choice.tsx";
+import { TextInput } from "../../shared/ui/text-input.tsx";
 import type { ReviewInput, ReviewMode } from "./review-mode.ts";
 
 type Props = {

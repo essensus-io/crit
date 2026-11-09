@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { type AdapterRegistry, createDefaultRegistry } from "@crit/providers";
 import { critPaths, type CritPaths, dbPath, openStore, type SqliteStore } from "@crit/store";
-import { ClackPrompter, type Prompter } from "./shared/lib/index.ts";
+import { ClackPrompter, type Prompter } from "./shared/lib/prompter.ts";
 
 export type CliContext = {
   cwd: string;

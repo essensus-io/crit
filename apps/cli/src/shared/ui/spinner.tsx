@@ -1,6 +1,6 @@
 import { Text } from "ink";
-import { SPINNER, T, type Tone } from "../lib/index.ts";
-import { useTick } from "../hooks/index.ts";
+import { SPINNER, T, type Tone } from "../lib/theme.ts";
+import { useTick } from "../hooks/use-tick.ts";
 type Props = { tone?: Tone; active?: boolean };
 
 export const Spinner = ({ tone = "orange", active = true }: Props) => {

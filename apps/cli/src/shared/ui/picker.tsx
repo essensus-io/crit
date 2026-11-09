@@ -1,6 +1,6 @@
 import { Box, Text, useInput } from "ink";
 import { useState } from "react";
-import { T } from "../lib/index.ts";
+import { T } from "../lib/theme.ts";
 import { Panel } from "./panel.tsx";
 
 export type PickOption<V> = { value: V; label: string; hint?: string };

@@ -1,5 +1,5 @@
 import { formatTokens, type ReviewEvent, type Shard } from "@crit/schema";
-import { SEV_LABEL, type Tone } from "../../../shared/lib/index.ts";
+import { SEV_LABEL, type Tone } from "../../../shared/lib/theme.ts";
 
 export type LogEntry = { at: number; tag: string; text: string; tone: Tone | "dim" };
 

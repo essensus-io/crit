@@ -1,15 +1,19 @@
 import { shortId } from "@crit/schema";
 import { Box, Text } from "ink";
 import { useMemo } from "react";
-import type { Line } from "../../features/review-session/index.ts";
-import { Footer, Status } from "../../shared/ui/index.ts";
-import { fileTree, type ListFilter, triage } from "../../features/review-session/index.ts";
-import type { FindingView, SessionState } from "../../features/review-session/index.ts";
-import { buildStream } from "../../features/review-session/index.ts";
-import { SPINNER, T } from "../../shared/lib/index.ts";
-import { Panel, Viewport } from "../../shared/ui/index.ts";
-import { truncate } from "../../shared/lib/index.ts";
-import { useTick } from "../../shared/hooks/index.ts";
+import type { Line } from "../../features/review-session/lib/finding-card.ts";
+import { Footer } from "../../shared/ui/footer.tsx";
+import { Status } from "../../shared/ui/status.tsx";
+import { fileTree } from "../../features/review-session/lib/file-tree.ts";
+import { type ListFilter } from "../../features/review-session/lib/parse-query.ts";
+import { triage } from "../../features/review-session/lib/triage.ts";
+import type { FindingView, SessionState } from "../../features/review-session/model/session.ts";
+import { buildStream } from "../../features/review-session/lib/stream.ts";
+import { SPINNER, T } from "../../shared/lib/theme.ts";
+import { Panel } from "../../shared/ui/panel.tsx";
+import { Viewport } from "../../shared/ui/viewport.tsx";
+import { truncate } from "../../shared/lib/text.ts";
+import { useTick } from "../../shared/hooks/use-tick.ts";
 type RowProps = { line: Line };
 
 const Row = ({ line }: RowProps) => {

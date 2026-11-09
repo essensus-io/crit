@@ -6,10 +6,10 @@ import {
   type HomeChoice,
   type HomeInfo,
   type RecentReview,
-} from "./index.ts";
-import { type Choice } from "../../features/model-switching/index.ts";
-import { makeSwitcher } from "../../features/model-switching/index.ts";
-import { renderFullScreen } from "../../shared/ui/index.ts";
+} from "./home-view.tsx";
+import { type Choice } from "../../features/model-switching/lib/create-switcher.ts";
+import { makeSwitcher } from "../../features/model-switching/lib/make-switcher.ts";
+import { renderFullScreen } from "../../shared/ui/render-full-screen.tsx";
 
 export const homeTui = async (
   ctx: CliContext,

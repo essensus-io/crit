@@ -1,11 +1,14 @@
 import type { ProposalOutcome } from "@crit/core";
 import { Box, Text } from "ink";
 import type { ReactNode } from "react";
-import { diffRows, Footer, HRule, Status } from "../../shared/ui/index.ts";
-import type { SessionState } from "../../features/review-session/index.ts";
-import { T } from "../../shared/lib/index.ts";
-import { Viewport } from "../../shared/ui/index.ts";
-import { wrapText } from "../../shared/lib/index.ts";
+import { diffRows } from "../../shared/ui/diff-view.tsx";
+import { Footer } from "../../shared/ui/footer.tsx";
+import { HRule } from "../../shared/ui/hrule.tsx";
+import { Status } from "../../shared/ui/status.tsx";
+import type { SessionState } from "../../features/review-session/model/session.ts";
+import { T } from "../../shared/lib/theme.ts";
+import { Viewport } from "../../shared/ui/viewport.tsx";
+import { wrapText } from "../../shared/lib/text.ts";
 
 const VERDICT_COLOR = { accepted: T.mint, concerns: T.yellow, rejected: T.red } as const;
 type Props = {

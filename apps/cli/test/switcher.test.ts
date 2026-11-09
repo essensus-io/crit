@@ -6,10 +6,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type Choice,
   createSwitcher,
+} from "../src/features/model-switching/lib/create-switcher.ts";
+import {
   describeChoice,
   describeChoiceParts,
-} from "../src/features/model-switching/index.ts";
-import { summaryLine } from "../src/features/review-session/index.ts";
+} from "../src/features/model-switching/lib/describe-choice.ts";
+import { summaryLine } from "../src/features/review-session/lib/summary-line.ts";
 import { fakeProvidersJson, type TestEnv, testContext } from "./helpers.ts";
 
 let t: TestEnv;

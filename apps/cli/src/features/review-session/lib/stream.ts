@@ -1,7 +1,7 @@
 import { boxCard, type Line } from "./finding-card.ts";
-import { clipToks, highlightFile } from "../../../shared/lib/index.ts";
+import { clipToks, highlightFile } from "../../../shared/lib/highlight.ts";
 import type { CodeInfo, FindingView, SessionState } from "../model/session.ts";
-import { T } from "../../../shared/lib/index.ts";
+import { T } from "../../../shared/lib/theme.ts";
 
 export type StreamRow = {
   kind: "file" | "code" | "gap" | "card";

@@ -10,7 +10,7 @@ import {
 } from "@crit/store";
 import { defineCommand } from "citty";
 import type { CliContext } from "../context.ts";
-import { EXIT } from "../shared/lib/index.ts";
+import { EXIT } from "../shared/lib/errors.ts";
 import { colors } from "../ui.ts";
 
 type Check = { name: string; ok: boolean; warn?: boolean; detail: string };

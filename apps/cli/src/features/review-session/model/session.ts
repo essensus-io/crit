@@ -23,8 +23,9 @@ import {
 } from "@crit/core";
 import type { DismissReason, Finding, Fix, Message, Review } from "@crit/schema";
 import type { SqliteStore } from "@crit/store";
-import { copyToClipboard, type Editor } from "../../../shared/lib/index.ts";
-import type { Tok } from "../../../shared/lib/index.ts";
+import { copyToClipboard } from "../../../shared/lib/clipboard.ts";
+import { type Editor } from "../../../shared/lib/terminal-editor.ts";
+import type { Tok } from "../../../shared/lib/highlight.ts";
 import { findingPrompt } from "../lib/finding-prompt.ts";
 
 const MAX_DRAFTS = 3;

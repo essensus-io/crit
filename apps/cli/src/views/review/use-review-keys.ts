@@ -5,8 +5,8 @@ import {
   type FindingView,
   type ReviewSession,
   type SessionState,
-  triage,
-} from "../../features/review-session/index.ts";
+} from "../../features/review-session/model/session.ts";
+import { triage } from "../../features/review-session/lib/triage.ts";
 import type { ReviewMode } from "./review-mode.ts";
 
 type Props = {

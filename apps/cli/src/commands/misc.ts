@@ -3,7 +3,7 @@ import { runMcpStdio } from "@crit/mcp";
 import { projectConfigPath, saveProjectConfig } from "@crit/store";
 import { defineCommand } from "citty";
 import { type CliContext, sessionsDir } from "../context.ts";
-import { CliError, EXIT } from "../shared/lib/index.ts";
+import { CliError, EXIT } from "../shared/lib/errors.ts";
 import { repoRootOrThrow } from "./shared.ts";
 
 export const mcpCommand = (ctx: CliContext) =>

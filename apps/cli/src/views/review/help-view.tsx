@@ -1,6 +1,6 @@
 import { Box, Text, useInput } from "ink";
-import { T } from "../../shared/lib/index.ts";
-import { Panel } from "../../shared/ui/index.ts";
+import { T } from "../../shared/lib/theme.ts";
+import { Panel } from "../../shared/ui/panel.tsx";
 
 const GROUPS: { title: string; rows: [string, string][] }[] = [
   {

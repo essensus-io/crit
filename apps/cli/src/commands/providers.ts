@@ -11,7 +11,7 @@ import { type ProvidersFile, Role } from "@crit/schema";
 import { loadProviders, saveProviders } from "@crit/store";
 import { defineCommand } from "citty";
 import type { CliContext } from "../context.ts";
-import { CliError, EXIT } from "../shared/lib/index.ts";
+import { CliError, EXIT } from "../shared/lib/errors.ts";
 import { editProfileFlow, firstRun, profilePrompts, testProvider } from "../setup.ts";
 import { colors, duration, table } from "../ui.ts";
 

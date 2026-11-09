@@ -1,6 +1,6 @@
 import { render } from "ink";
 import type { ReactElement } from "react";
-import { Screen } from "./index.ts";
+import { Screen } from "./screen.tsx";
 
 const ALT_SCROLL_ON = "\u001B[?1007h";
 

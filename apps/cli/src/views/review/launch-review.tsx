@@ -1,12 +1,12 @@
 import { type ResolvedConfig } from "@crit/schema";
 import { type SqliteStore } from "@crit/store";
 import { type CliContext } from "../../context.ts";
-import { ReviewView } from "./index.ts";
-import { type Choice } from "../../features/model-switching/index.ts";
+import { ReviewView } from "./review-view.tsx";
+import { type Choice } from "../../features/model-switching/lib/create-switcher.ts";
 import { makeSession } from "./make-session.ts";
-import { makeSwitcher } from "../../features/model-switching/index.ts";
-import { renderFullScreen } from "../../shared/ui/index.ts";
-import { summaryLine } from "../../features/review-session/index.ts";
+import { makeSwitcher } from "../../features/model-switching/lib/make-switcher.ts";
+import { renderFullScreen } from "../../shared/ui/render-full-screen.tsx";
+import { summaryLine } from "../../features/review-session/lib/summary-line.ts";
 
 export const openTui = async (
   ctx: CliContext,
