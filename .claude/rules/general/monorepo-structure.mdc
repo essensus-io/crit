@@ -32,7 +32,8 @@ packages/config     shared tsconfig. No code.
 
 - Group by **domain**, not by technical role. `core/src/pipeline`, `core/src/rules`, not `core/src/services`
   or `core/src/helpers`.
-- One folder per concept once it has 3+ files, with an `index.ts` barrel as its only public surface.
+- One folder per concept once it has 3+ files. A package exposes its public API through its single
+  `src/index.ts` entry.
 - Keep a file next to what uses it. Promote to a higher level only when a second consumer appears.
 
 ## apps/cli layout
