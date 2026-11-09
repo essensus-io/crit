@@ -1,8 +1,8 @@
 ---
 description: Terminal-specific rules for the Ink UI: full screen, widths, keys, slow work
-globs: apps/cli/src/tui/**
+globs: apps/cli/src/**/*.tsx
 paths:
-  - "apps/cli/src/tui/**"
+  - "apps/cli/src/**/*.tsx"
 alwaysApply: false
 ---
 

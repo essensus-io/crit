@@ -63,6 +63,6 @@ crit is a TypeScript (strict, ESM, Node 24) pnpm + Turborepo monorepo. Formattin
 ## Imports
 
 - Import from a package's public entry (`@crit/core`), never from its internals (`@crit/core/src/...`).
-- Inside a package use relative imports with the `.ts` extension (the repo runs TS natively).
-- `index.ts` files are **thin re-export barrels**, no logic. Do not create a barrel for a folder with a
-  single file.
+  `packages/*/src/index.ts` is that entry and the only kind of `index.ts` allowed.
+- In `apps/cli` import across folders with the `@/` alias and from the defining file; siblings with `./`.
+  Always include the `.ts`/`.tsx` extension. No barrel files.

@@ -18,16 +18,14 @@ Project rules are in `.claude/rules`. Read them before changing code:
 @.claude/rules/general/core-standards.mdc
 @.claude/rules/general/monorepo-structure.mdc
 
-Scoped rules, read when you work in that area:
+Always read `.claude/rules/cli/folder-structure.mdc` before touching `apps/cli`. Scoped rules, read when you work in that area:
 
 - `.claude/rules/general/testing.mdc` tests
-- `.claude/rules/tui/folder-structure.mdc`, `.claude/rules/tui/react-components.mdc`,
-  `.claude/rules/tui/terminal-ui.mdc` the terminal UI in `apps/cli/src/tui` (feature-sliced layout)
+- `.claude/rules/cli/react-components.mdc`, `.claude/rules/cli/terminal-ui.mdc` Ink components and terminal behaviour
 - `.claude/rules/technologies/store-drizzle-sqlite.mdc` `packages/store`
 - `.claude/rules/technologies/schema-zod.mdc` `packages/schema`
 
-Skills: `commit-messages` (every commit), `tui-fsd-migration` (restructuring or renaming TUI files),
-`turborepo` (turbo config and CI).
+Skills: `commit-messages` (every commit), `turborepo` (turbo config and CI).
 
 ## Hard constraints
 

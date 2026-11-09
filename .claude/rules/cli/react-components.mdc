@@ -1,8 +1,8 @@
 ---
-description: Conventions for Ink/React components in apps/cli/src/tui (props, handlers, rendering, splitting)
-globs: apps/cli/src/tui/**/*.tsx
+description: Conventions for Ink/React components in apps/cli/src (props, handlers, rendering, splitting)
+globs: apps/cli/src/**/*.tsx
 paths:
-  - "apps/cli/src/tui/**/*.tsx"
+  - "apps/cli/src/**/*.tsx"
 alwaysApply: false
 ---
 

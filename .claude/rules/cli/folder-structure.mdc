@@ -1,0 +1,87 @@
+---
+description: Feature-Sliced Design layout for apps/cli (app, views, features, shared), the @ alias, no barrels
+globs: apps/cli/**
+paths:
+  - "apps/cli/**"
+alwaysApply: true
+---
+
+# apps/cli structure (FSD)
+
+The whole CLI is organised like our React apps: Feature-Sliced Design with four layers under
+`apps/cli/src`. Imports only go **down**: `app` → `views` → `features` → `shared`.
+
+```
+src/app/        entry and routing: index.ts (bin), main.ts, process-context.ts, commands/<name>-command.ts
+src/views/      one folder per area: what a command runs and the terminal screens it shows
+src/features/   one folder per domain slice, with segments
+src/shared/     cross-cutting code that knows nothing about reviews: ui, hooks, lib
+```
+
+## app
+
+The equivalent of routes. Thin.
+
+- `commands/<name>-command.ts` holds one citty `defineCommand`: its name, description and argument schema, and a
+  `run` that calls one function from a view. No logic, no printing.
+- `main.ts` registers the commands; `process-context.ts` builds the real `CliContext`; `index.ts` is the bin entry.
+- Nothing imports from `app`.
+
+## views
+
+A view is a screen or a command runner that composes features and shared code. It owns layout, key handling,
+argument handling and printing, and holds no domain rules.
+
+- Terminal screens: `<name>-view.tsx` exporting `<Name>View` (`home-view.tsx` → `HomeView`).
+- Command runners: `run-<command>.ts` exporting one function, plus the small files it needs
+  (`review-args.ts`, `progress-printer.ts`). One function per file.
+- Launchers that mount a screen: `launch-<name>.tsx` (`launch-review.tsx` → `openTui`).
+- Areas: `review`, `home`, `run`, `history`, `providers`, `rules`, `apply`, `doctor`, `init`. A view may import
+  another view (`run` shows the `review` view); keep that rare.
+- A file over ~250 lines is split: keys into `use-<name>-keys.ts`, prompts and overlays into their own files.
+
+## features
+
+A feature is a domain slice: `features/<domain>/`. Segments:
+
+- `ui/` presentational components of the slice.
+- `lib/` pure logic, one function per file (`build-stream.ts`, `parse-query.ts`, `markdown-report.ts`).
+- `hooks/` hooks that hold the slice's behaviour (`use-switching.tsx`).
+- `model/` state and actions of the slice (`session.ts`).
+- A feature **never imports another feature**. When two slices must work together a view composes them; a type
+  both need moves to `@crit/schema` or `shared`.
+
+Slices today: `review-session`, `review-history`, `review-report`, `provider-setup`, `model-switching`,
+`run-progress`.
+
+## shared
+
+Infrastructure and primitives only: nothing that knows about findings, reviews or providers.
+
+- `shared/ui` terminal components, one per file (`panel.tsx`, `picker.tsx`, `footer.tsx`, `render-full-screen.tsx`).
+- `shared/hooks` generic hooks (`use-tick.ts`).
+- `shared/lib` pure helpers and infrastructure (`cli-context.ts`, `errors.ts`, `colors.ts`, `format.ts`,
+  `table.ts`, `text.ts`, `theme.ts`, `highlight.ts`, `prompter.ts`, `clipboard.ts`).
+- If two features need the same helper, promote it to `shared` and delete the copies.
+
+## Imports
+
+- **No barrel files** under `apps/cli`: no `index.ts` re-exports. Import from the file that defines the name.
+- Imports across folders use the alias: `import { Panel } from "@/shared/ui/panel.tsx"`. `@/` is `apps/cli/src`
+  (tsconfig `paths`, mirrored in the vitest config; tsdown reads tsconfig).
+- Siblings in the same folder use `./name.ts`. Never `../`.
+- Commands load the screens lazily: `await import("@/views/review/launch-review.tsx")`, so Ink is only loaded
+  when a screen is shown.
+- Tests live in `apps/cli/test`, import with `@/`, and are named after the file under test.
+
+## Adding code: where does it go?
+
+| You are adding                                          | Put it in                                          |
+| ------------------------------------------------------- | -------------------------------------------------- |
+| A new CLI command                                       | `app/commands/<name>-command.ts` + `views/<name>/run-<name>.ts` |
+| A box, list, prompt or key bar usable by any screen     | `shared/ui`                                        |
+| A pure function that decides what to show or print      | `features/<slice>/lib`                             |
+| State a screen reads and the actions it calls           | `features/<slice>/model`                           |
+| A new screen or overlay                                 | `views/<area>/<name>-view.tsx`                     |
+| A way to start a screen from a command                  | `views/<area>/launch-<name>.tsx`                   |
+| Something two slices need                               | `shared`, or a view that composes both slices      |

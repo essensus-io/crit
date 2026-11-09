@@ -35,19 +35,11 @@ packages/config     shared tsconfig. No code.
 - One folder per concept once it has 3+ files, with an `index.ts` barrel as its only public surface.
 - Keep a file next to what uses it. Promote to a higher level only when a second consumer appears.
 
-## apps/cli layout (target)
+## apps/cli layout
 
-```
-src/main.ts            entry: parse argv, build the context, dispatch
-src/context.ts         CliContext: paths, env, prompter, store, registry
-src/commands/<name>/   one folder per command: command.ts (citty), run.ts (logic)
-src/tui/               the terminal UI, laid out as FSD: app, views, features, shared (see the tui rules)
-src/lib/               cross-command helpers with a real name (clipboard, errors, report)
-```
-
-A command file parses arguments and calls one function. It stays under ~150 lines. Anything longer is
-logic that moves into `run.ts` or into `packages/core`. Commands reach the UI only through
-`await import("../tui/index.ts")`.
+`apps/cli/src` is feature-sliced: `app`, `views`, `features`, `shared`. The full rule is in
+`.claude/rules/cli/folder-structure.mdc`. A command is a thin file in `app/commands` plus a runner in
+`views/<name>`; anything that is a decision belongs in `packages/core`.
 
 ## Where tests live
 
