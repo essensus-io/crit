@@ -6,7 +6,7 @@ import {
   HomeView,
   type HomeChoice,
   type RecentReview,
-} from "../src/views/home/home-view.tsx";
+} from "@/views/home/home-view.tsx";
 
 const sleep = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 async function until(frame: () => string | undefined, text: string | RegExp, ms = 8000) {

@@ -3,15 +3,12 @@ import { join } from "node:path";
 import { DEFAULT_CONFIG, type ProvidersFile } from "@crit/schema";
 import { loadProviders, saveProviders } from "@crit/store";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  type Choice,
-  createSwitcher,
-} from "../src/features/model-switching/lib/create-switcher.ts";
+import { type Choice, createSwitcher } from "@/features/model-switching/lib/create-switcher.ts";
 import {
   describeChoice,
   describeChoiceParts,
-} from "../src/features/model-switching/lib/describe-choice.ts";
-import { summaryLine } from "../src/features/review-session/lib/summary-line.ts";
+} from "@/features/model-switching/lib/describe-choice.ts";
+import { summaryLine } from "@/features/review-session/lib/summary-line.ts";
 import { fakeProvidersJson, type TestEnv, testContext } from "./helpers.ts";
 
 let t: TestEnv;

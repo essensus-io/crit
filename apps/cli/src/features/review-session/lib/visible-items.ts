@@ -1,5 +1,5 @@
 import { SEVERITY_ORDER } from "@crit/schema";
-import type { FindingView, SessionState } from "../model/session.ts";
+import type { FindingView, SessionState } from "@/features/review-session/model/session.ts";
 import { type ListFilter } from "./parse-query.ts";
 import { isFiltered, triage } from "./triage.ts";
 

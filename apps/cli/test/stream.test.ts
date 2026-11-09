@@ -1,15 +1,15 @@
 import type { Finding } from "@crit/schema";
 import { describe, expect, it } from "vitest";
-import { lineLen, type Line } from "../src/features/review-session/lib/finding-card.ts";
-import { parseQuery } from "../src/features/review-session/lib/parse-query.ts";
-import { triage } from "../src/features/review-session/lib/triage.ts";
-import { visibleItems } from "../src/features/review-session/lib/visible-items.ts";
+import { lineLen, type Line } from "@/features/review-session/lib/finding-card.ts";
+import { parseQuery } from "@/features/review-session/lib/parse-query.ts";
+import { triage } from "@/features/review-session/lib/triage.ts";
+import { visibleItems } from "@/features/review-session/lib/visible-items.ts";
 import type {
   CodeInfo,
   FindingView,
   SessionState,
-} from "../src/features/review-session/model/session.ts";
-import { buildStream, type StreamInput } from "../src/features/review-session/lib/stream.ts";
+} from "@/features/review-session/model/session.ts";
+import { buildStream, type StreamInput } from "@/features/review-session/lib/stream.ts";
 
 const text = (l: Line) => l.map((s) => s.t).join("");
 

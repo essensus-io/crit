@@ -14,11 +14,11 @@ import {
 import { resolveProvider } from "@crit/providers";
 import { type ProvidersFile, type ResolvedConfig } from "@crit/schema";
 import { loadProviders, type SqliteStore } from "@crit/store";
-import { type CliContext, sessionsDir } from "../../context.ts";
-import { adapterFor } from "../../setup.ts";
-import { ReviewSession } from "../../features/review-session/model/session.ts";
-import { type Choice, type Switcher } from "../../features/model-switching/lib/create-switcher.ts";
-import { type Editor, terminalEditor } from "../../shared/lib/terminal-editor.ts";
+import { type CliContext, sessionsDir } from "@/context.ts";
+import { adapterFor } from "@/setup.ts";
+import { ReviewSession } from "@/features/review-session/model/session.ts";
+import { type Choice, type Switcher } from "@/features/model-switching/lib/create-switcher.ts";
+import { type Editor, terminalEditor } from "@/shared/lib/terminal-editor.ts";
 
 function runFor(ctx: CliContext, file: ProvidersFile, c: Choice): ProviderRun {
   const base = file.providers.find((p) => p.name === c.provider) ?? file.providers[0]!;

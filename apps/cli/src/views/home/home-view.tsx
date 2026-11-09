@@ -1,17 +1,17 @@
 import { formatTokens, type ScopeSpec } from "@crit/schema";
 import { Box, Text, useApp, useInput } from "ink";
 import { useEffect, useRef, useState } from "react";
-import { Footer } from "../../shared/ui/footer.tsx";
-import { TextInput } from "../../shared/ui/text-input.tsx";
-import { useScreen } from "../../shared/ui/screen.tsx";
-import { describeChoice } from "../../features/model-switching/lib/describe-choice.ts";
-import { type Choice, type Switcher } from "../../features/model-switching/lib/create-switcher.ts";
-import { T } from "../../shared/lib/theme.ts";
-import { useSwitching } from "../../features/model-switching/hooks/use-switching.tsx";
-import { Menu } from "../../shared/ui/menu.tsx";
-import { Panel } from "../../shared/ui/panel.tsx";
-import { Spinner } from "../../shared/ui/spinner.tsx";
-import { truncate } from "../../shared/lib/text.ts";
+import { Footer } from "@/shared/ui/footer.tsx";
+import { TextInput } from "@/shared/ui/text-input.tsx";
+import { useScreen } from "@/shared/ui/screen.tsx";
+import { describeChoice } from "@/features/model-switching/lib/describe-choice.ts";
+import { type Choice, type Switcher } from "@/features/model-switching/lib/create-switcher.ts";
+import { T } from "@/shared/lib/theme.ts";
+import { useSwitching } from "@/features/model-switching/hooks/use-switching.tsx";
+import { Menu } from "@/shared/ui/menu.tsx";
+import { Panel } from "@/shared/ui/panel.tsx";
+import { Spinner } from "@/shared/ui/spinner.tsx";
+import { truncate } from "@/shared/lib/text.ts";
 
 export type HomeChoice =
   | { kind: "start"; spec: ScopeSpec; choice: Choice | undefined }

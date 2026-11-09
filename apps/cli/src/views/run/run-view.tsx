@@ -7,13 +7,13 @@ import {
   reduceProgress,
   type RunRecovery,
   type Selection,
-} from "../../features/run-progress/lib/progress-state.ts";
+} from "@/features/run-progress/lib/progress-state.ts";
 import { ProgressView } from "./progress-view.tsx";
-import { useScreen } from "../../shared/ui/screen.tsx";
-import type { ReviewSession } from "../../features/review-session/model/session.ts";
-import { type Switcher } from "../../features/model-switching/lib/create-switcher.ts";
-import { useSwitching } from "../../features/model-switching/hooks/use-switching.tsx";
-import { ReviewView } from "../review/review-view.tsx";
+import { useScreen } from "@/shared/ui/screen.tsx";
+import type { ReviewSession } from "@/features/review-session/model/session.ts";
+import { type Switcher } from "@/features/model-switching/lib/create-switcher.ts";
+import { useSwitching } from "@/features/model-switching/hooks/use-switching.tsx";
+import { ReviewView } from "@/views/review/review-view.tsx";
 type Props = {
   subscribe: (fn: (e: ReviewEvent) => void) => () => void;
   makeSession: (reviewId: string) => Promise<ReviewSession>;

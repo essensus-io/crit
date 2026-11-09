@@ -1,5 +1,5 @@
 import { basename, dirname } from "node:path";
-import type { SessionState } from "../model/session.ts";
+import type { SessionState } from "@/features/review-session/model/session.ts";
 import { isFiltered } from "./triage.ts";
 
 export type TreeRow = { key: string; label: string; count: number; file?: string };

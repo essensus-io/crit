@@ -1,5 +1,5 @@
 import { type ResolvedConfig, type ScopeSpec } from "@crit/schema";
-import { type CliContext } from "../../context.ts";
+import { type CliContext } from "@/context.ts";
 import {
   type Estimate,
   HomeView,
@@ -7,9 +7,9 @@ import {
   type HomeInfo,
   type RecentReview,
 } from "./home-view.tsx";
-import { type Choice } from "../../features/model-switching/lib/create-switcher.ts";
-import { makeSwitcher } from "../../features/model-switching/lib/make-switcher.ts";
-import { renderFullScreen } from "../../shared/ui/render-full-screen.tsx";
+import { type Choice } from "@/features/model-switching/lib/create-switcher.ts";
+import { makeSwitcher } from "@/features/model-switching/lib/make-switcher.ts";
+import { renderFullScreen } from "@/shared/ui/render-full-screen.tsx";
 
 export const homeTui = async (
   ctx: CliContext,

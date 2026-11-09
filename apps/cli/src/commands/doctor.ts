@@ -9,9 +9,9 @@ import {
   SettingsError,
 } from "@crit/store";
 import { defineCommand } from "citty";
-import type { CliContext } from "../context.ts";
-import { EXIT } from "../shared/lib/errors.ts";
-import { colors } from "../ui.ts";
+import type { CliContext } from "@/context.ts";
+import { EXIT } from "@/shared/lib/errors.ts";
+import { colors } from "@/ui.ts";
 
 type Check = { name: string; ok: boolean; warn?: boolean; detail: string };
 
@@ -85,7 +85,7 @@ export async function doctor(ctx: CliContext, opts: { test?: boolean } = {}): Pr
   }
 
   if (opts.test && providers) {
-    const { testProvider } = await import("../setup.ts");
+    const { testProvider } = await import("@/setup.ts");
     for (const p of providers.providers.filter((x) => x.enabled)) {
       const r = await testProvider(ctx, p);
       checks.push({ name: `test ${p.name}`, ok: r.ok, detail: r.ok ? "replied" : r.error });

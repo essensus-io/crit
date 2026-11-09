@@ -1,10 +1,10 @@
 import type { ProposalOutcome } from "@crit/core";
 import type { ReactNode } from "react";
-import { describeChoice } from "../../features/model-switching/lib/describe-choice.ts";
-import { type Switcher } from "../../features/model-switching/lib/create-switcher.ts";
-import type { FindingView, ReviewSession } from "../../features/review-session/model/session.ts";
-import { Menu, type MenuItem } from "../../shared/ui/menu.tsx";
-import { Picker } from "../../shared/ui/picker.tsx";
+import { describeChoice } from "@/features/model-switching/lib/describe-choice.ts";
+import { type Switcher } from "@/features/model-switching/lib/create-switcher.ts";
+import type { FindingView, ReviewSession } from "@/features/review-session/model/session.ts";
+import { Menu, type MenuItem } from "@/shared/ui/menu.tsx";
+import { Picker } from "@/shared/ui/picker.tsx";
 import { HelpView } from "./help-view.tsx";
 import type { ReviewMode } from "./review-mode.ts";
 

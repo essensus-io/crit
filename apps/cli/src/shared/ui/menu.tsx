@@ -1,6 +1,6 @@
 import { Box, Text, useInput } from "ink";
 import { useState } from "react";
-import { T } from "../lib/theme.ts";
+import { T } from "@/shared/lib/theme.ts";
 import { Panel } from "./panel.tsx";
 
 export type MenuItem = { key: string; label: string; hint?: string };

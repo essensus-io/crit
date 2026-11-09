@@ -1,6 +1,6 @@
 import { stripVTControlCharacters } from "node:util";
 import { describe, expect, it } from "vitest";
-import { colors, duration, plural, table, visibleLength, when } from "../src/ui.ts";
+import { colors, duration, plural, table, visibleLength, when } from "@/ui.ts";
 
 describe("ui helpers", () => {
   it("formats durations", () => {

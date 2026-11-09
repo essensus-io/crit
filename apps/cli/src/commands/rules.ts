@@ -4,9 +4,9 @@ import { discoverRules, git, loadRules, resolveScope, ruleLabel, type RuleSet } 
 import { resolveConfig } from "@crit/schema";
 import { loadProjectConfig, loadUserConfig, writeJsonAtomic } from "@crit/store";
 import { defineCommand } from "citty";
-import type { CliContext } from "../context.ts";
-import { CliError, EXIT } from "../shared/lib/errors.ts";
-import { colors, plural, table } from "../ui.ts";
+import type { CliContext } from "@/context.ts";
+import { CliError, EXIT } from "@/shared/lib/errors.ts";
+import { colors, plural, table } from "@/ui.ts";
 import { repoRootOrThrow } from "./shared.ts";
 
 export async function listRules(

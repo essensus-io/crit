@@ -1,7 +1,7 @@
 import { Box, Text } from "ink";
 import { type ReactNode } from "react";
-import { DASH, T, type Tone } from "../lib/theme.ts";
-import { truncate } from "../lib/text.ts";
+import { DASH, T, type Tone } from "@/shared/lib/theme.ts";
+import { truncate } from "@/shared/lib/text.ts";
 type Props = {
   title?: string;
   tone?: Tone;

@@ -1,13 +1,13 @@
 import { type ResolvedConfig, type ReviewEvent } from "@crit/schema";
 import { type SqliteStore } from "@crit/store";
-import { type CliContext } from "../../context.ts";
+import { type CliContext } from "@/context.ts";
 import { RunView } from "./run-view.tsx";
-import type { RunRecovery } from "../../features/run-progress/lib/progress-state.ts";
-import { type Choice } from "../../features/model-switching/lib/create-switcher.ts";
-import { makeSession } from "../review/make-session.ts";
-import { makeSwitcher } from "../../features/model-switching/lib/make-switcher.ts";
-import { renderFullScreen } from "../../shared/ui/render-full-screen.tsx";
-import { summaryLine } from "../../features/review-session/lib/summary-line.ts";
+import type { RunRecovery } from "@/features/run-progress/lib/progress-state.ts";
+import { type Choice } from "@/features/model-switching/lib/create-switcher.ts";
+import { makeSession } from "@/views/review/make-session.ts";
+import { makeSwitcher } from "@/features/model-switching/lib/make-switcher.ts";
+import { renderFullScreen } from "@/shared/ui/render-full-screen.tsx";
+import { summaryLine } from "@/features/review-session/lib/summary-line.ts";
 
 export const runTui = async (
   ctx: CliContext,

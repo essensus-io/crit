@@ -1,4 +1,4 @@
-import { processContext } from "../context.ts";
+import { processContext } from "@/context.ts";
 import { runCli, VERSION } from "./main.ts";
 
 const code = await runCli(process.argv.slice(2), processContext(VERSION));

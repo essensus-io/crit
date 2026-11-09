@@ -1,4 +1,4 @@
-import type { FindingView } from "../model/session.ts";
+import type { FindingView } from "@/features/review-session/model/session.ts";
 
 export const isFiltered = (v: FindingView) =>
   v.finding.verdict === "rejected" || v.finding.status === "closed";

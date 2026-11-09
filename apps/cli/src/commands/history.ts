@@ -7,9 +7,9 @@ import {
   type SqliteStore,
 } from "@crit/store";
 import { defineCommand } from "citty";
-import type { CliContext } from "../context.ts";
-import { CliError, EXIT } from "../shared/lib/errors.ts";
-import { colors, plural, SEVERITY_LETTER, table, truncate, when } from "../ui.ts";
+import type { CliContext } from "@/context.ts";
+import { CliError, EXIT } from "@/shared/lib/errors.ts";
+import { colors, plural, SEVERITY_LETTER, table, truncate, when } from "@/ui.ts";
 import { resolveReview } from "./resolve.ts";
 import { repoRootOrThrow } from "./shared.ts";
 
@@ -191,7 +191,7 @@ export async function historyCommand(
     return EXIT.ok;
   }
   if (ctx.interactive && args.tui !== false) {
-    const { historyTui } = await import("../views/history/launch-history.tsx");
+    const { historyTui } = await import("@/views/history/launch-history.tsx");
     await historyTui(ctx, store, rows, args);
     return EXIT.ok;
   }

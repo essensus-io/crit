@@ -1,9 +1,9 @@
 import { parseUnifiedDiff } from "@crit/core";
-import type { FindingView, SessionState } from "../model/session.ts";
+import type { FindingView, SessionState } from "@/features/review-session/model/session.ts";
 import { triage } from "./triage.ts";
-import { clipToks, highlightLine } from "../../../shared/lib/highlight.ts";
-import { SEV_COLOR, SEV_LABEL, T } from "../../../shared/lib/theme.ts";
-import { wrapText } from "../../../shared/lib/text.ts";
+import { clipToks, highlightLine } from "@/shared/lib/highlight.ts";
+import { SEV_COLOR, SEV_LABEL, T } from "@/shared/lib/theme.ts";
+import { wrapText } from "@/shared/lib/text.ts";
 
 export type Seg = { t: string; color?: string; dim?: boolean; bold?: boolean; inverse?: boolean };
 export type Line = Seg[];

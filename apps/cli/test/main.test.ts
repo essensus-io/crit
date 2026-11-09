@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createMain, VERSION } from "../src/app/main.ts";
+import { createMain, VERSION } from "@/app/main.ts";
 import { testContext } from "./helpers.ts";
 
 describe("crit main command", () => {

@@ -1,16 +1,16 @@
 import { type CommandDef, defineCommand, renderUsage, runCommand } from "citty";
 import pkg from "../../package.json" with { type: "json" };
-import { applyDef, openDef, undoDef } from "../commands/apply.ts";
-import { doctorCommand } from "../commands/doctor.ts";
-import { historyDef } from "../commands/history.ts";
-import { initCommand, mcpCommand } from "../commands/misc.ts";
-import { providersCommand } from "../commands/providers.ts";
-import { reviewCommand } from "../commands/review.ts";
-import { rulesCommand } from "../commands/rules.ts";
-import type { CliContext } from "../context.ts";
-import { CliError, EXIT } from "../shared/lib/errors.ts";
-import { PromptCancelled } from "../shared/lib/prompter.ts";
-import { colors } from "../ui.ts";
+import { applyDef, openDef, undoDef } from "@/commands/apply.ts";
+import { doctorCommand } from "@/commands/doctor.ts";
+import { historyDef } from "@/commands/history.ts";
+import { initCommand, mcpCommand } from "@/commands/misc.ts";
+import { providersCommand } from "@/commands/providers.ts";
+import { reviewCommand } from "@/commands/review.ts";
+import { rulesCommand } from "@/commands/rules.ts";
+import type { CliContext } from "@/context.ts";
+import { CliError, EXIT } from "@/shared/lib/errors.ts";
+import { PromptCancelled } from "@/shared/lib/prompter.ts";
+import { colors } from "@/ui.ts";
 
 export const VERSION = pkg.version;
 

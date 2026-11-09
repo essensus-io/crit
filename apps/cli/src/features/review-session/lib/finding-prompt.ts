@@ -1,5 +1,5 @@
 import type { Finding, Fix } from "@crit/schema";
-import type { RuleRef } from "../model/session.ts";
+import type { RuleRef } from "@/features/review-session/model/session.ts";
 
 export function findingPrompt(finding: Finding, fix: Fix | undefined, rules: RuleRef[]): string {
   const where = `${finding.file}:${finding.range.start}${finding.range.end > finding.range.start ? `-${finding.range.end}` : ""}`;

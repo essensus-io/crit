@@ -30,12 +30,12 @@ import {
   type SqliteStore,
 } from "@crit/store";
 import { defineCommand } from "citty";
-import { type CliContext, sessionsDir } from "../context.ts";
-import { CliError, EXIT } from "../shared/lib/errors.ts";
-import { dryRunJson, renderDryRun } from "../features/review-report/lib/dry-run.ts";
-import { markdownReport, sarifReport, textReport } from "../report.ts";
-import { adapterFor, ensureProviders } from "../setup.ts";
-import { colors, duration, plural, when } from "../ui.ts";
+import { type CliContext, sessionsDir } from "@/context.ts";
+import { CliError, EXIT } from "@/shared/lib/errors.ts";
+import { dryRunJson, renderDryRun } from "@/features/review-report/lib/dry-run.ts";
+import { markdownReport, sarifReport, textReport } from "@/report.ts";
+import { adapterFor, ensureProviders } from "@/setup.ts";
+import { colors, duration, plural, when } from "@/ui.ts";
 import { repoRootOrThrow } from "./shared.ts";
 import { chooseReviewProvider } from "./providers.ts";
 
@@ -114,8 +114,8 @@ async function runHome(
     prepare: (spec: ScopeSpec) => Promise<Prepared>;
   },
 ): Promise<number> {
-  const { homeTui } = await import("../views/home/launch-home.tsx");
-  const { openTui } = await import("../views/review/launch-review.tsx");
+  const { homeTui } = await import("@/views/home/launch-home.tsx");
+  const { openTui } = await import("@/views/review/launch-review.tsx");
   const { root, store, config, profile } = home;
   const repo = await store.repos.getByRoot(root);
   const history = repo ? await listHistory(store.db, { repoId: repo.id, limit: 12 }) : [];
@@ -440,7 +440,7 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
       }))
     )
       return EXIT.cancelled;
-    const { runTui } = await import("../views/run/launch-run.tsx");
+    const { runTui } = await import("@/views/run/launch-run.tsx");
     const recovery = await runTui(
       ctx,
       store,

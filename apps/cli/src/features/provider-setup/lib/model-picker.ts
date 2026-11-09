@@ -1,6 +1,6 @@
 import { type AdapterFactory, listModels, type ModelInfo } from "@crit/providers";
-import type { CliContext } from "../../../context.ts";
-import type { Option } from "../../../shared/lib/prompter.ts";
+import type { CliContext } from "@/context.ts";
+import type { Option } from "@/shared/lib/prompter.ts";
 
 export const CLI_DEFAULT = "__cli_default__";
 const CUSTOM = "__custom__";
