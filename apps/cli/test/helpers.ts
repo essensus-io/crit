@@ -13,7 +13,7 @@ import {
 import { critPaths, dbPath, openStore, type SqliteStore } from "@crit/store";
 import type { CliContext } from "@/shared/lib/cli-context.ts";
 import { runCli, VERSION } from "@/app/main.ts";
-import { ScriptedPrompter } from "@/shared/lib/prompter.ts";
+import { createScriptedPrompter, type ScriptedPrompter } from "@/shared/lib/prompter.ts";
 
 export type TestEnv = {
   ctx: CliContext;
@@ -30,7 +30,7 @@ export type TestEnv = {
 export function testContext(
   opts: {
     interactive?: boolean;
-    answers?: ConstructorParameters<typeof ScriptedPrompter>[0];
+    answers?: Parameters<typeof createScriptedPrompter>[0];
     cwd?: string;
     models?: ModelInfo[];
   } = {},
@@ -45,7 +45,7 @@ export function testContext(
   const env: NodeJS.ProcessEnv = { PATH: bin, CRIT_HOME: join(dir, "crit") };
   let out = "";
   let err = "";
-  const prompter = new ScriptedPrompter(opts.answers ?? []);
+  const prompter = createScriptedPrompter(opts.answers ?? []);
   let script: FakeScript = FakeScript.parse({ runs: [] });
   const fakes: FakeAdapter[] = [];
   const registry = createAdapterRegistry().register({

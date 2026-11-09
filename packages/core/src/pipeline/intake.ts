@@ -49,42 +49,47 @@ function normalizePath(root: string, file: string): string {
   return f.replace(/^(\.\/|a\/|b\/)/, "");
 }
 
-export class Intake {
-  private readonly patchFailures = new Map<string, number>();
-  private readonly reportable: Map<string, ResolvedScope["files"][number]>;
-  readonly opts: IntakeOptions;
+export type Intake = {
+  opts: IntakeOptions;
+  restrictTo(files: string[]): Intake;
+  check(input: FindingInput, options?: { allowRetry?: boolean }): Promise<IntakeResult>;
+};
 
-  constructor(opts: IntakeOptions) {
-    this.opts = opts;
-    this.reportable = new Map(
-      opts.scope.files.filter((f) => f.status !== "deleted").map((f) => [f.path, f]),
-    );
-  }
+export const createIntake = (intakeOptions: IntakeOptions): Intake => {
+  const patchFailures = new Map<string, number>();
+  const reportable = new Map(
+    intakeOptions.scope.files
+      .filter((file) => file.status !== "deleted")
+      .map((file) => [file.path, file]),
+  );
 
-  restrictTo(files: string[]): Intake {
+  const restrictTo = (files: string[]): Intake => {
     const scope = {
-      ...this.opts.scope,
-      files: this.opts.scope.files.filter((f) => files.includes(f.path)),
+      ...intakeOptions.scope,
+      files: intakeOptions.scope.files.filter((file) => files.includes(file.path)),
     };
-    return new Intake({ ...this.opts, scope });
-  }
+    return createIntake({ ...intakeOptions, scope });
+  };
 
-  async check(input: FindingInput, opts: { allowRetry?: boolean } = {}): Promise<IntakeResult> {
+  const check = async (
+    input: FindingInput,
+    opts: { allowRetry?: boolean } = {},
+  ): Promise<IntakeResult> => {
     const allowRetry = opts.allowRetry ?? true;
     const errors: string[] = [];
     const warnings: string[] = [];
-    const file = normalizePath(this.opts.scope.root, input.file);
-    const scoped = this.reportable.get(file);
+    const file = normalizePath(intakeOptions.scope.root, input.file);
+    const scoped = reportable.get(file);
     if (!scoped) {
-      const sample = [...this.reportable.keys()].slice(0, 8).join(", ");
+      const sample = [...reportable.keys()].slice(0, 8).join(", ");
       return {
         accepted: false,
         errors: [
-          `file: ${file} is not in this review's scope (you may report on: ${sample}${this.reportable.size > 8 ? ", …" : ""})`,
+          `file: ${file} is not in this review's scope (you may report on: ${sample}${reportable.size > 8 ? ", …" : ""})`,
         ],
       };
     }
-    const content = await readAtRevision(this.opts.scope, file);
+    const content = await readAtRevision(intakeOptions.scope, file);
     if (content === undefined)
       return { accepted: false, errors: [`file: ${file} could not be read`] };
 
@@ -124,19 +129,19 @@ export class Intake {
       }
     }
 
-    const unknown = input.ruleIds.filter((id) => !this.opts.ruleIds.has(id));
-    const ruleIds = input.ruleIds.filter((id) => this.opts.ruleIds.has(id));
+    const unknown = input.ruleIds.filter((id) => !intakeOptions.ruleIds.has(id));
+    const ruleIds = input.ruleIds.filter((id) => intakeOptions.ruleIds.has(id));
     if (unknown.length) warnings.push(`ruleIds: unknown rule ids dropped: ${unknown.join(", ")}`);
 
     const normalized: FindingInput = { ...input, file, range, ruleIds };
     const fp = fingerprint(normalized);
 
-    if (input.fix && this.opts.checkPatches !== false) {
-      const check = await checkPatch(this.opts.scope.root, input.fix.patch);
+    if (input.fix && intakeOptions.checkPatches !== false) {
+      const check = await checkPatch(intakeOptions.scope.root, input.fix.patch);
       if (check.ok) normalized.fix = { summary: input.fix.summary, patch: check.patch };
       else {
-        const n = (this.patchFailures.get(fp) ?? 0) + 1;
-        this.patchFailures.set(fp, n);
+        const n = (patchFailures.get(fp) ?? 0) + 1;
+        patchFailures.set(fp, n);
         if (allowRetry && n === 1) {
           return {
             accepted: false,
@@ -150,7 +155,7 @@ export class Intake {
       }
     }
 
-    const threshold = this.opts.severityThreshold;
+    const threshold = intakeOptions.severityThreshold;
     if (
       threshold &&
       SEVERITY_ORDER.indexOf(normalized.severity) > SEVERITY_ORDER.indexOf(threshold)
@@ -163,7 +168,7 @@ export class Intake {
         dropped: "below-threshold",
       };
     }
-    if (this.opts.suppressed.has(fp)) {
+    if (intakeOptions.suppressed.has(fp)) {
       return {
         accepted: true,
         finding: normalized,
@@ -173,5 +178,7 @@ export class Intake {
       };
     }
     return { accepted: true, finding: normalized, fingerprint: fp, warnings };
-  }
-}
+  };
+
+  return { opts: intakeOptions, restrictTo, check };
+};

@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { createDefaultRegistry } from "@crit/providers";
 import { critPaths, dbPath, openStore, type SqliteStore } from "@crit/store";
-import { ClackPrompter } from "@/shared/lib/prompter.ts";
+import { createClackPrompter } from "@/shared/lib/prompter.ts";
 import { type CliContext } from "@/shared/lib/cli-context.ts";
 
 export function processContext(version: string): CliContext {
@@ -22,7 +22,7 @@ export function processContext(version: string): CliContext {
     color: Boolean(process.stdout.isTTY) && env.NO_COLOR === undefined && env.FORCE_COLOR !== "0",
     out: (t) => process.stdout.write(t),
     err: (t) => process.stderr.write(t),
-    prompter: new ClackPrompter(),
+    prompter: createClackPrompter(),
     registry: createDefaultRegistry(),
     mcpCommand: {
       command: process.execPath,

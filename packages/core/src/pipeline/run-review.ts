@@ -1,7 +1,7 @@
 import { type Review, type Shard } from "@crit/schema";
 import { cacheReviewedFiles } from "./cache-reviewed-files.ts";
 import { CancelledError } from "./cancelled-error.ts";
-import { Intake } from "./intake.ts";
+import { createIntake } from "./intake.ts";
 import { mapRepository } from "./map-repository.ts";
 import { mergeReviewFindings } from "./merge-review-findings.ts";
 import { planShards } from "./plan-shards.ts";
@@ -74,7 +74,7 @@ export const runReview = async (options: ReviewOptions): Promise<ReviewResult> =
     lastReportedSpend: -1,
     reviewedFiles: new Set(),
     rejectedFiles: new Set(),
-    baseIntake: new Intake({
+    baseIntake: createIntake({
       scope,
       ruleIds: new Set(ruleById.keys()),
       suppressed,

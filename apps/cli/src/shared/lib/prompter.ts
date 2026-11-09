@@ -2,7 +2,7 @@ import * as p from "@clack/prompts";
 
 export type Option<T> = { value: T; label: string; hint?: string; disabled?: boolean };
 
-export interface Prompter {
+export type Prompter = {
   intro(message: string): void;
   outro(message: string): void;
   note(message: string, title?: string): void;
@@ -31,7 +31,7 @@ export interface Prompter {
   }): Promise<T[]>;
   confirm(opts: { message: string; initialValue?: boolean }): Promise<boolean>;
   spinner(): { start(message: string): void; stop(message: string, failed?: boolean): void };
-}
+};
 
 export class PromptCancelled extends Error {
   override name = "PromptCancelled";
@@ -45,14 +45,14 @@ function unwrap<T>(v: unknown): T {
   return v as T;
 }
 
-export class ClackPrompter implements Prompter {
-  intro = (m: string) => p.intro(m);
-  outro = (m: string) => p.outro(m);
-  note = (m: string, t?: string) => p.note(m, t);
-  info = (m: string) => p.log.info(m);
-  warn = (m: string) => p.log.warn(m);
-  success = (m: string) => p.log.success(m);
-  error = (m: string) => p.log.error(m);
+export const createClackPrompter = (): Prompter => ({
+  intro: (m: string) => p.intro(m),
+  outro: (m: string) => p.outro(m),
+  note: (m: string, t?: string) => p.note(m, t),
+  info: (m: string) => p.log.info(m),
+  warn: (m: string) => p.log.warn(m),
+  success: (m: string) => p.log.success(m),
+  error: (m: string) => p.log.error(m),
   async text(o: Parameters<Prompter["text"]>[0]) {
     return unwrap<string>(
       await p.text({
@@ -62,7 +62,7 @@ export class ClackPrompter implements Prompter {
         ...(o.validate ? { validate: (v: string | undefined) => o.validate!(v ?? "") } : {}),
       }),
     );
-  }
+  },
   async select<T>(o: { message: string; options: Option<T>[]; initialValue?: T }) {
     return unwrap<T>(
       await p.select<T>({
@@ -71,7 +71,7 @@ export class ClackPrompter implements Prompter {
         ...(o.initialValue !== undefined ? { initialValue: o.initialValue } : {}),
       }),
     );
-  }
+  },
   async autocomplete<T>(o: {
     message: string;
     options: Option<T>[];
@@ -87,7 +87,7 @@ export class ClackPrompter implements Prompter {
         ...(o.initialValue !== undefined ? { initialValue: o.initialValue } : {}),
       }),
     );
-  }
+  },
   async multiselect<T>(o: {
     message: string;
     options: Option<T>[];
@@ -102,7 +102,7 @@ export class ClackPrompter implements Prompter {
         required: o.required ?? false,
       }),
     );
-  }
+  },
   async confirm(o: { message: string; initialValue?: boolean }) {
     return unwrap<boolean>(
       await p.confirm({
@@ -110,64 +110,65 @@ export class ClackPrompter implements Prompter {
         ...(o.initialValue !== undefined ? { initialValue: o.initialValue } : {}),
       }),
     );
-  }
+  },
   spinner() {
     const s = p.spinner();
     return {
       start: (m: string) => s.start(m),
       stop: (m: string, failed?: boolean) => (failed ? s.error(m) : s.stop(m)),
     };
-  }
-}
+  },
+});
 
 type Answer = string | boolean | string[] | ((question: string) => unknown);
 
-export class ScriptedPrompter implements Prompter {
-  readonly log: string[] = [];
-  private readonly answers: Answer[];
-  constructor(answers: Answer[] = []) {
-    this.answers = [...answers];
-  }
-  private next(question: string, fallback: unknown): unknown {
-    this.log.push(`? ${question}`);
-    if (this.answers.length === 0) return fallback;
-    const a = this.answers.shift()!;
-    if (a === "__cancel__") throw new PromptCancelled();
-    return typeof a === "function" ? a(question) : a;
-  }
-  intro = (m: string) => void this.log.push(`intro ${m}`);
-  outro = (m: string) => void this.log.push(`outro ${m}`);
-  note = (m: string, t?: string) => void this.log.push(`note ${t ?? ""}: ${m}`);
-  info = (m: string) => void this.log.push(`info ${m}`);
-  warn = (m: string) => void this.log.push(`warn ${m}`);
-  success = (m: string) => void this.log.push(`success ${m}`);
-  error = (m: string) => void this.log.push(`error ${m}`);
-  async text(o: Parameters<Prompter["text"]>[0]) {
-    const v = String(this.next(o.message, o.initialValue ?? ""));
-    const bad = o.validate?.(v);
-    if (bad) throw new Error(`invalid answer for "${o.message}": ${bad}`);
-    return v;
-  }
-  async select<T>(o: { message: string; options: Option<T>[]; initialValue?: T }) {
-    const v = this.next(o.message, o.initialValue ?? o.options.find((x) => !x.disabled)?.value);
-    const hit = o.options.find((x) => x.value === v || x.label === v);
-    if (!hit) throw new Error(`no option ${String(v)} for "${o.message}"`);
+export const createScriptedPrompter = (initialAnswers: Answer[] = []) => {
+  const log: string[] = [];
+  const answers = [...initialAnswers];
+  const next = (question: string, fallback: unknown): unknown => {
+    log.push(`? ${question}`);
+    if (answers.length === 0) return fallback;
+    const answer = answers.shift()!;
+    if (answer === "__cancel__") throw new PromptCancelled();
+    return typeof answer === "function" ? answer(question) : answer;
+  };
+  const select = async <T>(o: { message: string; options: Option<T>[]; initialValue?: T }) => {
+    const value = next(o.message, o.initialValue ?? o.options.find((x) => !x.disabled)?.value);
+    const hit = o.options.find((x) => x.value === value || x.label === value);
+    if (!hit) throw new Error(`no option ${String(value)} for "${o.message}"`);
     return hit.value;
-  }
-  async autocomplete<T>(o: { message: string; options: Option<T>[]; initialValue?: T }) {
-    return this.select(o);
-  }
-  async multiselect<T>(o: { message: string; options: Option<T>[]; initialValues?: T[] }) {
-    const v = this.next(o.message, o.initialValues ?? []) as unknown[];
-    return o.options.filter((x) => v.includes(x.value) || v.includes(x.label)).map((x) => x.value);
-  }
-  async confirm(o: { message: string; initialValue?: boolean }) {
-    return Boolean(this.next(o.message, o.initialValue ?? true));
-  }
-  spinner() {
-    return {
-      start: (m: string) => void this.log.push(`spin ${m}`),
-      stop: (m: string, failed?: boolean) => void this.log.push(`${failed ? "fail" : "done"} ${m}`),
-    };
-  }
-}
+  };
+  return {
+    log,
+    intro: (m: string) => void log.push(`intro ${m}`),
+    outro: (m: string) => void log.push(`outro ${m}`),
+    note: (m: string, t?: string) => void log.push(`note ${t ?? ""}: ${m}`),
+    info: (m: string) => void log.push(`info ${m}`),
+    warn: (m: string) => void log.push(`warn ${m}`),
+    success: (m: string) => void log.push(`success ${m}`),
+    error: (m: string) => void log.push(`error ${m}`),
+    async text(o: Parameters<Prompter["text"]>[0]) {
+      const value = String(next(o.message, o.initialValue ?? ""));
+      const invalid = o.validate?.(value);
+      if (invalid) throw new Error(`invalid answer for "${o.message}": ${invalid}`);
+      return value;
+    },
+    select,
+    autocomplete: select,
+    async multiselect<T>(o: { message: string; options: Option<T>[]; initialValues?: T[] }) {
+      const value = next(o.message, o.initialValues ?? []) as unknown[];
+      return o.options
+        .filter((x) => value.includes(x.value) || value.includes(x.label))
+        .map((x) => x.value);
+    },
+    async confirm(o: { message: string; initialValue?: boolean }) {
+      return Boolean(next(o.message, o.initialValue ?? true));
+    },
+    spinner: () => ({
+      start: (m: string) => void log.push(`spin ${m}`),
+      stop: (m: string, failed?: boolean) => void log.push(`${failed ? "fail" : "done"} ${m}`),
+    }),
+  } satisfies Prompter & { log: string[] };
+};
+
+export type ScriptedPrompter = ReturnType<typeof createScriptedPrompter>;

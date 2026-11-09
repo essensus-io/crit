@@ -21,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   type AgentRunner,
   fingerprint,
-  Intake,
+  createIntake,
   prepareReview,
   reanchorFindings,
   resolveScope,
@@ -660,7 +660,7 @@ describe("Intake", () => {
   const intakeFor = async (
     spec: Parameters<typeof resolveScope>[0]["spec"] = { kind: "branch", base: "main" },
   ) =>
-    new Intake({
+    createIntake({
       scope: await resolveScope({ cwd: repo.root, spec }),
       ruleIds: new Set(["R1"]),
       suppressed: new Set(),
