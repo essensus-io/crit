@@ -1,5 +1,5 @@
 import { type ResolvedConfig, type ScopeSpec } from "@crit/schema";
-import { type CliContext } from "@/context.ts";
+import { type CliContext } from "@/shared/lib/cli-context.ts";
 import {
   type Estimate,
   HomeView,

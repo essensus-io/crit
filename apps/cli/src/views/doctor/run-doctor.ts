@@ -8,10 +8,9 @@ import {
   loadUserConfig,
   SettingsError,
 } from "@crit/store";
-import { defineCommand } from "citty";
-import type { CliContext } from "@/context.ts";
+import type { CliContext } from "@/shared/lib/cli-context.ts";
 import { EXIT } from "@/shared/lib/errors.ts";
-import { colors } from "@/ui.ts";
+import { colors } from "@/shared/lib/colors.ts";
 
 type Check = { name: string; ok: boolean; warn?: boolean; detail: string };
 
@@ -85,7 +84,7 @@ export async function doctor(ctx: CliContext, opts: { test?: boolean } = {}): Pr
   }
 
   if (opts.test && providers) {
-    const { testProvider } = await import("@/setup.ts");
+    const { testProvider } = await import("@/features/provider-setup/lib/test-provider.ts");
     for (const p of providers.providers.filter((x) => x.enabled)) {
       const r = await testProvider(ctx, p);
       checks.push({ name: `test ${p.name}`, ok: r.ok, detail: r.ok ? "replied" : r.error });
@@ -109,14 +108,3 @@ export async function doctor(ctx: CliContext, opts: { test?: boolean } = {}): Pr
   const critical = checks.filter((ch) => !ch.ok && !agents.includes(ch));
   return critical.length ? EXIT.error : EXIT.ok;
 }
-
-export const doctorCommand = (ctx: CliContext) =>
-  defineCommand({
-    meta: { name: "doctor", description: "Check installed agent CLIs, logins and versions" },
-    args: {
-      test: { type: "boolean", description: "Also run a short test prompt on each provider" },
-    },
-    run: async ({ args }) => {
-      process.exitCode = await doctor(ctx, args);
-    },
-  });

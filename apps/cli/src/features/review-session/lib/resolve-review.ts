@@ -1,6 +1,6 @@
 import { type Review, shortId } from "@crit/schema";
 import type { SqliteStore } from "@crit/store";
-import type { CliContext } from "@/context.ts";
+import type { CliContext } from "@/shared/lib/cli-context.ts";
 import { CliError } from "@/shared/lib/errors.ts";
 
 export async function resolveReview(

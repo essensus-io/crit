@@ -1,6 +1,9 @@
 import { estimateDurationMs, type Prepared } from "@crit/core";
 import { formatTokens, type ResolvedConfig } from "@crit/schema";
-import { colors, duration, plural, table, truncate } from "@/ui.ts";
+import { colors } from "@/shared/lib/colors.ts";
+import { duration, plural } from "@/shared/lib/format.ts";
+import { table } from "@/shared/lib/table.ts";
+import { truncate } from "@/shared/lib/text.ts";
 
 export type DryRunInfo = {
   provider: string;

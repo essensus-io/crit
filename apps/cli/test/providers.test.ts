@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { createFixtureRepo, type FixtureRepo } from "@crit/testkit";
 import { afterEach, describe, expect, it } from "vitest";
 import { fakeProvidersJson, normalize, type TestEnv, testContext } from "./helpers.ts";
-import { chooseReviewProvider } from "@/commands/providers.ts";
+import { chooseReviewProvider } from "@/views/providers/choose-review-provider.ts";
 
 const posix = process.platform !== "win32";
 let t: TestEnv;

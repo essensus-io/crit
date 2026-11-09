@@ -1,6 +1,6 @@
 import { type ResolvedConfig, type ReviewEvent } from "@crit/schema";
 import { type SqliteStore } from "@crit/store";
-import { type CliContext } from "@/context.ts";
+import { type CliContext } from "@/shared/lib/cli-context.ts";
 import { RunView } from "./run-view.tsx";
 import type { RunRecovery } from "@/features/run-progress/lib/progress-state.ts";
 import { type Choice } from "@/features/model-switching/lib/create-switcher.ts";

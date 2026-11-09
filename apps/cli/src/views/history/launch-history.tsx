@@ -2,9 +2,10 @@ import { makeSession } from "@/views/review/make-session.ts";
 import { renderFullScreen } from "@/shared/ui/render-full-screen.tsx";
 import { resolveConfig } from "@crit/schema";
 import { type HistoryRow, loadProjectConfig, loadUserConfig, type SqliteStore } from "@crit/store";
-import { compareReviews, type HistoryArgs, historyRows } from "@/commands/history.ts";
-import { repoRootOrThrow } from "@/commands/shared.ts";
-import type { CliContext } from "@/context.ts";
+import { compareReviews } from "@/features/review-history/lib/compare-reviews.ts";
+import { type HistoryArgs, historyRows } from "@/features/review-history/lib/history-rows.ts";
+import { repoRootOrThrow } from "@/shared/lib/repo-root-or-throw.ts";
+import type { CliContext } from "@/shared/lib/cli-context.ts";
 import { type HistoryActions, HistoryView, previousOf } from "./history-view.tsx";
 
 export const historyTui = async (

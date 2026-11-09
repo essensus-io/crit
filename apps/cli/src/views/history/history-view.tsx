@@ -3,8 +3,14 @@ import { type HistoryRow } from "@crit/store";
 import { Box, Text, useApp, useInput } from "ink";
 import { useScreen } from "@/shared/ui/screen.tsx";
 import { useState } from "react";
-import { compareReviews, outcomeOf, tokensLabel, severitySummary } from "@/commands/history.ts";
-import { truncate, when } from "@/ui.ts";
+import { compareReviews } from "@/features/review-history/lib/compare-reviews.ts";
+import {
+  outcomeOf,
+  tokensLabel,
+  severitySummary,
+} from "@/features/review-history/lib/history-labels.ts";
+import { truncate } from "@/shared/lib/text.ts";
+import { when } from "@/shared/lib/format.ts";
 import { ReviewView } from "@/views/review/review-view.tsx";
 import { Choice } from "@/shared/ui/choice.tsx";
 import { Footer } from "@/shared/ui/footer.tsx";

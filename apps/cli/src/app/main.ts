@@ -1,16 +1,19 @@
 import { type CommandDef, defineCommand, renderUsage, runCommand } from "citty";
 import pkg from "../../package.json" with { type: "json" };
-import { applyDef, openDef, undoDef } from "@/commands/apply.ts";
-import { doctorCommand } from "@/commands/doctor.ts";
-import { historyDef } from "@/commands/history.ts";
-import { initCommand, mcpCommand } from "@/commands/misc.ts";
-import { providersCommand } from "@/commands/providers.ts";
-import { reviewCommand } from "@/commands/review.ts";
-import { rulesCommand } from "@/commands/rules.ts";
-import type { CliContext } from "@/context.ts";
+import { applyDef } from "@/app/commands/apply-command.ts";
+import { openDef } from "@/app/commands/open-command.ts";
+import { undoDef } from "@/app/commands/undo-command.ts";
+import { doctorCommand } from "@/app/commands/doctor-command.ts";
+import { historyDef } from "@/app/commands/history-command.ts";
+import { initCommand } from "@/app/commands/init-command.ts";
+import { mcpCommand } from "@/app/commands/mcp-command.ts";
+import { providersCommand } from "@/app/commands/providers-command.ts";
+import { reviewCommand } from "@/app/commands/review-command.ts";
+import { rulesCommand } from "@/app/commands/rules-command.ts";
+import type { CliContext } from "@/shared/lib/cli-context.ts";
 import { CliError, EXIT } from "@/shared/lib/errors.ts";
 import { PromptCancelled } from "@/shared/lib/prompter.ts";
-import { colors } from "@/ui.ts";
+import { colors } from "@/shared/lib/colors.ts";
 
 export const VERSION = pkg.version;
 

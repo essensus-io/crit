@@ -10,7 +10,7 @@ import {
   type ModelInfo,
 } from "@crit/providers";
 import { critPaths, dbPath, openStore, type SqliteStore } from "@crit/store";
-import type { CliContext } from "@/context.ts";
+import type { CliContext } from "@/shared/lib/cli-context.ts";
 import { runCli, VERSION } from "@/app/main.ts";
 import { ScriptedPrompter } from "@/shared/lib/prompter.ts";
 

@@ -1,6 +1,6 @@
 import { type ResolvedConfig } from "@crit/schema";
 import { type SqliteStore } from "@crit/store";
-import { type CliContext } from "@/context.ts";
+import { type CliContext } from "@/shared/lib/cli-context.ts";
 import { ReviewView } from "./review-view.tsx";
 import { type Choice } from "@/features/model-switching/lib/create-switcher.ts";
 import { makeSession } from "./make-session.ts";

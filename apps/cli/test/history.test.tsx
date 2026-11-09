@@ -4,7 +4,8 @@ import { createFixtureRepo, type FixtureRepo } from "@crit/testkit";
 import { listHistory } from "@crit/store";
 import { render } from "ink-testing-library";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { outcomeOf, parseAge, parseSince } from "@/commands/history.ts";
+import { outcomeOf } from "@/features/review-history/lib/history-labels.ts";
+import { parseAge, parseSince } from "@/features/review-history/lib/parse-age.ts";
 import { HistoryView, previousOf } from "@/views/history/history-view.tsx";
 import { ReviewSession } from "@/features/review-session/model/session.ts";
 import { fakeProvidersJson, type TestEnv, testContext } from "./helpers.ts";
@@ -170,7 +171,8 @@ describe("history screen", () => {
         actions={{
           reload: async (q) => (q ? rows.filter((r) => r.review.scopeLabel.includes(q)) : rows),
           compare: async (row, all) => {
-            const { compareReviews } = await import("@/commands/history.ts");
+            const { compareReviews } =
+              await import("@/features/review-history/lib/compare-reviews.ts");
             const prev = previousOf(row, all);
             return prev ? compareReviews(store, prev.review, row.review) : undefined;
           },

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createFixtureRepo, type FixtureRepo } from "@crit/testkit";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { argsFromScope, parseTokens, scopeFromArgs } from "@/commands/review.ts";
+import { argsFromScope, parseTokens, scopeFromArgs } from "@/views/review/review-args.ts";
 import { fakeProvidersJson, normalize, type TestEnv, testContext } from "./helpers.ts";
 
 const FEATURE = `export async function refund(orders, provider, orderId, amount) {

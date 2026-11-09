@@ -7,7 +7,7 @@ import {
 } from "@crit/providers";
 import type { Depth, ProviderProfile, ProvidersFile, ResolvedConfig } from "@crit/schema";
 import { loadProviders, saveProviders } from "@crit/store";
-import type { CliContext } from "@/context.ts";
+import type { CliContext } from "@/shared/lib/cli-context.ts";
 
 export type Choice = {
   provider: string;

@@ -1,25 +1,9 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { type AdapterRegistry, createDefaultRegistry } from "@crit/providers";
-import { critPaths, type CritPaths, dbPath, openStore, type SqliteStore } from "@crit/store";
-import { ClackPrompter, type Prompter } from "./shared/lib/prompter.ts";
-
-export type CliContext = {
-  cwd: string;
-  env: NodeJS.ProcessEnv;
-  home: string;
-  paths: CritPaths;
-  interactive: boolean;
-  color: boolean;
-  out: (text: string) => void;
-  err: (text: string) => void;
-  prompter: Prompter;
-  registry: AdapterRegistry;
-  mcpCommand: { command: string; args: string[] };
-  version: string;
-  openStore(): SqliteStore;
-  now(): number;
-};
+import { createDefaultRegistry } from "@crit/providers";
+import { critPaths, dbPath, openStore, type SqliteStore } from "@crit/store";
+import { ClackPrompter } from "@/shared/lib/prompter.ts";
+import { type CliContext } from "@/shared/lib/cli-context.ts";
 
 export function processContext(version: string): CliContext {
   const env = process.env;
@@ -49,5 +33,3 @@ export function processContext(version: string): CliContext {
     now: Date.now,
   };
 }
-
-export const sessionsDir = (ctx: CliContext) => join(ctx.paths.cache, "sessions");
