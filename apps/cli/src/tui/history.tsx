@@ -14,7 +14,7 @@ import {
 import { repoRootOrThrow } from "../commands/shared.ts";
 import type { CliContext } from "../context.ts";
 import { truncate, when } from "../ui.ts";
-import { ReviewApp } from "./App.tsx";
+import { ReviewApp } from "./app.tsx";
 import { Choice, Footer, HRule, TextInput } from "./components.tsx";
 import type { ReviewSession } from "./session.ts";
 

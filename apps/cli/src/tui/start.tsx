@@ -27,15 +27,15 @@ import { render } from "ink";
 import type { ReactElement } from "react";
 import { type CliContext, sessionsDir } from "../context.ts";
 import { adapterFor } from "../setup.ts";
-import { ReviewApp, RunApp } from "./App.tsx";
+import { ReviewApp, RunApp } from "./app.tsx";
 import {
   type Estimate,
   HomeApp,
   type HomeChoice,
   type HomeInfo,
   type RecentReview,
-} from "./HomeScreen.tsx";
-import type { RunRecovery } from "./ProgressScreen.tsx";
+} from "./home-screen.tsx";
+import type { RunRecovery } from "./progress-screen.tsx";
 import { Screen } from "./screen.tsx";
 import { type Editor, ReviewSession } from "./session.ts";
 import { type Choice, createSwitcher, type Switcher } from "./switcher.ts";

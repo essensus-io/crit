@@ -4,7 +4,7 @@ import { Box, useApp, useInput } from "ink";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Choice, TextInput } from "./components.tsx";
 import { parseQuery, triage, visibleItems } from "./filter.ts";
-import { HelpOverlay } from "./HelpOverlay.tsx";
+import { HelpOverlay } from "./help-overlay.tsx";
 import {
   emptyProgress,
   ProgressScreen,
@@ -12,13 +12,13 @@ import {
   reduceProgress,
   type RunRecovery,
   type Selection,
-} from "./ProgressScreen.tsx";
-import { ProposalScreen } from "./ProposalScreen.tsx";
+} from "./progress-screen.tsx";
+import { ProposalScreen } from "./proposal-screen.tsx";
 import { useScreen } from "./screen.tsx";
 import type { ReviewSession } from "./session.ts";
-import { StreamScreen } from "./StreamScreen.tsx";
+import { StreamScreen } from "./stream-screen.tsx";
 import { describeChoice, type Switcher } from "./switcher.ts";
-import { useSwitching } from "./useSwitching.tsx";
+import { useSwitching } from "./use-switching.tsx";
 import { Menu, type MenuItem, Picker } from "./widgets.tsx";
 
 type Mode =

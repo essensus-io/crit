@@ -6,7 +6,7 @@ import {
   HomeApp,
   type HomeChoice,
   type RecentReview,
-} from "../src/tui/HomeScreen.tsx";
+} from "../src/tui/home-screen.tsx";
 
 const sleep = (ms = 40) => new Promise((r) => setTimeout(r, ms));
 async function until(frame: () => string | undefined, text: string | RegExp, ms = 8000) {

@@ -5,7 +5,7 @@ import { Footer, TextInput } from "./components.tsx";
 import { useScreen } from "./screen.tsx";
 import { describeChoice, type Choice, type Switcher } from "./switcher.ts";
 import { T } from "./theme.ts";
-import { useSwitching } from "./useSwitching.tsx";
+import { useSwitching } from "./use-switching.tsx";
 import { Menu, Panel, Spinner, truncate } from "./widgets.tsx";
 
 export type HomeChoice =
