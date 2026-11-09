@@ -60,6 +60,8 @@ export type SessionState = {
   disabledRules: string[];
   /** Findings the AI is writing a fix for right now (in the background). */
   drafting: string[];
+  /** Findings the agent reported that crit did not keep, with why. */
+  omitted: string[];
   busy?: string;
   notice?: string;
   error?: string;
@@ -121,6 +123,18 @@ export class ReviewSession {
     const ruleEvent = (await store.events.list(reviewId, "rules")).at(-1)?.payload as
       | { rules: RuleRef[] }
       | undefined;
+    const why = (r: string) =>
+      r === "suppressed" ? "marked won't fix before" : "below the severity threshold";
+    const omitted = [
+      ...(await store.events.list(reviewId, "rejected")).map((e) => {
+        const p = e.payload as { title?: string; errors?: string[] };
+        return `${p.title ?? "a finding"}: rejected, ${p.errors?.[0] ?? "failed crit's checks"}`;
+      }),
+      ...(await store.events.list(reviewId, "hidden")).map((e) => {
+        const p = e.payload as { title?: string; why?: string };
+        return `${p.title ?? "a finding"}: hidden, ${why(p.why ?? "")}`;
+      }),
+    ];
     const items = findings.map((finding): FindingView => {
       const own = fixes.filter((f) => f.findingId === finding.id);
       const v: FindingView = {
@@ -144,6 +158,7 @@ export class ReviewSession {
       rules: new Map((ruleEvent?.rules ?? []).map((r) => [r.id, r])),
       disabledRules: await getDisabledRules(this.deps.store, review.repoId),
       drafting: [...this.draftingIds],
+      omitted,
     };
     for (const l of this.listeners) l();
     return this.state;

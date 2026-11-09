@@ -197,7 +197,12 @@ export function StreamScreen(props: {
           {items.length === 0 ? (
             <Text dimColor>
               {state.items.length === 0
-                ? "No findings. Files unchanged since an earlier review reuse its result, and findings you marked won't fix stay hidden. Press R to review every file again."
+                ? state.omitted.length > 0
+                  ? `No findings kept. The agent reported ${state.omitted.length} that crit left out:\n${state.omitted
+                      .slice(0, 6)
+                      .map((o) => `  · ${o}`)
+                      .join("\n")}`
+                  : "No findings. Files unchanged since an earlier review reuse its result, and findings you marked won't fix stay hidden. Press r to review every file again."
                 : props.filter.tab === "filtered"
                   ? "Nothing filtered."
                   : "No findings match. Clear the search with / and enter."}
@@ -234,6 +239,9 @@ export function StreamScreen(props: {
             <Text
               color={T.orange}
             >{`  ·  ${spin} writing ${drafting.size} fix${drafting.size === 1 ? "" : "es"}`}</Text>
+          ) : null}
+          {state.omitted.length > 0 ? (
+            <Text color={T.yellow}>{`  ·  ${state.omitted.length} left out`}</Text>
           ) : null}
           {props.canRerun ? <Text dimColor>{"  ·  r re-run review"}</Text> : null}
           {p.total > 0 && p.reviewed === p.total ? (

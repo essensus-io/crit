@@ -239,6 +239,7 @@ describe("runReview with the fake provider", () => {
     ]);
     expect(types.filter((t) => t === "finding")).toHaveLength(4);
     expect(types.filter((t) => t === "finding-rejected")).toHaveLength(2);
+    expect(await store.events.list(result.review.id, "rejected")).toHaveLength(2);
     expect(types.at(-1)).toBe("review-done");
     const rules = o.events.find((e) => e.type === "rules")!;
     expect(rules.type === "rules" && rules.attached.map((r) => r.id)).toEqual(["R1"]);

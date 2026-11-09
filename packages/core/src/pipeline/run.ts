@@ -409,6 +409,7 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
 
     // Files answered by the cache: replay their findings, validated against today's code.
     const reviewedOk = new Set<string>();
+    const rejectedFiles = new Set<string>();
     let replayed = 0;
     for (const [path, list] of prep.cached) {
       const intake = baseIntake.restrictTo([path]);
@@ -493,9 +494,21 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
         const r = await intake.check(raw, { allowRetry });
         if (!r.accepted) {
           emit({ type: "finding-rejected", shardId: shard.id, errors: r.errors });
+          rejectedFiles.add(raw.file);
+          await store.events.append(review.id, "rejected", {
+            file: raw.file,
+            title: raw.title,
+            errors: r.errors,
+          });
           return { accepted: false as const, errors: r.errors };
         }
         accepted.push(r.finding);
+        if (r.dropped)
+          await store.events.append(review.id, "hidden", {
+            file: r.finding.file,
+            title: r.finding.title,
+            why: r.dropped,
+          });
         const f = await persist(shard.id, r);
         return {
           accepted: true as const,
@@ -674,9 +687,11 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
           : null,
       });
       if (status === "done") {
-        for (const file of shard.files) reviewedOk.add(file);
+        // A file where crit rejected a finding is not trusted as clean, so it is not cached.
+        for (const file of shard.files) if (!rejectedFiles.has(file)) reviewedOk.add(file);
         if (opts.useCache !== false) {
           for (const file of shard.files) {
+            if (rejectedFiles.has(file)) continue;
             await store.cache.put({
               key: await cacheKeyFor(prep, opts, file),
               reviewId: review.id,
