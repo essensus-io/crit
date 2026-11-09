@@ -1,7 +1,7 @@
 import type { ResolvedConfig } from "@crit/schema";
 import type { Rebaser } from "./apply.ts";
 import { runAgent } from "./pipeline/agent.ts";
-import type { ProviderRun } from "./pipeline/run.ts";
+import type { ProviderRun } from "./pipeline/review-types.ts";
 
 export const DRAFT_FIX_SYSTEM = `You are crit. You write minimal unified diffs. You never edit files yourself.
 Reply with ONLY the unified diff in a \`\`\`diff block: headers --- a/<path> and +++ b/<path>, correct @@ hunk headers, and at least 3 lines of context.`;

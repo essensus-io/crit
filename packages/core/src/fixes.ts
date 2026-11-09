@@ -18,7 +18,7 @@ import { runAgent } from "./pipeline/agent.ts";
 import { excerpt } from "./pipeline/anchor.ts";
 import { applyPatch as gitApplyPatch, checkPatch } from "./pipeline/patch.ts";
 import { parseJsonReply, repairPrompt } from "./pipeline/prompts.ts";
-import type { ProviderRun } from "./pipeline/run.ts";
+import type { ProviderRun } from "./pipeline/review-types.ts";
 import { DRAFT_FIX_SYSTEM, extractDiff } from "./rebase.ts";
 import { runVerify } from "./verify.ts";
 
