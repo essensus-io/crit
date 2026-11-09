@@ -114,8 +114,21 @@ export function ReviewApp({
     if (cursor >= items.length && items.length > 0) setCursor(items.length - 1);
   }, [items.length, cursor]);
 
+  // A fix you asked for with space is checked as soon as it is written.
+  useEffect(() => {
+    for (const id of wanted.current) {
+      if (state.drafting.includes(id)) continue;
+      const it = state.items.find((v) => v.finding.id === id);
+      if (!it) continue;
+      if (!it.fix) continue;
+      wanted.current.delete(id);
+      if (!it.finding.selected) void session.toggle(id);
+    }
+  }, [state]);
+
   // A fix that finishes while you are on its finding opens the card: that diff is what you approve.
   const wasDrafting = useRef<string[]>([]);
+  const wanted = useRef(new Set<string>());
   useEffect(() => {
     const finished = wasDrafting.current.filter((id) => !state.drafting.includes(id));
     wasDrafting.current = state.drafting;
@@ -225,7 +238,22 @@ export function ReviewApp({
       if (input === ".") return setMode("actions");
       if (input === "i") return setMode("instruct");
       if (input === "x") return void session.applyOne(id);
-      if (input === "a" || input === " ") {
+      if (input === " ") {
+        // space: "fix this". Check the fix and go on; no fix yet: the AI writes one, checked when ready.
+        if (triage(current) === "dismissed") return void session.restore(id);
+        const next = () => move(cursor + 1);
+        if (current.finding.selected) return void session.toggle(id); // again: uncheck
+        if (current.fix) {
+          void session.toggle(id).then(next);
+          return;
+        }
+        if (state.drafting.includes(id))
+          return session.notify("Already writing a fix for this one.");
+        wanted.current.add(id);
+        session.draftFix(id);
+        return next();
+      }
+      if (input === "a") {
         if (triage(current) === "dismissed") return void session.restore(id);
         if (!current.fix && !current.finding.selected) return setMode("instruct");
         return void session.toggle(id);

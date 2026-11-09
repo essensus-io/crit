@@ -353,6 +353,23 @@ describe("review stream", () => {
     app.unmount();
   });
 
+  it("space on a fix checks it and goes to the next finding; on a finding without a fix the AI writes one that is checked when ready", async () => {
+    const app = await mount(
+      session({
+        runs: [{ match: { kind: "draft-fix" }, message: `\`\`\`diff\n${USER_PATCH}\`\`\`` }],
+      }),
+    );
+    await app.press("a"); // uncheck the first fix
+    await until(app.lastFrame, "1 of 2 looked at · 0 accepted");
+    await app.press(" ");
+    await until(app.lastFrame, "2/2"); // checked, and on to the next finding
+    expect((await store.findings.get(ids["Refund amount not validated"]!))!.selected).toBe(true);
+    await app.press(" "); // no fix here: ask the AI for one
+    await until(app.lastFrame, "[x] Unused import", 10_000);
+    expect(await store.fixes.active(ids["Unused import"]!)).toMatchObject({ author: "ai" });
+    app.unmount();
+  });
+
   it("space checks and unchecks the fix; enter with nothing checked says so", async () => {
     const app = await mount(session());
     await app.press(" ");

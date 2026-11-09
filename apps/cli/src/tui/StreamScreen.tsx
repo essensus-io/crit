@@ -133,9 +133,7 @@ export function StreamScreen(props: {
       : fitKeys(
           [
             ["j/k", "next"],
-            ...(current.fix
-              ? ([["space", current.finding.selected ? "uncheck" : "check"]] as [string, string][])
-              : []),
+            ["space", current.finding.selected ? "uncheck" : current.fix ? "fix it" : "get a fix"],
             ["i", current.fix ? "change the fix" : "tell the AI the fix"],
             ["enter", p.applicable > 0 ? `apply ${p.applicable} checked` : "finish"],
             ...(props.canRerun ? ([["r", "re-run"]] as [string, string][]) : []),

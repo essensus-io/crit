@@ -239,7 +239,7 @@ export class ReviewSession {
         // a new fix is a new proposal: the old agreement does not carry over
         if (instruction) await this.deps.store.findings.update(id, { selected: false });
         await this.load().catch(() => undefined);
-        this.set({ notice: `Fix ready for “${finding.title}”. Press a on it to accept.` });
+        this.set({ notice: `Fix ready for “${finding.title}”. Space checks it.` });
       },
       async (err: Error) => {
         this.draftingIds.delete(id);
@@ -257,7 +257,7 @@ export class ReviewSession {
     const it = this.item(id);
     if (!it) return;
     if (!it.fix && !it.finding.selected) {
-      this.set({ notice: "This finding has no fix to apply. Press p to propose one." });
+      this.set({ notice: "This finding has no fix to apply. Press i to tell the AI the fix." });
       return;
     }
     await this.deps.store.findings.update(id, { selected: !it.finding.selected });
