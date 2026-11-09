@@ -32,7 +32,9 @@ type Option = { id: string; label: string; hint: string; spec: ScopeSpec | undef
 const optionsFor = (base: string | undefined): Option[] => [
   {
     id: "branch",
-    label: base ? `This branch vs ${base}` : "This branch",
+    label: base
+      ? `This branch vs ${/^[0-9a-f]{40}$/.test(base) ? `${base.slice(0, 8)} (just before its merge)` : base}`
+      : "This branch",
     hint: "what you changed since it left the base branch, plus uncommitted work",
     spec: { kind: "branch", ...(base ? { base } : {}) },
   },

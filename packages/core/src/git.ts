@@ -116,7 +116,26 @@ export async function detectBase(cwd: string): Promise<string | undefined> {
   if (scored.length === 0) return anyExisting;
   // The branch it will merge into is the nearest one: fewest commits ahead wins (0 means
   // already merged there); ties keep the order above (origin/HEAD first).
-  return scored.reduce((best, c) => (c.ahead < best.ahead ? c : best)).ref;
+  const best = scored.reduce((b, c) => (c.ahead < b.ahead ? c : b));
+  if (best.ahead > 0) return best.ref;
+  // Already merged into it: review what the merge brought in, i.e. compare against the
+  // base as it was just before that merge commit (what the pull request showed).
+  const merge = (
+    await tryGit(cwd, [
+      "rev-list",
+      "--ancestry-path",
+      "--merges",
+      "--first-parent",
+      `HEAD..${best.ref}`,
+    ])
+  )
+    ?.split("\n")
+    .filter(Boolean)
+    .pop();
+  const before = merge
+    ? await tryGit(cwd, ["rev-parse", "--verify", "-q", `${merge}^1`])
+    : undefined;
+  return before || best.ref;
 }
 
 /** Branches this one could be compared against, with how many commits it is ahead of each. */
