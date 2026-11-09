@@ -1,5 +1,5 @@
 import type { Finding, Fix } from "@crit/schema";
-import type { RuleRef } from "./session.ts";
+import type { RuleRef } from "../model/session.ts";
 
 /** A finding written up as a prompt another coding agent can act on. */
 export function findingPrompt(finding: Finding, fix: Fix | undefined, rules: RuleRef[]): string {

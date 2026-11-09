@@ -121,7 +121,7 @@ async function runHome(
     prepare: (spec: ScopeSpec) => Promise<Prepared>;
   },
 ): Promise<number> {
-  const { homeTui, openTui } = await import("../tui/start.tsx");
+  const { homeTui, openTui } = await import("../tui/index.ts");
   const { root, store, config, profile } = home;
   const repo = await store.repos.getByRoot(root);
   const history = repo ? await listHistory(store.db, { repoId: repo.id, limit: 12 }) : [];
@@ -452,7 +452,7 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
       }))
     )
       return EXIT.cancelled;
-    const { runTui } = await import("../tui/start.tsx");
+    const { runTui } = await import("../tui/index.ts");
     const recovery = await runTui(
       ctx,
       store,

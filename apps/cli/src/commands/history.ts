@@ -195,7 +195,7 @@ export async function historyCommand(
     return EXIT.ok;
   }
   if (ctx.interactive && args.tui !== false) {
-    const { historyTui } = await import("../tui/history.tsx");
+    const { historyTui } = await import("../tui/index.ts");
     await historyTui(ctx, store, rows, args);
     return EXIT.ok;
   }

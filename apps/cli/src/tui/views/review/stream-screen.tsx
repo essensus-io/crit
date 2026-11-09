@@ -1,13 +1,13 @@
 import { shortId } from "@crit/schema";
 import { Box, Text } from "ink";
 import { useMemo } from "react";
-import type { Line } from "./card.ts";
-import { Footer, Status } from "./components.tsx";
-import { fileTree, type ListFilter, triage } from "./filter.ts";
-import type { FindingView, SessionState } from "./session.ts";
-import { buildStream } from "./stream.ts";
-import { SPINNER, T } from "./theme.ts";
-import { Panel, truncate, useTick, Viewport } from "./widgets.tsx";
+import type { Line } from "../../features/review-session/index.ts";
+import { Footer, Status } from "../../shared/ui/index.ts";
+import { fileTree, type ListFilter, triage } from "../../features/review-session/index.ts";
+import type { FindingView, SessionState } from "../../features/review-session/index.ts";
+import { buildStream } from "../../features/review-session/index.ts";
+import { SPINNER, T } from "../../shared/lib/index.ts";
+import { Panel, truncate, useTick, Viewport } from "../../shared/ui/index.ts";
 
 /** A row of styled segments as one terminal line. */
 function Row({ line }: { line: Line }) {

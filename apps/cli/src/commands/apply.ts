@@ -136,7 +136,7 @@ export async function openCommand(
   const store = ctx.openStore();
   const review = await resolveReview(ctx, store, root, args.review);
   if (ctx.interactive && args.tui !== false) {
-    const { openTui } = await import("../tui/start.tsx");
+    const { openTui } = await import("../tui/index.ts");
     const rerun = await openTui(
       ctx,
       store,

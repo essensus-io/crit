@@ -1,6 +1,6 @@
 import { Box, Text, useInput } from "ink";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { DASH, SPINNER, T, type Tone } from "./theme.ts";
+import { DASH, SPINNER, T, type Tone } from "../lib/index.ts";
 
 export const truncate = (s: string, n: number) =>
   s.length > n ? `${s.slice(0, Math.max(0, n - 1))}…` : s;

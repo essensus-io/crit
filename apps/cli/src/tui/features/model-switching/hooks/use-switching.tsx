@@ -1,10 +1,10 @@
 import type { Depth } from "@crit/schema";
 import { Box, Text, useInput } from "ink";
 import { Fragment, type ReactNode, useState } from "react";
-import { TextInput } from "./components.tsx";
-import { useScreen } from "./screen.tsx";
-import { describeChoice, type Switcher } from "./switcher.ts";
-import { Panel, Picker, type PickOption } from "./widgets.tsx";
+import { TextInput } from "../../../shared/ui/index.ts";
+import { useScreen } from "../../../shared/ui/index.ts";
+import { describeChoice, type Switcher } from "../lib/switcher.ts";
+import { Panel, Picker, type PickOption } from "../../../shared/ui/index.ts";
 
 const DEFAULT = "__default__";
 const CUSTOM = "__custom__";

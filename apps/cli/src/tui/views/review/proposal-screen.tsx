@@ -1,10 +1,10 @@
 import type { ProposalOutcome } from "@crit/core";
 import { Box, Text } from "ink";
 import type { ReactNode } from "react";
-import { diffRows, Footer, HRule, Status } from "./components.tsx";
-import type { SessionState } from "./session.ts";
-import { T } from "./theme.ts";
-import { Viewport, wrapText } from "./widgets.tsx";
+import { diffRows, Footer, HRule, Status } from "../../shared/ui/index.ts";
+import type { SessionState } from "../../features/review-session/index.ts";
+import { T } from "../../shared/lib/index.ts";
+import { Viewport, wrapText } from "../../shared/ui/index.ts";
 
 const VERDICT_COLOR = { accepted: T.mint, concerns: T.yellow, rejected: T.red } as const;
 

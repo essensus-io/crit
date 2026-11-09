@@ -25,20 +25,20 @@ import {
 import { listHistory, loadProviders, type SqliteStore } from "@crit/store";
 import { render } from "ink";
 import type { ReactElement } from "react";
-import { type CliContext, sessionsDir } from "../context.ts";
-import { adapterFor } from "../setup.ts";
-import { ReviewApp, RunApp } from "./app.tsx";
+import { type CliContext, sessionsDir } from "../../context.ts";
+import { adapterFor } from "../../setup.ts";
+import { ReviewApp, RunApp } from "../views/review/index.ts";
 import {
   type Estimate,
   HomeApp,
   type HomeChoice,
   type HomeInfo,
   type RecentReview,
-} from "./home-screen.tsx";
-import type { RunRecovery } from "./progress-screen.tsx";
-import { Screen } from "./screen.tsx";
-import { type Editor, ReviewSession } from "./session.ts";
-import { type Choice, createSwitcher, type Switcher } from "./switcher.ts";
+} from "../views/home/index.ts";
+import type { RunRecovery } from "../views/run/index.ts";
+import { Screen } from "../shared/ui/index.ts";
+import { type Editor, ReviewSession } from "../features/review-session/index.ts";
+import { type Choice, createSwitcher, type Switcher } from "../features/model-switching/index.ts";
 
 /** $VISUAL / $EDITOR on a temp copy of the file (same name, so editors pick the right syntax). */
 export function terminalEditor(env: NodeJS.ProcessEnv): Editor {

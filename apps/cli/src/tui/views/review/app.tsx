@@ -2,8 +2,8 @@ import type { ProposalOutcome } from "@crit/core";
 import type { ReviewEvent } from "@crit/schema";
 import { Box, useApp, useInput } from "ink";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Choice, TextInput } from "./components.tsx";
-import { parseQuery, triage, visibleItems } from "./filter.ts";
+import { Choice, TextInput } from "../../shared/ui/index.ts";
+import { parseQuery, triage, visibleItems } from "../../features/review-session/index.ts";
 import { HelpOverlay } from "./help-overlay.tsx";
 import {
   emptyProgress,
@@ -12,14 +12,14 @@ import {
   reduceProgress,
   type RunRecovery,
   type Selection,
-} from "./progress-screen.tsx";
+} from "../run/index.ts";
 import { ProposalScreen } from "./proposal-screen.tsx";
-import { useScreen } from "./screen.tsx";
-import type { ReviewSession } from "./session.ts";
+import { useScreen } from "../../shared/ui/index.ts";
+import type { ReviewSession } from "../../features/review-session/index.ts";
 import { StreamScreen } from "./stream-screen.tsx";
-import { describeChoice, type Switcher } from "./switcher.ts";
-import { useSwitching } from "./use-switching.tsx";
-import { Menu, type MenuItem, Picker } from "./widgets.tsx";
+import { describeChoice, type Switcher } from "../../features/model-switching/index.ts";
+import { useSwitching } from "../../features/model-switching/index.ts";
+import { Menu, type MenuItem, Picker } from "../../shared/ui/index.ts";
 
 type Mode =
   | "none"

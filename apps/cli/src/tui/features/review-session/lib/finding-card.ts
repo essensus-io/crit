@@ -1,9 +1,9 @@
 import { parseUnifiedDiff } from "@crit/core";
-import type { FindingView, SessionState } from "./session.ts";
+import type { FindingView, SessionState } from "../model/session.ts";
 import { triage } from "./filter.ts";
-import { clipToks, highlightLine } from "./highlight.ts";
-import { SEV_COLOR, SEV_LABEL, T } from "./theme.ts";
-import { wrapText } from "./widgets.tsx";
+import { clipToks, highlightLine } from "../../../shared/lib/index.ts";
+import { SEV_COLOR, SEV_LABEL, T } from "../../../shared/lib/index.ts";
+import { wrapText } from "../../../shared/ui/index.ts";
 
 /** A piece of styled text. Rows are arrays of these, so their width is known. */
 export type Seg = { t: string; color?: string; dim?: boolean; bold?: boolean; inverse?: boolean };

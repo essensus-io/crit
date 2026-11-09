@@ -1,6 +1,6 @@
 import { type Lens, SEVERITY_ORDER, type Severity } from "@crit/schema";
 import { basename, dirname } from "node:path";
-import type { FindingView, SessionState } from "./session.ts";
+import type { FindingView, SessionState } from "../model/session.ts";
 
 export type ListFilter = {
   tab: "findings" | "filtered";

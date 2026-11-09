@@ -8,10 +8,14 @@ import { openStore, type SqliteStore } from "@crit/store";
 import { createFixtureRepo, type FixtureRepo } from "@crit/testkit";
 import { render } from "ink-testing-library";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ReviewApp, RunApp } from "../src/tui/app.tsx";
-import { emptyProgress, ProgressScreen, reduceProgress } from "../src/tui/progress-screen.tsx";
-import { type Editor, ReviewSession, type SessionDeps } from "../src/tui/session.ts";
-import type { Choice, Switcher } from "../src/tui/switcher.ts";
+import { ReviewApp, RunApp } from "../src/tui/views/review/index.ts";
+import { emptyProgress, ProgressScreen, reduceProgress } from "../src/tui/views/run/index.ts";
+import {
+  type Editor,
+  ReviewSession,
+  type SessionDeps,
+} from "../src/tui/features/review-session/index.ts";
+import type { Choice, Switcher } from "../src/tui/features/model-switching/index.ts";
 
 const CODE = `export async function refund(order, amount, provider) {
   if (amount > order.capturedAmount) {

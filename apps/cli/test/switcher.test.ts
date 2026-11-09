@@ -8,8 +8,8 @@ import {
   createSwitcher,
   describeChoice,
   describeChoiceParts,
-} from "../src/tui/switcher.ts";
-import { summaryLine } from "../src/tui/start.tsx";
+} from "../src/tui/features/model-switching/index.ts";
+import { summaryLine } from "../src/tui/app/index.ts";
 import { fakeProvidersJson, type TestEnv, testContext } from "./helpers.ts";
 
 let t: TestEnv;

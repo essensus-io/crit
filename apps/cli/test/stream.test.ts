@@ -1,9 +1,13 @@
 import type { Finding } from "@crit/schema";
 import { describe, expect, it } from "vitest";
-import { lineLen, type Line } from "../src/tui/card.ts";
-import { parseQuery, triage, visibleItems } from "../src/tui/filter.ts";
-import type { CodeInfo, FindingView, SessionState } from "../src/tui/session.ts";
-import { buildStream, type StreamInput } from "../src/tui/stream.ts";
+import { lineLen, type Line } from "../src/tui/features/review-session/index.ts";
+import { parseQuery, triage, visibleItems } from "../src/tui/features/review-session/index.ts";
+import type {
+  CodeInfo,
+  FindingView,
+  SessionState,
+} from "../src/tui/features/review-session/index.ts";
+import { buildStream, type StreamInput } from "../src/tui/features/review-session/index.ts";
 
 const text = (l: Line) => l.map((s) => s.t).join("");
 

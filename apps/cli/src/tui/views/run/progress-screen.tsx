@@ -1,9 +1,17 @@
 import { formatTokens, type ReviewEvent, type Shard } from "@crit/schema";
 import { Box, Text } from "ink";
 import type { ReactNode } from "react";
-import { Footer } from "./components.tsx";
-import { SEV_LABEL, T, type Tone } from "./theme.ts";
-import { Bar, Panel, Spinner, StatusBar, truncate, useTick, Viewport } from "./widgets.tsx";
+import { Footer } from "../../shared/ui/index.ts";
+import { SEV_LABEL, T, type Tone } from "../../shared/lib/index.ts";
+import {
+  Bar,
+  Panel,
+  Spinner,
+  StatusBar,
+  truncate,
+  useTick,
+  Viewport,
+} from "../../shared/ui/index.ts";
 
 export type LogEntry = { at: number; tag: string; text: string; tone: Tone | "dim" };
 

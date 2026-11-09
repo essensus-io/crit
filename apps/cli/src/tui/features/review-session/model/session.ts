@@ -23,9 +23,9 @@ import {
 } from "@crit/core";
 import type { DismissReason, Finding, Fix, Message, Review } from "@crit/schema";
 import type { SqliteStore } from "@crit/store";
-import { copyToClipboard } from "../clipboard.ts";
-import type { Tok } from "./highlight.ts";
-import { findingPrompt } from "./prompt.ts";
+import { copyToClipboard } from "../../../../clipboard.ts";
+import type { Tok } from "../../../shared/lib/index.ts";
+import { findingPrompt } from "../lib/finding-prompt.ts";
 
 /** Fixes written at the same time. */
 const MAX_DRAFTS = 3;

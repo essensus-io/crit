@@ -1,12 +1,16 @@
 import { formatTokens, type ScopeSpec } from "@crit/schema";
 import { Box, Text, useApp, useInput } from "ink";
 import { useEffect, useRef, useState } from "react";
-import { Footer, TextInput } from "./components.tsx";
-import { useScreen } from "./screen.tsx";
-import { describeChoice, type Choice, type Switcher } from "./switcher.ts";
-import { T } from "./theme.ts";
-import { useSwitching } from "./use-switching.tsx";
-import { Menu, Panel, Spinner, truncate } from "./widgets.tsx";
+import { Footer, TextInput } from "../../shared/ui/index.ts";
+import { useScreen } from "../../shared/ui/index.ts";
+import {
+  describeChoice,
+  type Choice,
+  type Switcher,
+} from "../../features/model-switching/index.ts";
+import { T } from "../../shared/lib/index.ts";
+import { useSwitching } from "../../features/model-switching/index.ts";
+import { Menu, Panel, Spinner, truncate } from "../../shared/ui/index.ts";
 
 export type HomeChoice =
   | { kind: "start"; spec: ScopeSpec; choice: Choice | undefined }

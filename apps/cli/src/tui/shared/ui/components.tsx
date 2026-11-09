@@ -2,8 +2,6 @@ import { Box, Text, useInput } from "ink";
 import { type ReactNode, useRef, useState } from "react";
 import { parseUnifiedDiff } from "@crit/core";
 
-export { SEV_COLOR, SEV_LABEL } from "./theme.ts";
-
 export function HRule({ width, char = "─" }: { width: number; char?: string }) {
   return <Text dimColor>{char.repeat(Math.max(1, width))}</Text>;
 }
@@ -184,6 +182,3 @@ export function Choice({
     </Text>
   );
 }
-
-export const truncate = (s: string, n: number) =>
-  s.length > n ? `${s.slice(0, Math.max(0, n - 1))}…` : s;
