@@ -27,7 +27,6 @@ function need(file: ProvidersFile, name: string): ProviderProfile {
   return p;
 }
 
-/** Add a profile. The first profile becomes the default. */
 export function addProfile(
   file: ProvidersFile,
   input: ProviderProfileInput,
@@ -41,7 +40,6 @@ export function addProfile(
   return { ...file, providers, default: def };
 }
 
-/** Update fields of a profile; renaming also updates the default and roles. */
 export function updateProfile(
   file: ProvidersFile,
   name: string,
@@ -62,10 +60,6 @@ export function updateProfile(
   };
 }
 
-/**
- * Remove a profile and any roles pointing at it. Removing the default needs
- * `newDefault` when other profiles remain.
- */
 export function removeProfile(
   file: ProvidersFile,
   name: string,
@@ -104,17 +98,11 @@ export function setRole(file: ProvidersFile, role: Role, name: string | null): P
   return { ...file, roles };
 }
 
-/** Roles that point at this profile. */
 export const rolesOf = (file: ProvidersFile, name: string): Role[] =>
   (Object.entries(file.roles) as [Role, string][]).filter(([, n]) => n === name).map(([r]) => r);
 
 export type ResolvedProvider = { profile: ProviderProfile; warnings: string[] };
 
-/**
- * Pick the profile for a run: an explicit `--provider` wins, then a role
- * assignment, then the project's preferred provider (if the user has a
- * profile with that name), then the default.
- */
 export function resolveProvider(
   file: ProvidersFile,
   opts: { name?: string; role?: Role; preferred?: string } = {},

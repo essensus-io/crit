@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { type Editor } from "../features/review-session/index.ts";
 
-/** $VISUAL / $EDITOR on a temp copy of the file (same name, so editors pick the right syntax). */
 export function terminalEditor(env: NodeJS.ProcessEnv): Editor {
   return async (content, filename) => {
     const dir = mkdtempSync(join(tmpdir(), "crit-edit-"));

@@ -16,32 +16,20 @@ export type Choice = {
   depth: Depth;
 };
 
-/**
- * What the model/provider/effort/depth shortcuts change. It holds the current
- * choice and reports changes; the screens decide what a change means (the
- * next AI action, or the retry of a review).
- */
 export type Switcher = {
   current(): Choice;
-  /** Called after every change. Returns an unsubscribe function. */
   subscribe(fn: (choice: Choice) => void): () => void;
   providers(): Pick<ProviderProfile, "name" | "type" | "model" | "enabled">[];
   setProvider(name: string): Choice;
   models(): Promise<{ models: ModelInfo[]; live: boolean }>;
-  /** Efforts the current model accepts. Empty when the CLI has none (Cursor). */
   efforts(): Promise<string[]>;
   setModel(id: string | null): Choice;
   setEffort(effort: string | null): Choice;
   setDepth(depth: Depth): Choice;
-  /** Write provider, model and effort back to the saved profile. */
   save(): string;
-  /** Provider types that can be added, with the environment variable that selects an account. */
   types(): { type: string; label: string; accountVar?: string }[];
-  /** A free name for a new profile of this type. */
   suggestName(type: string): string;
-  /** Add a profile, save it and switch to it. `account` is a config folder for another login. */
   add(input: { type: string; name: string; account?: string }): Choice;
-  /** Remove a profile and save. The last one cannot be removed. */
   remove(name: string): void;
 };
 
@@ -103,7 +91,6 @@ export function createSwitcher(
     setEffort: (effort) => set({ effort }),
     setDepth: (depth) => set({ depth }),
     save() {
-      // Re-read the file so edits made elsewhere are not overwritten.
       const fresh = loadProviders(ctx.paths) ?? file;
       saveProviders(
         ctx.paths,
@@ -154,7 +141,6 @@ export function createSwitcher(
   };
 }
 
-/** The variable each agent CLI reads to pick its login. */
 const ACCOUNT_VAR: Record<string, string> = {
   "claude-code": "CLAUDE_CONFIG_DIR",
   codex: "CODEX_HOME",

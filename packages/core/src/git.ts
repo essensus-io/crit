@@ -17,7 +17,6 @@ export class GitError extends Error {
 
 export type GitResult = { stdout: string; stderr: string; exitCode: number };
 
-/** Run git and return the full result without throwing. */
 export async function gitRaw(cwd: string, args: string[], input?: string): Promise<GitResult> {
   const proc = x("git", ["-c", "core.quotepath=off", ...args], {
     nodeOptions: { cwd, stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"] },
@@ -30,7 +29,6 @@ export async function gitRaw(cwd: string, args: string[], input?: string): Promi
   return { stdout: r.stdout, stderr: r.stderr, exitCode: r.exitCode ?? 1 };
 }
 
-/** Run git, throw GitError on a non-zero exit. */
 export async function git(cwd: string, args: string[], input?: string): Promise<string> {
   const r = await gitRaw(cwd, args, input);
   if (r.exitCode !== 0) throw new GitError(args, r.exitCode, r.stderr);
@@ -65,19 +63,10 @@ export async function refExists(cwd: string, ref: string): Promise<boolean> {
   return (await tryGit(cwd, ["rev-parse", "--verify", "-q", `${ref}^{commit}`])) !== undefined;
 }
 
-/**
- * Base branch for branch reviews. An upstream that tracks a different branch
- * wins (a feature branch created from origin/main). Otherwise the nearest of
- * origin/HEAD and the usual integration branches: the one the current branch
- * is fewest commits ahead of. Taking origin/HEAD blindly reviewed a branch off
- * `develop` against a `main` five weeks behind, 1,576 files instead of 27.
- * Refs that HEAD is not ahead of (the branch itself, its ancestors) are skipped.
- */
 export async function detectBase(cwd: string): Promise<string | undefined> {
   const branch = await currentBranch(cwd);
   const upstream = await tryGit(cwd, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]);
   if (upstream && branch && upstream.split("/").slice(1).join("/") !== branch) return upstream;
-  // The base the branch was created for, when git or `gh` recorded it.
   if (branch)
     for (const key of ["gh-merge-base", "vscode-merge-base"]) {
       const configured = await tryGit(cwd, ["config", "--get", `branch.${branch}.${key}`]);
@@ -91,7 +80,6 @@ export async function detectBase(cwd: string): Promise<string | undefined> {
     "refs/remotes/origin/HEAD",
   ]);
   if (originHead) names.push(originHead);
-  // Remote refs first: a local develop can be stale, and ties keep this order.
   for (const c of [
     "origin/main",
     "origin/master",
@@ -112,14 +100,9 @@ export async function detectBase(cwd: string): Promise<string | undefined> {
     const ahead = Number(await tryGit(cwd, ["rev-list", "--count", `${ref}..HEAD`]));
     if (Number.isFinite(ahead)) scored.push({ ref, ahead });
   }
-  // Nothing to compare against: fall back to any existing branch.
   if (scored.length === 0) return anyExisting;
-  // The branch it will merge into is the nearest one: fewest commits ahead wins (0 means
-  // already merged there); ties keep the order above (origin/HEAD first).
   const best = scored.reduce((b, c) => (c.ahead < b.ahead ? c : b));
   if (best.ahead > 0) return best.ref;
-  // Already merged into it: review what the merge brought in, i.e. compare against the
-  // base as it was just before that merge commit (what the pull request showed).
   const merge = (
     await tryGit(cwd, [
       "rev-list",
@@ -138,7 +121,6 @@ export async function detectBase(cwd: string): Promise<string | undefined> {
   return before || best.ref;
 }
 
-/** Branches this one could be compared against, with how many commits it is ahead of each. */
 export async function candidateBases(cwd: string): Promise<{ ref: string; ahead: number }[]> {
   const branch = await currentBranch(cwd);
   const out: { ref: string; ahead: number }[] = [];
@@ -161,7 +143,6 @@ export async function candidateBases(cwd: string): Promise<{ ref: string; ahead:
   return out;
 }
 
-/** NUL-separated output → list. */
 export const splitZ = (s: string) => s.split("\0").filter(Boolean);
 
 export async function trackedFiles(cwd: string): Promise<string[]> {
@@ -172,5 +153,4 @@ export async function untrackedFiles(cwd: string): Promise<string[]> {
   return splitZ(await git(cwd, ["ls-files", "-z", "--others", "--exclude-standard"]));
 }
 
-/** The empty tree object, used to diff the root commit. */
 export const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";

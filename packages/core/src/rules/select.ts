@@ -2,27 +2,20 @@ import { RULE_LAYER_PRECEDENCE, Rule, type RuleLayer, type RuleSourceKind } from
 import picomatch from "picomatch";
 import { type ParsedRule, parseRuleFile, type RuleFile } from "./parse.ts";
 
-/** Rough token estimate: 4 characters per token. */
 export const estimateTokens = (s: string) => Math.ceil(s.length / 4);
 
 const NON_REVIEW_TITLE =
   /\b(commit(s| messages?)?|pr titles?|pull requests?|branch(es| naming)?|changelog|releases?|releasing|versioning|install(ation|ing)?|setup|set up|getting started|quick ?start|dev(elopment)? (server|environment)|running( the)? (app|tests|locally)|how to run|scripts|commands|deploy(ment|ing)?|ci( ?\/ ?cd)?|tool(s|ing)|editor|ide|workflow|git( usage)?|contributing|license|contact|links|table of contents|toc)\b/i;
 
-/**
- * Heuristic: is this section about how code should be written (a review rule)
- * rather than commits, PR titles, setup or tooling?
- */
 export function isReviewRelevant(r: Pick<ParsedRule, "title" | "body" | "kind">): boolean {
   if (r.kind === "crit-rule" || r.kind === "cursor-rule" || r.kind === "review-md") return true;
   if (r.kind === "skill" || r.kind === "claude-agent") return true;
   if (NON_REVIEW_TITLE.test(r.title) && !/\b(code|review|style|error|security)\b/i.test(r.title))
     return false;
-  // Sections that are only shell commands are setup notes.
   const prose = r.body.replace(/```[\s\S]*?```/g, "").trim();
   return prose.length > 0 || !/```/.test(r.body);
 }
 
-/** Optional one-time model pass that tags sections; results are cached by content hash. */
 export type RuleTagger = (
   sections: { hash: string; title: string; body: string }[],
 ) => Promise<Map<string, boolean>>;
@@ -33,14 +26,10 @@ export type TagCache = {
 
 export type LoadRulesOptions = {
   files: RuleFile[];
-  /** Repo-relative files in scope; rules with globs or a folder attach only when one matches. */
   scopeFiles: string[];
-  /** Kinds the agent loads by itself: those rules are sent as an index only. */
   nativeKinds?: RuleSourceKind[];
   sources?: RuleLayer[];
-  /** `path` or `path#Section` */
   exclude?: string[];
-  /** Rule keys turned off by the user in the review screen. */
   disabled?: string[];
   budgetTokens?: number;
   tagger?: RuleTagger;
@@ -50,21 +39,13 @@ export type LoadRulesOptions = {
 export type RuleConflict = { topic: string; ruleIds: string[]; winner: string };
 
 export type RuleSet = {
-  /** Every review-relevant rule with an id (R1, R2, …). */
   all: Rule[];
-  /** Inlined into the prompt. */
   attached: Rule[];
-  /** Sent as id + title + path; the agent reads them with get_rules when needed. */
   listed: Rule[];
-  /** Skills and agents: name + description only. */
   skills: Rule[];
-  /** Attached but loaded natively by the agent: index only. */
   native: Rule[];
-  /** Sections tagged as not about review. */
   filtered: Rule[];
-  /** Same topic in more than one layer; the winner is kept. */
   conflicts: RuleConflict[];
-  /** Rules that do not apply to any file in scope. */
   unattached: Rule[];
   errors: string[];
 };
@@ -76,7 +57,6 @@ const topicOf = (title: string) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
 
-/** Does a rule apply to any of the given files? */
 export function ruleApplies(
   rule: Pick<Rule, "globs" | "scopeDir" | "alwaysApply">,
   files: string[],
@@ -120,11 +100,6 @@ const kindOrder: RuleSourceKind[] = [
   "skill",
 ];
 
-/**
- * Turn rule files into one numbered rule set for a review: parse, filter for
- * review, attach by scope, resolve conflicts (user > project > global), and
- * fit the inline budget.
- */
 export async function loadRules(opts: LoadRulesOptions): Promise<RuleSet> {
   const sources = new Set(opts.sources ?? ["project", "global", "user"]);
   const disabled = new Set(opts.disabled ?? []);
@@ -142,7 +117,6 @@ export async function loadRules(opts: LoadRulesOptions): Promise<RuleSet> {
   }
   parsed = parsed.filter((r) => !excluded(r, opts.exclude ?? []) && !disabled.has(r.key));
 
-  // Review filter: heuristic first, then an optional cached model pass for markdown sections.
   const relevance = new Map<string, boolean>(parsed.map((r) => [r.hash, isReviewRelevant(r)]));
   if (opts.tagger) {
     const candidates = parsed.filter((r) =>
@@ -169,7 +143,6 @@ export async function loadRules(opts: LoadRulesOptions): Promise<RuleSet> {
     }
   }
 
-  // Stable numbering: layer precedence, then kind, then path, then section order.
   const ordered = parsed
     .map((r, i) => ({ r, i }))
     .sort(
@@ -200,10 +173,8 @@ export async function loadRules(opts: LoadRulesOptions): Promise<RuleSet> {
   const unattached: Rule[] = [];
   for (const r of regular) (ruleApplies(r, opts.scopeFiles) ? applicable : unattached).push(r);
 
-  // Conflicts: the same topic in more than one layer. Higher layer wins; deeper folder wins within a layer.
   const byTopic = new Map<string, Rule[]>();
   for (const r of applicable) {
-    // Titles derived from a file name ("AGENTS.md", "CLAUDE.md (intro)") are not topics.
     const file = r.path.split("/").pop()!;
     const derived =
       r.title === file || r.title === file.replace(/\.mdc?$/, "") || r.title.endsWith("(intro)");
@@ -229,7 +200,6 @@ export async function loadRules(opts: LoadRulesOptions): Promise<RuleSet> {
   const nativeRules = kept.filter((r) => native.has(r.kind));
   const toInline = kept
     .filter((r) => !native.has(r.kind))
-    // Specific rules first: always-apply, then glob/folder-scoped, then general; within that, precedence.
     .map((r, i) => ({ r, i }))
     .sort((a, b) => {
       const spec = (r: Rule) => (r.alwaysApply ? 0 : r.globs.length || r.scopeDir ? 1 : 2);
@@ -265,7 +235,6 @@ export async function loadRules(opts: LoadRulesOptions): Promise<RuleSet> {
   };
 }
 
-/** Short label for a rule in headers: "CLAUDE.md §Errors", ".cursor/rules/payments.mdc", "skill api-design". */
 export function ruleLabel(r: Pick<Rule, "kind" | "path" | "section" | "title">): string {
   if (r.kind === "skill") return `skill ${r.title}`;
   if (r.kind === "claude-agent") return `agent ${r.title}`;

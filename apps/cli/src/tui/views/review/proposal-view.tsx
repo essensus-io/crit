@@ -16,7 +16,6 @@ type Props = {
   input?: ReactNode;
 };
 
-/** The result of checking a user proposal: verdict, the user's diff, the AI's reply and a reply box. */
 export const ProposalView = (props: Props) => {
   const { outcome, width, height, state } = props;
   const e = outcome.evaluation;
@@ -58,7 +57,6 @@ export const ProposalView = (props: Props) => {
       </Text>,
     );
   }
-  // header 1 · rule 1 · body · input 1 · status 1 · footer 2
   const body = Math.max(3, height - 6);
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">

@@ -5,16 +5,10 @@ import { RuleLayer } from "./rule.ts";
 export const Depth = z.enum(["quick", "standard", "deep"]);
 export type Depth = z.infer<typeof Depth>;
 
-/**
- * `.crit/config.json` (team) merged over `~/.config/crit/config.json` (personal).
- * Every field is optional; `resolveConfig` fills defaults.
- */
 export const ConfigFile = z
   .object({
     $schema: z.string().optional(),
-    /** Preferred provider profile name; falls back to the user's default with a warning. */
     provider: z.string().optional(),
-    /** Base branch for branch reviews. Detected from upstream / origin/HEAD when unset. */
     base: z.string().optional(),
     lenses: z.array(Lens).min(1).optional(),
     severityThreshold: Severity.optional(),
@@ -22,9 +16,7 @@ export const ConfigFile = z
       .object({
         sources: z.array(RuleLayer).optional(),
         include: z.array(z.string()).optional(),
-        /** `path` or `path#Section heading` */
         exclude: z.array(z.string()).optional(),
-        /** Max tokens of rule text inlined into the prompt. */
         budgetTokens: z.number().int().positive().optional(),
       })
       .strict()
@@ -48,24 +40,18 @@ export const ConfigFile = z
       .object({
         maxShards: z.number().int().positive().optional(),
         maxMinutes: z.number().positive().optional(),
-        /** Ask before starting a review estimated above this many effective tokens. */
         confirmTokens: z.number().int().positive().optional(),
-        /** Stop a review once it has used this many effective tokens. */
         maxTokens: z.number().int().positive().optional(),
       })
       .strict()
       .optional(),
-    /** Target shard size in estimated tokens (4 chars ≈ 1 token). */
     shardTokens: z.number().int().positive().optional(),
-    /** Skip files above this many tokens in whole-file scopes (name a file to review it anyway). */
     maxFileTokens: z.number().int().positive().optional(),
-    /** How much review to buy: quick, standard (default) or deep. */
     depth: Depth.optional(),
   })
   .strict();
 export type ConfigFile = z.infer<typeof ConfigFile>;
 
-/** Never sent to an agent: secrets, keys and lockfiles. Naming a file does not bypass these. */
 export const SECRET_IGNORES = [
   ".env",
   ".env.*",
@@ -86,10 +72,6 @@ export const SECRET_IGNORES = [
   "**/*.map",
 ];
 
-/**
- * Not worth review tokens: docs, assets, agent config, snapshots, build output
- * and generated code. Naming the file on the command line still reviews it.
- */
 export const NOISE_IGNORES = [
   "**/*.svg",
   "**/*.md",
@@ -113,11 +95,9 @@ export const NOISE_IGNORES = [
 
 export const DEFAULT_IGNORES = [...SECRET_IGNORES, ...NOISE_IGNORES];
 
-/** Extensions that are binary or media whatever their content looks like. */
 export const BINARY_EXTENSIONS =
   /\.(png|jpe?g|gif|webp|avif|ico|icns|bmp|tiff?|heic|otf|ttf|woff2?|eot|mp3|mp4|mov|avi|webm|wav|ogg|flac|zip|gz|tgz|bz2|xz|7z|rar|tar|pdf|psd|sketch|fig|exe|dll|so|dylib|bin|wasm|class|jar|onnx|pt|ckpt|sqlite|db)$/i;
 
-/** Fully resolved config with defaults applied. */
 export type ResolvedConfig = {
   provider?: string;
   base?: string;
@@ -158,10 +138,6 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   depth: "standard",
 };
 
-/**
- * Merge config layers, later layers win. Arrays replace, except `ignore`,
- * `rules.include` and `rules.exclude`, which accumulate across layers.
- */
 export function resolveConfig(...layers: (ConfigFile | undefined)[]): ResolvedConfig {
   const out: ResolvedConfig = structuredClone(DEFAULT_CONFIG);
   for (const layer of layers) {

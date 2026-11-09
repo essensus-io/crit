@@ -13,7 +13,6 @@ import { colors, plural, SEVERITY_LETTER, table, truncate, when } from "../ui.ts
 import { resolveReview } from "./resolve.ts";
 import { repoRootOrThrow } from "./shared.ts";
 
-/** "90d", "12w", "24h" → ms */
 export function parseAge(s: string): number {
   const m = /^(\d+)\s*([hdw])$/.exec(s.trim());
   if (!m)
@@ -24,7 +23,6 @@ export function parseAge(s: string): number {
   return n * { h: 3_600_000, d: 86_400_000, w: 604_800_000 }[m[2] as "h" | "d" | "w"];
 }
 
-/** A date (YYYY-MM-DD) or an age ("7d") → ms timestamp. */
 export function parseSince(s: string, now: number): number {
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(`${s}T00:00:00`).getTime();
   return now - parseAge(s);
@@ -33,7 +31,6 @@ export function parseSince(s: string, now: number): number {
 export const severitySummary = (r: HistoryRow) =>
   SEVERITY_ORDER.map((s) => `${r.severity[s]}${SEVERITY_LETTER[s]}`).join(" ");
 
-/** Effective tokens (fresh + output + cached/10), or "-" when the review recorded none. */
 export const tokensLabel = (r: HistoryRow) =>
   r.tokens.effective > 0 ? `~${formatTokens(r.tokens.effective)}` : "-";
 
@@ -81,7 +78,6 @@ export async function historyRows(
   });
 }
 
-/** The history table from the mockup: ID, WHEN, SCOPE, PROVIDER, FINDINGS, OUTCOME. */
 export function renderHistory(
   rows: HistoryRow[],
   opts: { now: number; color: boolean; allRepos?: boolean; cursor?: number },
@@ -283,11 +279,6 @@ const filterArgs = {
   json: { type: "boolean", description: "Print JSON" },
 } as const;
 
-/**
- * `crit history [--compare <a> <b>]`, `crit history rm <id>`, `crit history prune`.
- * rm/prune are routed from positionals: citty would read review ids after
- * --compare as unknown subcommand names.
- */
 export const historyDef = (ctx: CliContext) =>
   defineCommand({
     meta: {

@@ -4,11 +4,9 @@ type Props = {
   options: [string, string][];
   onPick: (key: string) => void;
   onCancel: () => void;
-  /** Enter takes the first option, which is then marked. */
   enterPicksFirst?: boolean;
 };
 
-/** A one-key choice line, e.g. "Dismiss: f false positive · w won't fix · l later · esc cancel". */
 export const Choice = ({ label, options, onPick, onCancel, enterPicksFirst = false }: Props) => {
   useInput((input, key) => {
     if (key.escape) return onCancel();

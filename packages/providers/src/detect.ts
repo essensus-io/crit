@@ -4,7 +4,6 @@ import { commandVersion, which } from "./process.ts";
 
 export type Detected = { factory: AdapterFactory; path?: string; version?: string };
 
-/** First run: which known agent CLIs are on PATH, with versions. */
 export async function detectInstalled(
   registry: AdapterRegistry,
   env: NodeJS.ProcessEnv = process.env,
@@ -19,7 +18,6 @@ export async function detectInstalled(
   );
 }
 
-/** Shared detect() for CLI adapters: installed + version; login is checked by the test prompt. */
 export async function detectCli(
   command: string,
   env: NodeJS.ProcessEnv,
@@ -41,7 +39,6 @@ export async function detectCli(
   return r;
 }
 
-/** Compare dotted numeric versions; pre-release suffixes are ignored. */
 export function compareVersions(a: string, b: string): number {
   const pa = a.split(/[-+]/)[0]!.split(".").map(Number);
   const pb = b.split(/[-+]/)[0]!.split(".").map(Number);

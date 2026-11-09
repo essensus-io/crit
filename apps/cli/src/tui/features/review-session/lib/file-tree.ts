@@ -4,7 +4,6 @@ import { isFiltered } from "./triage.ts";
 
 export type TreeRow = { key: string; label: string; count: number; file?: string };
 
-/** Sidebar rows: folders with counts, files under them. */
 export function fileTree(state: SessionState): TreeRow[] {
   const shown = state.items.filter((v) => !isFiltered(v));
   const byDir = new Map<string, Map<string, number>>();

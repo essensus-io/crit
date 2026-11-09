@@ -21,13 +21,8 @@ const GIT_ENV = {
   GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null",
 };
 
-/** Environment that makes git deterministic and independent of the user's config. */
 export const gitTestEnv = (): NodeJS.ProcessEnv => ({ ...process.env, ...GIT_ENV });
 
-/**
- * A temporary git repo on `main` with an optional first commit.
- * Real git, no network: the same setup the pipeline and CLI tests use.
- */
 export function createFixtureRepo(initial?: Record<string, string>): FixtureRepo {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "crit-fixture-")));
   const git = (...args: string[]) =>

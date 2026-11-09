@@ -97,7 +97,6 @@ export function renderRules(set: RuleSet, c: ReturnType<typeof colors>, all: boo
 
 type PackRecord = { name: string; url: string; ref?: string; commit: string; addedAt: number };
 
-/** `crit rules add <path|git-url>`: copy a rule file/folder, or clone a pack pinned to a commit. */
 export async function addRules(
   ctx: CliContext,
   source: string,
@@ -150,7 +149,6 @@ export async function addRules(
   return EXIT.ok;
 }
 
-/** Cursor keeps user rules in app settings; paste them into a crit rule file. */
 export async function importCursorRules(ctx: CliContext, text?: string): Promise<number> {
   let body = text;
   if (body === undefined) {

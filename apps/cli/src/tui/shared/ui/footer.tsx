@@ -2,7 +2,6 @@ import { Box, Text } from "ink";
 import { HRule } from "./hrule.tsx";
 type Props = { keys: [string, string][]; width: number };
 
-/** Key hints at the bottom: "j/k move · space select · …" */
 export const Footer = ({ keys, width }: Props) => {
   return (
     <Box flexDirection="column">

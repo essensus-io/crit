@@ -31,22 +31,12 @@ export const DEPTH_HINTS: Record<Depth, string> = {
   deep: "lenses split, skeptic checks all, high effort",
 };
 
-/**
- * The model/provider/effort/depth shortcuts. `m`, `P`, `E`, `D` open a searchable
- * picker as a full-screen overlay (it never leaves the alternate screen) and
- * `S` saves the current choice as the profile's default. While an overlay is
- * open `modal` is true and the screen should ignore its own keys.
- */
 export const useSwitching = (opts: {
   switcher: Switcher | undefined;
-  /** Keys are live only while this is true (a text prompt elsewhere turns them off). */
   active: boolean;
   onNotice: (message: string) => void;
-  /** "Connect another provider…" was picked. */
   onConnect?: () => void;
-  /** The choice changed (re-render, rebuild the provider). */
   onChange?: () => void;
-  /** Off when the screen opens the pickers itself (through `open`). */
   hotkeys?: boolean;
 }): { overlay: ReactNode; modal: boolean; open: (key: "m" | "p" | "e" | "d" | "s") => void } => {
   const { switcher, active, onNotice } = opts;
@@ -60,7 +50,6 @@ export const useSwitching = (opts: {
     onNotice(`${verb}: ${describeChoice(c)}. ${save} it as the default for ${c.provider}.`);
   };
 
-  // A new setup: add it, switch to it, and go straight to picking its model (saved with it).
   const finishAdd = (type: string, name: string, account?: string) => {
     try {
       switcher!.add({ type, name, ...(account ? { account } : {}) });
@@ -342,6 +331,5 @@ export const useSwitching = (opts: {
       );
       break;
   }
-  // a new key per stage: one picker must not inherit the previous one's search text
   return { overlay: <Fragment key={stage.kind}>{overlay}</Fragment>, modal: true, open: trigger };
 };

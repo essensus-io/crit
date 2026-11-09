@@ -6,16 +6,10 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { z } from "zod";
 import type { AdapterEnv, AdapterFactory, ProviderAdapter } from "./adapter.ts";
 
-/**
- * A scripted run. The fake provider replays these instead of calling a real
- * agent: it emits the events, calls the real crit MCP server with the scripted
- * tool calls, and ends with the scripted final message.
- */
 export const FakeRun = z.object({
   match: z
     .object({
       kind: z.string().optional(),
-      /** Substring the prompt must contain (e.g. a file path in the shard). */
       promptIncludes: z.string().optional(),
     })
     .optional(),
@@ -23,12 +17,7 @@ export const FakeRun = z.object({
   calls: z
     .array(z.object({ tool: z.string(), args: z.record(z.string(), z.unknown()).default({}) }))
     .default([]),
-  /** Final assistant message (JSON for skeptic / evaluate / JSON-fallback tasks). */
   message: z.string().optional(),
-  /**
-   * Skeptic helper: answer for every finding id in the prompt. `byTitle` maps a
-   * title substring to a verdict; everything else gets `default`.
-   */
   skeptic: z
     .object({
       default: z.enum(["confirmed", "plausible", "rejected"]).default("confirmed"),
@@ -37,14 +26,12 @@ export const FakeRun = z.object({
     .optional(),
   exitCode: z.number().int().default(0),
   delayMs: z.number().int().min(0).default(0),
-  /** Reusable: not consumed when matched. */
   repeat: z.boolean().default(false),
 });
 export type FakeRun = z.infer<typeof FakeRun>;
 export type FakeRunInput = z.input<typeof FakeRun>;
 
 export const FakeScript = z.object({
-  /** Reported by detect() as the CLI version. */
   version: z.string().default("0.0.0-fake"),
   loggedIn: z.boolean().default(true),
   runs: z.array(FakeRun).default([]),
@@ -52,7 +39,6 @@ export const FakeScript = z.object({
 export type FakeScript = z.infer<typeof FakeScript>;
 export type FakeScriptInput = z.input<typeof FakeScript>;
 
-/** Records what the fake was asked to do, for assertions. */
 export type FakeCall = { task: AgentTask; run: FakeRun | undefined };
 
 const sleep = (ms: number, signal: AbortSignal) =>
@@ -69,7 +55,6 @@ const sleep = (ms: number, signal: AbortSignal) =>
     );
   });
 
-/** Pull `"id": "…"` / `"title": "…"` pairs out of the findings block of a skeptic prompt. */
 export function findingsInPrompt(prompt: string): { id: string; title: string }[] {
   const m = /<findings>\s*([\s\S]*?)\s*<\/findings>/.exec(prompt);
   if (!m) return [];
@@ -184,7 +169,6 @@ export class FakeAdapter implements ProviderAdapter {
   }
 }
 
-/** Shared instances per script path so tests can inspect `calls` and consumed runs. */
 const instances = new Map<string, FakeAdapter>();
 
 export const fakeFactory: AdapterFactory = {
@@ -207,7 +191,6 @@ export const fakeFactory: AdapterFactory = {
   },
 };
 
-/** Forget cached fake instances (between tests). */
 export function resetFakes(): void {
   instances.clear();
 }

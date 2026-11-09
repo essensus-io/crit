@@ -95,10 +95,8 @@ describe("branch scope", () => {
     const s = await resolveScope({ cwd: repo.root, spec: { kind: "branch" } });
     expect(s.label).toBe("feature/x → develop");
     expect(paths(s)).toEqual(["src/x.ts"]);
-    // on develop itself, main is the base (develop is not ahead of itself)
     repo.git("checkout", "-q", "develop");
     expect(await detectBase(repo.root)).toBe("main");
-    // a tie keeps the preferred order: main before develop
     repo.git("checkout", "-q", "-b", "other", "main");
     repo.commit("other", { "src/o.ts": "export const o = 1;\n" });
     expect(await detectBase(repo.root)).toBe("main");
@@ -142,7 +140,6 @@ describe("base detection", () => {
       await git(clone, ["remote", "set-head", "origin", "main"]);
       expect(await detectBase(clone)).toBe("origin/main");
       await git(clone, ["remote", "set-head", "origin", "-d"]);
-      // no origin/HEAD: the remote main is still preferred over the local one
       expect(await detectBase(clone)).toBe("origin/main");
     } finally {
       remote.cleanup();

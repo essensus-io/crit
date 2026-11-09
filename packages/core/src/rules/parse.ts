@@ -13,12 +13,10 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 export type RuleFile = {
   layer: RuleLayer;
   kind: RuleSourceKind;
-  /** Display path: repo-relative for project files, `~/…` for home files. */
   path: string;
   content: string;
 };
 
-/** A parsed rule before ids are assigned. */
 export type ParsedRule = Omit<RuleInput, "id">;
 
 export const hashText = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 16);
@@ -41,11 +39,6 @@ function headingText(h: Heading): string {
 
 type Section = { title: string | undefined; body: string };
 
-/**
- * Split a markdown doc into sections at the shallowest heading depth that
- * occurs more than once (so a single H1 title + H2 sections splits on H2).
- * Text before the first split heading becomes a preamble section.
- */
 export function splitSections(markdown: string): Section[] {
   const tree: Root = fromMarkdown(markdown);
   const headings = tree.children.filter((n): n is Heading => n.type === "heading");
@@ -59,7 +52,6 @@ export function splitSections(markdown: string): Section[] {
   const sections: Section[] = [];
   const firstOffset = splits[0]!.position!.start.offset!;
   const preamble = markdown.slice(0, firstOffset).trim();
-  // A lone title heading above the split level is not content on its own.
   const preambleIsTitle = /^#{1,6} [^\n]*$/.test(preamble);
   if (preamble && !preambleIsTitle) sections.push({ title: undefined, body: preamble });
   for (const [i, h] of splits.entries()) {
@@ -84,7 +76,6 @@ function base(file: RuleFile, title: string, body: string, section?: string): Pa
   return r;
 }
 
-/** Folder a nested CLAUDE.md / AGENTS.md applies to (repo-relative, "" for root). */
 function scopeDirOf(file: RuleFile): string {
   if (file.layer !== "project") return "";
   if (file.kind !== "claude-md" && file.kind !== "agents-md") return "";

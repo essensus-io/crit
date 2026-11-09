@@ -41,7 +41,6 @@ type Props = {
   onClose: () => void;
 };
 
-/** The cheat sheet: every key, grouped by what it is for. */
 export const HelpView = ({ width, height, onClose }: Props) => {
   useInput((input, key) => {
     if (key.escape || input === "q" || input === "?") onClose();

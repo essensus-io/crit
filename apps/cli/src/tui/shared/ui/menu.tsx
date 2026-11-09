@@ -14,14 +14,9 @@ type Props = {
   onCancel: () => void;
 };
 
-/**
- * A short list where each row has its own letter: press it, or move with the
- * arrows and press enter. Used for the actions and options menus.
- */
 export const Menu = ({ title, items, width, height, note, onPick, onCancel }: Props) => {
   const [index, setIndex] = useState(0);
   useInput((input, key) => {
-    // Letters belong to the rows, so only arrows move.
     if (key.escape) return onCancel();
     if (key.return) return void (items[index] && onPick(items[index]!.key));
     if (key.upArrow) return setIndex((i) => Math.max(0, i - 1));

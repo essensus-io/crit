@@ -32,9 +32,7 @@ export function createMain(ctx: CliContext): CommandDef {
   });
 }
 
-/** Run crit with argv (without node and script) and return the exit code. Never calls process.exit. */
 export async function runCli(rawArgv: string[], ctx: CliContext): Promise<number> {
-  // `crit` alone in a terminal opens the start screen; piped, it prints help.
   const argv = rawArgv.length === 0 && ctx.interactive ? ["review"] : rawArgv;
   const main = createMain(ctx);
   const c = colors(ctx.color);

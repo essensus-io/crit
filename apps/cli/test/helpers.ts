@@ -20,25 +20,17 @@ export type TestEnv = {
   prompter: ScriptedPrompter;
   stdout(): string;
   stderr(): string;
-  /** Run crit with argv; returns the exit code. Output accumulates. */
   run(...argv: string[]): Promise<number>;
-  /** Set the script every `test-agent` profile replays (fresh adapter per call). */
   script(s: FakeScriptInput): void;
   fakes: FakeAdapter[];
   cleanup(): void;
 };
 
-/**
- * A CLI context with a temp crit home, captured output, scripted prompts and a
- * registry whose "test-agent" type replays fake scripts. A stub `test-agent`
- * binary on PATH lets first-run detection find it.
- */
 export function testContext(
   opts: {
     interactive?: boolean;
     answers?: ConstructorParameters<typeof ScriptedPrompter>[0];
     cwd?: string;
-    /** Give the fake agent CLI its own model list, as Codex and Cursor have. */
     models?: ModelInfo[];
   } = {},
 ): TestEnv {
@@ -114,7 +106,6 @@ export function testContext(
   };
 }
 
-/** Replace ids, times and temp paths so output can be snapshotted. */
 export function normalize(s: string, env: TestEnv, extra: Record<string, string> = {}): string {
   let r = s;
   for (const [from, to] of Object.entries(extra)) r = r.split(from).join(to);

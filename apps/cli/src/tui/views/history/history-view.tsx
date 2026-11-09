@@ -29,7 +29,6 @@ type Props = {
   width?: number;
 };
 
-/** Review history (mockup 7): newest first; enter opens, c compares with the previous run on the same scope. */
 export const HistoryView = ({ initial, actions, now, width: widthProp }: Props) => {
   const app = useApp();
   const screen = useScreen();
@@ -142,7 +141,6 @@ export const HistoryView = ({ initial, actions, now, width: widthProp }: Props) 
   );
 };
 
-/** Previous review of the same scope (and branch) before `row`. */
 export const previousOf = (row: HistoryRow, rows: HistoryRow[]): HistoryRow | undefined => {
   return rows.find(
     (r) =>

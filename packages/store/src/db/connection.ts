@@ -32,12 +32,6 @@ function exec(
   return { rows: stmt.all(...args) };
 }
 
-/**
- * Open (and migrate) the crit database. Drizzle 0.45 has no node:sqlite driver,
- * so this wires node:sqlite through the sqlite-proxy driver. `batch` runs its
- * statements synchronously inside one transaction, so concurrent async work
- * cannot interleave with it.
- */
 export function openDatabase(path: string = ":memory:"): Connection {
   if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
   const raw = new DatabaseSync(path);
@@ -65,7 +59,6 @@ export function openDatabase(path: string = ":memory:"): Connection {
   return { db, raw, close: () => raw.close() };
 }
 
-/** Apply pending embedded migrations, each in its own transaction. Returns the tags applied. */
 export function migrate(raw: DatabaseSync): string[] {
   raw.exec(
     "CREATE TABLE IF NOT EXISTS crit_migrations (tag text PRIMARY KEY NOT NULL, applied_at integer NOT NULL)",

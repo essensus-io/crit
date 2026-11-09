@@ -2,22 +2,15 @@ import { x } from "tinyexec";
 import type { AdapterFactory } from "./adapter.ts";
 
 export type ModelInfo = {
-  /** What goes after --model. */
   id: string;
   label: string;
-  /** Reasoning efforts this model accepts, when the CLI reports them. */
   efforts?: string[];
   defaultEffort?: string;
-  /** Short note shown next to the label: "default", "hidden", … */
   hint?: string;
 };
 
 const ZERO_WIDTH = /[​-‍⁠﻿]/g;
 
-/**
- * `codex debug models` prints the catalog the CLI itself uses. Only models the
- * CLI lists to users (visibility "list") are offered, in its own priority order.
- */
 export function parseCodexModels(json: string): ModelInfo[] {
   let data: unknown;
   try {
@@ -51,11 +44,6 @@ export function parseCodexModels(json: string): ModelInfo[] {
     });
 }
 
-/**
- * `cursor-agent --list-models`: lines of "<id> - <label>" under a header, then a
- * tip. The effort and speed are part of the id (gpt-5.3-codex-high-fast), so
- * there is no separate effort to choose.
- */
 export function parseCursorModels(text: string): ModelInfo[] {
   const out: ModelInfo[] = [];
   for (const line of text.replace(ZERO_WIDTH, "").split("\n")) {
@@ -85,11 +73,6 @@ async function capture(
   }
 }
 
-/**
- * Claude Code has no command that lists models. With an API key in the
- * environment, ask the Models API for the real list (newest first); without one
- * (a subscription login) the caller falls back to the built-in list.
- */
 export async function claudeModels(env: NodeJS.ProcessEnv, timeoutMs = 8000): Promise<ModelInfo[]> {
   const key = env.ANTHROPIC_API_KEY;
   if (!key) return [];
@@ -104,7 +87,6 @@ export async function claudeModels(env: NodeJS.ProcessEnv, timeoutMs = 8000): Pr
       .filter((m): m is { id: string; display_name?: string } => Boolean(m.id))
       .map((m) => ({ id: m.id, label: m.display_name ?? m.id, hint: m.id }));
     if (live.length === 0) return [];
-    // the aliases follow the newest model of each family, so they come first
     return [
       { id: "opus", label: "Opus", hint: "latest Opus" },
       { id: "sonnet", label: "Sonnet", hint: "latest Sonnet" },
@@ -126,7 +108,6 @@ export const cursorModels = (command: string, env: NodeJS.ProcessEnv, timeoutMs 
     out ? parseCursorModels(out) : [],
   );
 
-/** Models to offer for a provider: the CLI's own list, falling back to the factory's static one. */
 export async function listModels(
   factory: Pick<AdapterFactory, "models" | "listModels">,
   opts: { command: string; env: NodeJS.ProcessEnv; timeoutMs?: number },

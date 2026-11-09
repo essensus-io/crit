@@ -22,7 +22,6 @@ const SEVERITY_GUIDE = `Severity:
 - minor: an edge case, a smaller bug, or a clear maintainability problem
 - nit: small, optional improvement`;
 
-/** System prompt for reviewer runs (shared by every shard so it caches well). */
 export function reviewSystemPrompt(opts: { mcp: boolean; diff?: boolean }): string {
   return `You are crit, a careful senior code reviewer. You review code; you never change it.
 
@@ -60,18 +59,15 @@ const ruleBlock = (r: Rule) =>
   `### ${r.id} ${r.title}\nSource: ${r.path}${r.globs.length ? ` (applies to ${r.globs.join(", ")})` : ""}\n\n${r.body}`;
 
 export type ReviewPromptInput = {
-  /** File contents to inline (whole-file scopes), keyed by path. */
   contents?: Map<string, string>;
   scope: ResolvedScope;
   files: string[];
   lenses: Lens[];
   rules: RuleSet;
   repoSummary?: string;
-  /** Max characters of diff text to inline. */
   diffBudgetChars?: number;
 };
 
-/** Source with 1-based line numbers, for whole-file scopes. */
 function numbered(content: string): string {
   const lines = content.split("\n");
   if (lines.at(-1) === "") lines.pop();
@@ -79,17 +75,11 @@ function numbered(content: string): string {
   return lines.map((l, i) => `${String(i + 1).padStart(w)}  ${l}`).join("\n");
 }
 
-/**
- * The per-shard prompt. Text that is the same for every shard (rules, skills,
- * repo overview) comes first so the provider's prompt cache can reuse it; what
- * differs per shard (scope, lenses, files, diff) comes last.
- */
 export function reviewPrompt(i: ReviewPromptInput): string {
   const inShard = new Set(i.files);
   const parts: string[] = [];
   const isDiff = i.scope.diff !== undefined;
 
-  // Stable across shards
   if (i.rules.attached.length) {
     parts.push(`Review rules (cite by id):\n\n${i.rules.attached.map(ruleBlock).join("\n\n")}`);
   }
@@ -116,7 +106,6 @@ export function reviewPrompt(i: ReviewPromptInput): string {
   }
   if (i.repoSummary) parts.push(`Repository overview:\n${i.repoSummary}`);
 
-  // Specific to this shard
   parts.push(
     `Review scope: ${i.scope.label}${i.scope.baseRef ? ` (base ${i.scope.baseRef})` : ""}.`,
   );
@@ -204,7 +193,6 @@ export const mapPrompt = (files: string[]) =>
 
 export type ParseResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
-/** Pull the first JSON object out of a model reply (tolerates code fences and prose around it). */
 export function parseJsonReply<S extends z.ZodType>(
   text: string,
   schema: S,

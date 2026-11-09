@@ -15,7 +15,6 @@ import { colors } from "../ui.ts";
 
 type Check = { name: string; ok: boolean; warn?: boolean; detail: string };
 
-/** `crit doctor`: installed agent CLIs, logins and versions, plus crit's own setup. */
 export async function doctor(ctx: CliContext, opts: { test?: boolean } = {}): Promise<number> {
   const checks: Check[] = [];
   const node = process.versions.node;

@@ -147,9 +147,7 @@ export async function openCommand(
     );
     if (!rerun) return EXIT.ok;
     const { argsFromScope, runReviewCommand } = await import("./review.ts");
-    // q: back to the start screen.
     if (rerun === "home") return runReviewCommand(ctx, { _: [] });
-    // "Re-run": the same scope with whatever provider, model, effort and depth was picked.
     return runReviewCommand(ctx, {
       ...argsFromScope(review.scope),
       ...(rerun.provider ? { provider: rerun.provider } : {}),

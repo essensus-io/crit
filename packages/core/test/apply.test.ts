@@ -119,7 +119,6 @@ describe("plannedFixes and overlaps", () => {
 
 describe("apply to the working tree, then undo", () => {
   it("applies fixes, backs up, and undo restores the tree exactly (keeping prior uncommitted edits)", async () => {
-    // The user already has an uncommitted change in the same file.
     repo.write({ "src/a.ts": FILE.replace("line 19", "line 19 (wip)") });
     const before = { status: status(), a: read("src/a.ts"), b: read("src/b.ts") };
     await addFinding(2, patchFor(2, "two"));

@@ -7,7 +7,6 @@ type Props = {
   tone?: Tone;
 };
 
-/** A hatched progress bar: solid for done, a half-tone edge, light for the rest. */
 export const Bar = ({ value, max, width, tone }: Props) => {
   const w = Math.max(4, width);
   const ratio = max > 0 ? Math.min(1, value / max) : 0;

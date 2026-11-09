@@ -11,8 +11,6 @@ import { type Choice } from "../features/model-switching/index.ts";
 import { makeSwitcher } from "./make-switcher.ts";
 import { renderFullScreen } from "./render-full-screen.tsx";
 
-/** `crit open` in a terminal: the review screen for a saved review. */
-/** The start screen. Nothing runs until the user picks something and presses enter. */
 export const homeTui = async (
   ctx: CliContext,
   config: ResolvedConfig,

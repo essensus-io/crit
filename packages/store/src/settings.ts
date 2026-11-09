@@ -5,19 +5,11 @@ import envPaths from "env-paths";
 import type { z } from "zod";
 
 export type CritPaths = {
-  /** Personal settings: providers.json, config.json, rules/ */
   config: string;
-  /** crit.db */
   data: string;
-  /** Agent transcripts, temp MCP configs */
   cache: string;
 };
 
-/**
- * Standard per-OS app folders (Linux: ~/.config/crit, ~/.local/share/crit, ~/.cache/crit).
- * `CRIT_HOME` puts all three under one folder (tests, portable installs);
- * `CRIT_CONFIG_DIR`, `CRIT_DATA_DIR`, `CRIT_CACHE_DIR` override each one.
- */
 export function critPaths(env: NodeJS.ProcessEnv = process.env): CritPaths {
   const base = env.CRIT_HOME
     ? {
@@ -66,7 +58,6 @@ function readJson<S extends z.ZodType>(file: string, schema: S): z.infer<S> | un
   return parsed.data;
 }
 
-/** Write JSON atomically (temp file + rename) so a crash never leaves half a file. */
 export function writeJsonAtomic(file: string, data: unknown): void {
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
@@ -74,7 +65,6 @@ export function writeJsonAtomic(file: string, data: unknown): void {
   renameSync(tmp, file);
 }
 
-/** `undefined` when providers.json does not exist yet (first run). */
 export function loadProviders(paths: CritPaths): ProvidersFile | undefined {
   return readJson(providersPath(paths), ProvidersFile);
 }

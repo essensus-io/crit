@@ -1,9 +1,3 @@
-/**
- * The crit process that runs a review hosts each session on a local socket
- * (a named pipe on Windows). `crit mcp --session <id>`, spawned by the agent
- * CLI, connects to it and forwards tool calls. Each session has its own socket
- * and a random token, so one agent run can never report into another.
- */
 import { randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createConnection, createServer, type Server, type Socket } from "node:net";
@@ -28,7 +22,6 @@ export const sessionFilePath = (dir: string, sessionId: string) => join(dir, `${
 
 function socketPathFor(sessionId: string): string {
   if (process.platform === "win32") return `\\\\.\\pipe\\crit-${sessionId}`;
-  // Unix socket paths are limited to ~104 bytes; keep them short and in tmp.
   return join(tmpdir(), `crit-${sessionId.slice(0, 12)}.sock`);
 }
 
@@ -46,7 +39,6 @@ function lines(socket: Socket, onLine: (line: string) => void) {
   });
 }
 
-/** Host a session: write `<dir>/<id>.json` and serve the handler on a local socket. */
 export async function startSessionHost(opts: {
   handler: SessionHandler;
   dir: string;
@@ -115,7 +107,6 @@ export function readSessionFile(dir: string, sessionId: string): SessionFile {
   }
 }
 
-/** Connect to a hosted session; returns a handler that forwards every call. */
 export async function connectSession(
   dir: string,
   sessionId: string,

@@ -3,7 +3,6 @@ import type { FindingView, SessionState } from "../model/session.ts";
 import { type ListFilter } from "./parse-query.ts";
 import { isFiltered, triage } from "./triage.ts";
 
-/** The findings the stream shows for the current filter, in display order. */
 export function visibleItems(state: SessionState, f: ListFilter): FindingView[] {
   const q = f.search?.toLowerCase();
   return state.items

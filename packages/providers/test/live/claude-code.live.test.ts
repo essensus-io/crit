@@ -1,4 +1,3 @@
-/** Live smoke test through the real Claude Code CLI. Opt-in: `pnpm test:live`. Never in CI. */
 import { describe } from "vitest";
 import { ClaudeCodeAdapter, which } from "../../src/index.ts";
 import { liveReview } from "./live-helper.ts";

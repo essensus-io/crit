@@ -1,4 +1,3 @@
-/** Anything with the store's key-value table. */
 type KvStore = {
   kv: {
     get(key: string): Promise<string | undefined>;
@@ -8,7 +7,6 @@ type KvStore = {
 
 const keyFor = (repoId: string) => `disabled-rules:${repoId}`;
 
-/** Rule keys (`path#Section`) the user turned off for this repository. */
 export async function getDisabledRules(store: KvStore, repoId: string): Promise<string[]> {
   const raw = await store.kv.get(keyFor(repoId));
   try {

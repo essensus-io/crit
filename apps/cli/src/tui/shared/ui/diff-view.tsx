@@ -2,7 +2,6 @@ import { Box, Text } from "ink";
 import { type ReactNode } from "react";
 import { parseUnifiedDiff } from "@crit/core";
 
-/** A diff as one colored row per line, for a scrolling Viewport. */
 export const diffRows = (patch: string): ReactNode[] => {
   const rows: { n: string; sign: string; text: string }[] = [];
   for (const file of parseUnifiedDiff(patch)) {
@@ -36,7 +35,6 @@ export const diffRows = (patch: string): ReactNode[] => {
 };
 type Props = { patch: string; maxLines?: number };
 
-/** A unified diff with new-side line numbers, + green and - red, as in the finding detail mockup. */
 export const DiffView = ({ patch, maxLines = 30 }: Props) => {
   const rows: { n: string; sign: string; text: string }[] = [];
   for (const file of parseUnifiedDiff(patch)) {

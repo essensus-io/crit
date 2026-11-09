@@ -7,18 +7,6 @@ import { streamProcess } from "../process.ts";
 
 export const CURSOR_TESTED = { min: "2026.10.0", max: "2026.12.999" };
 
-/**
- * What the T10 spike found (cursor-agent 2026.10.22):
- * - `-p` alone has write and shell access; `--mode ask` is read-only (it
- *   refused to create files or run shell commands in a probe), so there is no
- *   shell and no git in Cursor reviews.
- * - MCP servers load only from .cursor/mcp.json or ~/.cursor/mcp.json; there
- *   is no per-run flag. crit does not write into those files, so Cursor uses
- *   the JSON fallback: the reply is a JSON object checked against the finding
- *   schema, with one repair round.
- * - Cursor loads .cursor/rules, AGENTS.md and CLAUDE.md by itself (verified),
- *   so crit sends those as an index only.
- */
 export function buildCursorInvocation(
   profile: Pick<ProviderProfile, "command" | "model">,
   task: AgentTask,
@@ -55,7 +43,6 @@ type Line = {
 const USAGE_LIMIT = /usage limit|rate limit|too many requests|429|quota/i;
 const NOT_LOGGED_IN = /not logged in|log ?in|unauthori[sz]ed|401|api key|authenticat/i;
 
-/** Turn cursor-agent stream-json lines into AgentEvents. */
 export class CursorStreamParser {
   readonly stderr: string[] = [];
   private gotResult = false;

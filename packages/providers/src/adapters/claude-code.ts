@@ -7,10 +7,8 @@ import { detectCli } from "../detect.ts";
 import { claudeModels } from "../models.ts";
 import { streamProcess } from "../process.ts";
 
-/** Versions the contract tests were recorded against. */
 export const CLAUDE_TESTED = { min: "2.1.0", max: "2.1.999" };
 
-/** Read-only git commands every reviewer may run. */
 export const GIT_READ_COMMANDS = [
   "git log",
   "git show",
@@ -32,14 +30,6 @@ export type Invocation = {
   cleanupDir: string;
 };
 
-/**
- * Build the headless, read-only invocation:
- * - `--setting-sources ""`: no user/project settings, so no permission rule
- *   from the repo can widen the tool allowlist. It also means Claude Code does
- *   not load CLAUDE.md itself; crit inlines it (nativeContext is empty).
- * - `--tools` limits the built-in tool set; Edit/Write do not exist in the run.
- * - `--permission-mode dontAsk` denies anything not in `--allowedTools`.
- */
 export function buildClaudeInvocation(
   profile: Pick<ProviderProfile, "command" | "model" | "effort">,
   task: AgentTask,
@@ -72,7 +62,6 @@ export function buildClaudeInvocation(
   if (task.systemPrompt) {
     const promptFile = join(dir, "system.md");
     files.push({ path: promptFile, content: task.systemPrompt });
-    // Replaces Claude Code's default system prompt: measured 8.0k to 4.8k tokens of context per turn.
     args.push("--system-prompt-file", promptFile);
   }
   const bashRules = [...GIT_READ_COMMANDS, ...(task.allowedCommands ?? [])].flatMap((c) => [
@@ -130,7 +119,6 @@ type ClaudeUsage = {
   output_tokens?: number;
 };
 
-/** Fresh input includes cache writes (billed above normal input); cache reads are the cached part. */
 const claudeUsage = (u: ClaudeUsage) => ({
   inputTokens: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0),
   outputTokens: u.output_tokens ?? 0,
@@ -161,7 +149,6 @@ const USAGE_LIMIT = /usage limit|rate limit|limit reached|too many requests|over
 const NOT_LOGGED_IN =
   /not logged in|please run \/login|invalid api key|authentication|unauthorized|oauth/i;
 
-/** Turn Claude Code stream-json lines into AgentEvents. Stateful per run. */
 export class ClaudeStreamParser {
   private gotResult = false;
   private readonly perMessage = new Map<string, ReturnType<typeof claudeUsage>>();
@@ -194,8 +181,6 @@ export class ClaudeStreamParser {
         }
         break;
       case "assistant":
-        // Each content block of one API call arrives as its own line with the same
-        // usage; keep the latest per message id and report the running total.
         if (d.message?.usage) {
           this.perMessage.set(
             d.message.id ?? `m${this.perMessage.size}`,
@@ -249,7 +234,6 @@ export class ClaudeStreamParser {
     return out;
   }
 
-  /** Events for the process exit. */
   exit(code: number, timedOut: boolean): AgentEvent[] {
     const out: AgentEvent[] = [];
     if (timedOut) out.push({ type: "error", message: "claude timed out" });
@@ -321,7 +305,6 @@ export const claudeCodeFactory: AdapterFactory = {
   defaultCommand: "claude",
   defaultName: "claude",
   loginHint: "run `claude` once to log in",
-  // The aliases follow the newest model of each family; the full names pin one.
   models: [
     "opus",
     "sonnet",

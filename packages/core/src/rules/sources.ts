@@ -12,7 +12,6 @@ type ProjectPattern = { kind: RuleSourceKind; match: (p: string) => boolean };
 
 const pm = (globs: string | string[]) => picomatch(globs, { dot: true });
 
-/** Project rule files, matched against repo-relative paths. */
 const PROJECT_PATTERNS: ProjectPattern[] = [
   {
     kind: "claude-md",
@@ -39,7 +38,6 @@ function read(abs: string): string | undefined {
   }
 }
 
-/** Project rule files: tracked or untracked-but-not-ignored, so .gitignore is respected. */
 export async function discoverProjectRules(
   root: string,
   include: string[] = [],
@@ -75,7 +73,6 @@ function globFiles(dir: string, pattern: string): string[] {
   return globSync(pattern, { cwd: dir, absolute: true, dot: true }).sort();
 }
 
-/** Global agent config: ~/.claude and ~/.codex. */
 export function discoverGlobalRules(home: string): RuleFile[] {
   const out: RuleFile[] = [];
   const add = (abs: string, kind: RuleSourceKind) => {
@@ -91,7 +88,6 @@ export function discoverGlobalRules(home: string): RuleFile[] {
   return out;
 }
 
-/** User rules and installed packs: <config>/rules/**.md (packs live in <config>/rules/packs/<name>/). */
 export function discoverUserRules(configDir: string, home: string): RuleFile[] {
   const dir = join(configDir, "rules");
   return globFiles(dir, "**/*.md")

@@ -15,7 +15,6 @@ import { reviewFromRow } from "./mappers.ts";
 export type HistoryFilter = {
   repoId?: string;
   branch?: string;
-  /** Matches scope label substring, e.g. "src/db" or "→ main". */
   scope?: string;
   provider?: string;
   since?: number;
@@ -26,16 +25,13 @@ export type HistoryFilter = {
 export type HistoryRow = {
   review: Review;
   repoName: string;
-  /** Visible findings (skeptic-rejected excluded) by severity. */
   severity: Record<Severity, number>;
   outcome: { applied: number; dismissed: number; open: number; filtered: number };
-  /** Reviewer shards plus skeptic and map runs. `effective` counts cached input at a tenth. */
   tokens: TokenUsage & { effective: number };
 };
 
 const emptySeverity = (): Record<Severity, number> => ({ critical: 0, major: 0, minor: 0, nit: 0 });
 
-/** Reviews newest first, with finding counts by severity and outcome. */
 export async function listHistory(db: Db, filter: HistoryFilter = {}): Promise<HistoryRow[]> {
   const conds = [
     filter.repoId ? eq(t.reviews.repoId, filter.repoId) : undefined,
@@ -127,17 +123,13 @@ export async function listHistory(db: Db, filter: HistoryFilter = {}): Promise<H
 }
 
 export type Comparison = {
-  /** In the older review, gone (or applied) in the newer one. */
   fixed: Finding[];
-  /** Only in the newer review. */
   new: Finding[];
-  /** In both and still open in the newer one. */
   stillOpen: Finding[];
 };
 
 const visible = (f: Finding) => f.verdict !== "rejected";
 
-/** Match findings by fingerprint between an older review `a` and a newer review `b`. */
 export function compareFindings(a: Finding[], b: Finding[]): Comparison {
   const older = a.filter(visible);
   const newer = b.filter(visible);

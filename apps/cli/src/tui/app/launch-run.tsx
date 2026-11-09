@@ -9,10 +9,6 @@ import { makeSwitcher } from "./make-switcher.ts";
 import { renderFullScreen } from "./render-full-screen.tsx";
 import { summaryLine } from "./summary-line.ts";
 
-/**
- * `crit review` in a terminal: the run dashboard, then the review screen.
- * Returns what the user asked for when leaving (retry, connect a provider…).
- */
 export const runTui = async (
   ctx: CliContext,
   store: SqliteStore,
@@ -48,9 +44,6 @@ export const runTui = async (
   await ui;
   ac.abort();
   await running;
-  // Ink unreferences stdin when it releases raw mode. Readline (used by the
-  // provider prompts) resumes that stream but does not reference it again,
-  // so Node can exit while the next prompt is still awaiting an answer.
   if (recovery && process.stdin.isTTY) process.stdin.ref();
   if (!recovery && reviewId) {
     const line = await summaryLine(store, reviewId);

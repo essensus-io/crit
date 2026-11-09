@@ -119,7 +119,6 @@ describe("crit review --no-tui", () => {
     md.ctx.paths = t.ctx.paths;
     md.ctx.openStore = t.ctx.openStore;
     md.script({ runs: [] });
-    // reuse the cache from the first run: no agent calls needed
     expect(await md.run("review", "--no-tui", "--format", "md", "--no-verify")).toBe(0);
     const text = normalize(md.stdout(), md);
     expect(text).toContain("# crit review <short>");

@@ -3,7 +3,6 @@ import { ConfigFile } from "./config.ts";
 import { FindingInput, FindingsInput, FinishInput } from "./finding.ts";
 import { ProvidersFile } from "./provider.ts";
 
-/** JSON Schemas published for editors (config, providers) and agents (MCP tool input, JSON fallback). */
 export function jsonSchemas(): Record<string, Record<string, unknown>> {
   const gen = (schema: z.ZodType, title: string) => ({
     title,

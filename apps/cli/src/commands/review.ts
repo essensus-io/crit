@@ -61,7 +61,6 @@ export type ReviewArgs = {
   effort?: string;
   budget?: string;
   "dry-run"?: boolean;
-  /** Start straight away instead of opening the start screen. */
   now?: boolean;
 };
 
@@ -93,7 +92,6 @@ const withoutNow = (args: ReviewArgs): ReviewArgs => {
   return next;
 };
 
-/** The same arguments with the scope replaced (used when the start screen picks one). */
 const withScope = (args: ReviewArgs, spec: ScopeSpec): ReviewArgs => {
   const next: ReviewArgs = { ...args };
   delete next.all;
@@ -104,11 +102,6 @@ const withScope = (args: ReviewArgs, spec: ScopeSpec): ReviewArgs => {
   return { ...next, ...argsFromScope(spec) };
 };
 
-/**
- * The start screen: pick a scope, see the estimate, and start the review
- * yourself. Starting runs the normal review (`now`); a finished review comes
- * back here with q.
- */
 async function runHome(
   ctx: CliContext,
   args: ReviewArgs,
@@ -204,7 +197,6 @@ async function runHome(
   return EXIT.ok;
 }
 
-/** The CLI arguments that review the same scope again (for re-running a saved review). */
 export function argsFromScope(spec: ScopeSpec): ReviewArgs {
   switch (spec.kind) {
     case "branch":
@@ -238,7 +230,6 @@ function parseLenses(v: string | undefined): Lens[] | undefined {
   return list as Lens[];
 }
 
-/** Progress lines for non-TUI runs, on stderr so stdout stays clean for --format. */
 function progressPrinter(ctx: CliContext) {
   const c = colors(ctx.color);
   const labels = new Map<string, string>();
@@ -307,7 +298,6 @@ function progressPrinter(ctx: CliContext) {
   };
 }
 
-/** "500000", "500k", "2M", "1.5m" → tokens. */
 export function parseTokens(v: string): number {
   const m = /^(\d+(?:\.\d+)?)\s*([km]?)$/i.exec(v.trim());
   if (!m)
@@ -370,7 +360,6 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
     ...(config.provider ? { preferred: config.provider } : {}),
   });
   for (const w of resolved.warnings) ctx.err(colors(ctx.color).yellow(`warning: ${w}\n`));
-  // --model / --effort apply to this run only; the saved profile is not changed.
   const profile = {
     ...resolved.profile,
     ...(args.model !== undefined ? { model: args.model === "default" ? null : args.model } : {}),
@@ -387,7 +376,6 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
   }
 
   const store = ctx.openStore();
-  /** Ask before spending: every whole-project review, and any review estimated above budget.confirmTokens. */
   const confirm = async (plan: {
     shards: unknown[];
     estimateMs: number;
@@ -440,7 +428,6 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
     return EXIT.ok;
   }
   if (useTui) {
-    // Ask here, before the screen takes over the terminal.
     const prep = await prepareReview(base);
     const estimateMs = estimateDurationMs(prep.runs.length, config.concurrency);
     if (

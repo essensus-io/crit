@@ -7,22 +7,12 @@ type Props = {
   width: number;
   active?: boolean;
   follow?: boolean;
-  /** Changing this scrolls back to the top (a new finding, a new screen). */
   resetKey?: string;
-  /** j/k/g/G scroll too. Off when those keys belong to the screen. */
   vim?: boolean;
-  /** ↑/↓ scroll a line. Off when the screen uses them for something else. */
   arrows?: boolean;
-  /** When `key` changes, scroll just enough to show rows `from`..`to`. */
   reveal?: { key: string; from: number; to: number };
 };
 
-/**
- * Lines that scroll inside their own box: ↑/↓, j/k, PgUp/PgDn, g/G, Home/End
- * (and the mouse wheel, which terminals send as arrows on the alternate
- * screen). The terminal itself never scrolls. `follow` keeps the bottom in view
- * until the user scrolls up, for logs.
- */
 export const Viewport = ({
   lines,
   height,

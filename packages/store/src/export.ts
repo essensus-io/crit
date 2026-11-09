@@ -5,7 +5,6 @@ import * as t from "./db/schema.ts";
 import { findingToRow, fixToRow, reviewToRow, shardToRow } from "./mappers.ts";
 import type { SqliteStore } from "./store.ts";
 
-/** The versioned JSON document for one review. */
 export async function exportReview(store: SqliteStore, reviewId: string): Promise<ReviewExport> {
   const review = await store.reviews.get(reviewId);
   if (!review) throw new Error(`crit: review ${reviewId} not found`);
@@ -24,10 +23,6 @@ export async function exportReview(store: SqliteStore, reviewId: string): Promis
   });
 }
 
-/**
- * Import a review document. The repo is matched by root path (or created with
- * the document's id). Replaces any existing review with the same id. Atomic.
- */
 export async function importReview(store: SqliteStore, input: unknown): Promise<ReviewExport> {
   const doc = ReviewExport.parse(input);
   const { db } = store;

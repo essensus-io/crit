@@ -25,9 +25,7 @@ import {
 export type ResolveScopeOptions = {
   cwd: string;
   spec: ScopeSpec;
-  /** Extra ignore globs (config `ignore`), on top of the secret/lockfile defaults. */
   ignore?: string[];
-  /** Whole-file scopes skip files above this many tokens (default 20k). Named files are exempt. */
   maxFileTokens?: number;
 };
 
@@ -38,13 +36,11 @@ export class ScopeError extends Error {
 const fmtTokens = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
 const toPosix = (p: string) => p.split(sep).join("/");
 
-/** Matcher for ignored paths: secrets, keys, lockfiles, noise and user ignores. */
 export function ignoreMatcher(extra: string[] = []): (path: string) => boolean {
   const why = skipReasonMatcher(extra);
   return (path) => why(path) !== undefined;
 }
 
-/** Why a path is ignored by pattern, or undefined. `named` files bypass the noise list only. */
 export function skipReasonMatcher(
   extra: string[] = [],
 ): (path: string, named?: boolean) => string | undefined {
@@ -81,7 +77,6 @@ function fileSize(abs: string): number {
   }
 }
 
-/** Synthesize an "added file" diff for an untracked file. */
 function untrackedDiff(root: string, path: string): string {
   const content = readFileSync(join(root, path), "utf8");
   const lines = content.split("\n");
@@ -164,7 +159,6 @@ function scopedFromDiff(
   return { files: out, skipped };
 }
 
-/** Normalize CLI path args (relative to cwd, possibly globs) into repo-relative matchers. */
 export function pathMatcher(root: string, cwd: string, args: string[]): (file: string) => boolean {
   const prefixes: string[] = [];
   const globs: string[] = [];
@@ -200,10 +194,6 @@ function filterIgnored<T extends { path: string }>(
   return { kept, skipped };
 }
 
-/**
- * Turn a scope spec into the set of files (and, for diffs, hunks) that findings
- * may be reported on. The agent can still read the whole repo for context.
- */
 export async function resolveScope(opts: ResolveScopeOptions): Promise<ResolvedScope> {
   const root = await repoRoot(opts.cwd);
   const { spec } = opts;
@@ -306,7 +296,6 @@ export async function resolveScope(opts: ResolveScopeOptions): Promise<ResolvedS
   }
 }
 
-/** Files the user named exactly (not via a folder or glob): they bypass noise ignores and the size cap. */
 export function namedFiles(
   root: string,
   cwd: string,
@@ -322,7 +311,6 @@ export function namedFiles(
   return exact;
 }
 
-/** Repo-relative paths a finding may be reported on. */
 export function reportableFiles(scope: ResolvedScope): Set<string> {
   return new Set(scope.files.filter((f) => f.status !== "deleted").map((f) => f.path));
 }

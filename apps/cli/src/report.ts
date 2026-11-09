@@ -27,7 +27,6 @@ function sortFindings(list: Finding[]): Finding[] {
   );
 }
 
-/** Reviewer tokens from the export's shards (skeptic usage is kept in the events table, not the export). */
 function reviewerTokens(doc: ReviewExport) {
   const u = doc.shards.reduce(
     (a, s) =>
@@ -52,7 +51,6 @@ const loc = (f: Finding) =>
     ? `${f.file}:${f.range.start}`
     : `${f.file}:${f.range.start}-${f.range.end}`;
 
-/** Markdown report: header, counts, findings grouped by file with fixes as diffs, then filtered ones. */
 export function markdownReport(doc: ReviewExport): string {
   const { review } = doc;
   const fixes = activeFixes(doc);
@@ -116,7 +114,6 @@ const SARIF_LEVEL: Record<Severity, "error" | "warning" | "note"> = {
   nit: "note",
 };
 
-/** SARIF 2.1.0 for code-scanning tools. Skeptic-rejected findings are left out. */
 export function sarifReport(doc: ReviewExport, toolVersion: string): object {
   const shown = sortFindings(doc.findings.filter(visible));
   const categories = [...new Set(shown.map((f) => f.category))].sort();
@@ -170,7 +167,6 @@ export function sarifReport(doc: ReviewExport, toolVersion: string): object {
   };
 }
 
-/** Plain-text summary for terminals and logs (the non-TUI report). */
 export function textReport(
   doc: ReviewExport,
   opts: { color: boolean; durationMs?: number },

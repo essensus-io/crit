@@ -14,7 +14,6 @@ export type ReviewMode =
   | "instruct"
   | "rerun";
 
-/** What the user last gave the proposal check: their patch or their words. */
 export type ReviewInput =
   | { kind: "patch"; patch: string }
   | { kind: "description"; text: string }

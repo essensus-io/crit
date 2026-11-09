@@ -1,7 +1,3 @@
-/**
- * Shared live smoke test: one tiny read-only review through a real agent CLI
- * and the crit MCP server.
- */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

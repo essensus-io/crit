@@ -32,17 +32,14 @@ const MAX_LOG = 500;
 
 export type RunRecovery =
   | { kind: "provider" }
-  /** Back to the start screen. */
   | { kind: "home" }
   | { kind: "budget"; maxShards: number }
-  /** Run again with what the user picked on the run screen. */
   | {
       kind: "retry";
       provider?: string;
       model?: string | null;
       effort?: string | null;
       depth?: string;
-      /** Review every file again instead of reusing the last result. */
       fresh?: boolean;
     };
 
@@ -54,7 +51,6 @@ export const emptyProgress = (): ProgressState => ({
   warnings: [],
 });
 
-/** Fold a review event into the progress state (pure, for tests). */
 export function reduceProgress(p: ProgressState, e: ReviewEvent, now = Date.now()): ProgressState {
   const shards = new Map(p.shards);
   const log = (tag: string, text: string, tone: LogEntry["tone"] = "dim"): LogEntry[] =>
@@ -213,7 +209,6 @@ export function reduceProgress(p: ProgressState, e: ReviewEvent, now = Date.now(
   }
 }
 
-/** What the user has chosen on the run screen but not yet run. */
 export type Selection = {
   provider?: string;
   model?: string | null;

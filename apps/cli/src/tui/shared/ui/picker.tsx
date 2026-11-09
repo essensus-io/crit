@@ -15,10 +15,6 @@ type Props<V> = {
   onCancel: () => void;
 };
 
-/**
- * A searchable list as a full-screen overlay (model, provider, effort, depth).
- * Type to filter, ↑/↓ to move, enter to pick, esc to cancel.
- */
 export const Picker = <V,>({
   title,
   options,

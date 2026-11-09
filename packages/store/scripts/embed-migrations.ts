@@ -1,7 +1,3 @@
-/**
- * Embeds drizzle-kit's SQL migrations into a TS module so the bundled CLI
- * carries them without a migrations folder on disk.
- */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 

@@ -26,7 +26,6 @@ type Props = {
   exit: () => void;
 };
 
-/** The one-line prompt under the stream for the modes that ask something (search, dismiss, apply, ...). */
 export const reviewPrompt = ({
   mode,
   current,

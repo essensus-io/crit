@@ -45,7 +45,6 @@ function parseRoles(v: string | undefined): Role[] | undefined {
   return list as Role[];
 }
 
-/** `crit providers`: each profile's status, version and default. */
 export async function listProviders(ctx: CliContext): Promise<number> {
   const file = loadProviders(ctx.paths);
   const c = colors(ctx.color);
@@ -197,7 +196,6 @@ export async function editProvider(
   return EXIT.ok;
 }
 
-/** `crit providers models [name|type]`: what the agent CLI offers, with the profile's current choice marked. */
 export async function listProviderModels(
   ctx: CliContext,
   target: string | undefined,
@@ -329,7 +327,6 @@ const run = (fn: () => Promise<number>) => async () => {
   process.exitCode = await fn();
 };
 
-/** Called after the review screen releases the terminal, so setup can prompt safely. */
 export async function chooseReviewProvider(ctx: CliContext): Promise<string> {
   const file = load(ctx);
   const choice = await ctx.prompter.select({

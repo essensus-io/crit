@@ -57,36 +57,25 @@ export type ReviewOptions = {
   config: ResolvedConfig;
   store: Repositories;
   provider: ProviderRun;
-  /** Provider for the skeptic pass; defaults to `provider`. `null` skips verification. */
   skeptic?: ProviderRun | null;
-  /** Where session files for `crit mcp --session <id>` live. */
   sessionsDir: string;
-  /** How agents start the crit MCP server; `--session <id>` is appended. */
   mcpCommand: { command: string; args: string[] };
   home: string;
-  /** crit's personal config dir (user rules). */
   configDir: string;
-  /** Rule files to use instead of discovering them (tests). */
   ruleFiles?: RuleFile[];
-  /** Rule keys turned off by the user. */
   disabledRules?: string[];
   useCache?: boolean;
   signal?: AbortSignal;
   onEvent?: (e: ReviewEvent) => void;
-  /** Called with the plan before running; return false to cancel. Core never prompts by itself. */
   confirm?: (plan: ReviewPlan) => Promise<boolean>;
-  /** Cap on waiting for a rate limit to reset before giving up on a shard. */
   maxRateLimitWaitMs?: number;
   now?: () => number;
 };
 
-/** What a review is about to do and cost, shown before it starts. */
 export type ReviewPlan = {
   shards: Shard[];
   estimateMs: number;
-  /** Effective tokens (fresh input + output + cached/10), from past runs' observed ratio. */
   estimatedTokens: number;
-  /** Files answered from the cache, which cost nothing. */
   cachedFiles: number;
   scope: ResolvedScope;
 };
@@ -108,7 +97,6 @@ const sleep = (ms: number, signal: AbortSignal) =>
 
 const CachedFile = z.object({ findings: z.array(z.any()) });
 
-/** A cached finding keeps its skeptic verdict, so a re-run does not pay for the skeptic again. */
 type CachedFinding = FindingInput & {
   verdict?: Finding["verdict"];
   verdictReason?: string;
@@ -120,7 +108,6 @@ class CancelledError extends Error {
   override name = "CancelledError";
 }
 
-/** First guess at effective tokens per estimated file token, until real runs calibrate it. */
 export const DEFAULT_COST_RATIO = 3;
 
 export type Prepared = {
@@ -129,9 +116,7 @@ export type Prepared = {
   rules: RuleSet;
   ruleById: Map<string, RuleSet["all"][number]>;
   rulesHash: string;
-  /** Findings of files whose review is still valid (same content, rules, provider, model, depth). */
   cached: Map<string, CachedFinding[]>;
-  /** The scope minus cached files: what actually gets reviewed. */
   toReview: ResolvedScope;
   runs: PlannedRun[];
   ratio: number;
@@ -141,11 +126,6 @@ export type Prepared = {
 const fileCacheKey = (parts: unknown[]) =>
   `file:${sha(JSON.stringify(["v2-skeptical-prompt", ...parts]))}`;
 
-/**
- * Everything a review decides before spending tokens: scope, rules, which files
- * the cache already answers, the runs for the rest, and what they should cost.
- * `crit review --dry-run` and the confirmation both use this.
- */
 export async function prepareReview(opts: ReviewOptions): Promise<Prepared> {
   const { store, config } = opts;
   const scope = await resolveScope({
@@ -184,7 +164,6 @@ export async function prepareReview(opts: ReviewOptions): Promise<Prepared> {
       set: (h, v) => store.kv.set(`rule-tag:${h}`, v ? "1" : "0"),
     },
   });
-  // Rule contents, not their per-run ids, so renumbering does not invalidate the cache.
   const rulesHash = sha(
     rules.all
       .map((r) => r.hash)
@@ -232,7 +211,6 @@ export async function prepareReview(opts: ReviewOptions): Promise<Prepared> {
   };
 }
 
-/** Cache key for one file's review under this run's settings. */
 export async function cacheKeyFor(
   prep: Prepared,
   opts: ReviewOptions,
@@ -251,11 +229,6 @@ export async function cacheKeyFor(
   ]);
 }
 
-/**
- * Run a full review: resolve scope → plan shards → build context → run
- * reviewers → collect findings → merge and dedupe → verify. Emits events as it
- * goes and persists everything through the store's repositories.
- */
 export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
   const now = opts.now ?? Date.now;
   const userSignal = opts.signal ?? new AbortController().signal;
@@ -263,7 +236,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
   const { store, config } = opts;
   const started = now();
 
-  // 1. Scope, rules, cache and the plan
   const prep = await prepareReview(opts);
   const { scope, repo, rules, ruleById } = prep;
 
@@ -292,7 +264,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     provider: review.provider,
     model: review.model,
   });
-  // Rule titles and paths, so a reopened review can show where each cited rule comes from.
   await store.events.append(review.id, "rules", {
     rules: [...rules.attached, ...rules.listed, ...rules.native, ...rules.skills].map(
       ({ id, title, path, section }) => ({ id, title, path, ...(section ? { section } : {}) }),
@@ -322,13 +293,11 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     return review;
   };
 
-  // Stopping early: `stop` ends in-flight runs (budget); `stopReason` also holds back queued ones.
   const stop = new AbortController();
   const signal = AbortSignal.any([userSignal, stop.signal]);
   let stopReason: "budget" | "rate-limit" | undefined;
 
   try {
-    // 2. Shards for the files the cache did not answer
     const shards: Shard[] = prep.runs.map((p) => ({
       id: newId(now()),
       reviewId: review.id,
@@ -408,7 +377,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
       return finding;
     };
 
-    // Files answered by the cache: replay their findings, validated against today's code.
     const reviewedOk = new Set<string>();
     const rejectedFiles = new Set<string>();
     let replayed = 0;
@@ -428,7 +396,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     }
     if (prep.cached.size > 0) emit({ type: "cache", files: prep.cached.size, findings: replayed });
 
-    // Token accounting: effective tokens against budget.maxTokens.
     const maxTokens = config.budget.maxTokens;
     let finishedSpend = 0;
     const live = new Map<string, number>();
@@ -447,7 +414,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
       stop.abort();
     };
 
-    // 3. Map pass for whole-project reviews (fast model, cached per repo for a week)
     let repoSummary: string | undefined;
     if (opts.spec.kind === "project" && shards.length > 0) {
       const key = `map:${repo.id}`;
@@ -480,7 +446,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
       }
     }
 
-    // 4–5. Run reviewers and collect findings
     const runShard = async (shard: Shard): Promise<Shard> => {
       if (signal.aborted) return store.shards.update(shard.id, { status: "cancelled" });
       const t0 = now();
@@ -574,7 +539,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
         }),
         timeoutMs: config.review.timeoutMinutes * 60_000,
         allowedCommands: config.review.allowedCommands,
-        // A shell costs ~1.5k tokens per turn: only when commands are allowlisted or at deep depth.
         access:
           config.review.allowedCommands.length > 0 || config.depth === "deep" ? "shell" : "read",
         ...modelOf(opts.provider, "main", depthEffort(config.depth)),
@@ -600,7 +564,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
             if (e.type === "usage") {
               live.set(shard.id, effectiveTokens(e));
               report_usage("review");
-              // Only a running figure can stop a run; a final one means it is already done.
               if (e.partial) checkBudget();
             }
           });
@@ -610,7 +573,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
           if (attempt === 2 || (out.rateLimited.retryAfterMs ?? 0) > maxWait) break;
           await sleep(wait, signal);
         }
-        // JSON fallback when the agent cannot load MCP, with one repair round.
         if (!useMcp && out && out.exitCode === 0 && !out.rateLimited) {
           let parsed = parseJsonReply(out.message ?? "", ReviewJson);
           if (!parsed.ok) {
@@ -645,8 +607,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
         await host?.close();
       }
 
-      // An agent that exits cleanly without ever calling crit's tools reported nothing; that is
-      // not "no findings". Treat it as a failure so it is neither cached nor shown as clean.
       const silent = useMcp && !!out?.ok && toolCalls === 0 && !signal.aborted;
       if (silent)
         emit({
@@ -688,7 +648,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
           : null,
       });
       if (status === "done") {
-        // A file where crit rejected a finding is not trusted as clean, so it is not cached.
         for (const file of shard.files) if (!rejectedFiles.has(file)) reviewedOk.add(file);
         if (opts.useCache !== false) {
           for (const file of shard.files) {
@@ -701,7 +660,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
             });
           }
         }
-        // Learn how many effective tokens a file token really costs on this provider.
         if (shard.estimatedTokens > 0 && spend > 0) {
           const key = `cost-ratio:${opts.provider.profile.type}`;
           const next = Math.min(30, Math.max(0.5, spend / shard.estimatedTokens));
@@ -726,7 +684,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     );
     if (userSignal.aborted) throw new CancelledError("cancelled");
 
-    // 6. Merge and dedupe
     const all = await store.findings.listByReview(review.id);
     const merged = mergeFindings(all);
     for (const id of merged.removed) await store.findings.delete(id);
@@ -738,8 +695,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
       });
     let findings = await store.findings.listByReview(review.id);
 
-    // 7. Verify with the skeptic
-    // The depth decides what the skeptic checks: nothing, everything but nits, or everything.
     const mode = depthProfile(config).skeptic;
     const skeptic =
       mode === "off" ? null : opts.skeptic === undefined ? opts.provider : opts.skeptic;
@@ -767,7 +722,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
       findings = await store.findings.listByReview(review.id);
     }
 
-    // Default checkboxes: confirmed findings with a fix start checked; plausible ones unchecked.
     for (const f of findings) {
       const hasFix = (await store.fixes.active(f.id)) !== undefined;
       const selected =
@@ -777,7 +731,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     }
     findings = await store.findings.listByReview(review.id);
 
-    // Re-save what we just reviewed with verdicts and merged fixes, so the next run reuses them.
     if (opts.useCache !== false) {
       for (const file of reviewedOk) {
         const entries: CachedFinding[] = [];
@@ -823,7 +776,6 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
     for (const s of failedShards)
       emit({ type: "warning", message: `shard ${s.label} failed: ${s.error}` });
     const ran = done.filter((s) => s.status === "done").length;
-    // Hitting the budget on the very last run is not a partial review: everything ran.
     const partial =
       stopReason && ran < shards.length
         ? stopReason === "budget"
@@ -857,24 +809,19 @@ export async function runReview(opts: ReviewOptions): Promise<ReviewResult> {
   }
 }
 
-/** The model for a task: `fast` tasks (skeptic, map, drafts) use the profile's cheaper model when set. */
 const modelOf = (
   p: ProviderRun,
   kind: "main" | "fast" = "main",
   depthEffort?: string,
 ): { model?: string; effort?: string } => {
   const model = (kind === "fast" && p.profile.fastModel) || p.profile.model;
-  // Cheap tasks (skeptic, map, drafts) always run at low effort; main tasks use the profile's
-  // effort, else the depth's. Both CLIs accept "low"; adapters without efforts ignore it.
   const effort = kind === "fast" ? "low" : (p.profile.effort ?? depthEffort);
   return { ...(model ? { model } : {}), ...(effort ? { effort } : {}) };
 };
 
-/** Quick reviews think less, deep ones more; standard leaves the CLI's own default. */
 export const depthEffort = (depth: ResolvedConfig["depth"]): string | undefined =>
   depth === "quick" ? "low" : depth === "deep" ? "high" : undefined;
 
-/** Skeptic pass: confirmed / plausible / rejected per finding, in chunks, with one repair round. */
 export async function verify(
   findings: Finding[],
   skeptic: ProviderRun,
@@ -936,7 +883,6 @@ export async function verify(
   return { results, warnings, usage };
 }
 
-/** Re-locate old findings in the current code; findings whose code is gone are closed. */
 export async function reanchorFindings(
   store: Repositories,
   scope: ResolvedScope,

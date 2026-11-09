@@ -27,75 +27,56 @@ import { copyToClipboard } from "../../../../clipboard.ts";
 import type { Tok } from "../../../shared/lib/index.ts";
 import { findingPrompt } from "../lib/finding-prompt.ts";
 
-/** Fixes written at the same time. */
 const MAX_DRAFTS = 3;
 
 export type RuleRef = { id: string; title: string; path: string; section?: string };
 
 export type FindingView = {
   finding: Finding;
-  /** The active fix (AI or the user's). */
   fix?: Fix;
   aiFix?: Fix;
-  /** The latest user fix, if any. */
   userFix?: Fix;
   messages: Message[];
 };
 
-/** A file's text and which of its lines the reviewed change added. */
 export type CodeInfo = {
   lines: string[];
   added: Set<number>;
-  /** Colored pieces per line, filled in when the stream is built. */
   tokens?: Tok[][] | null;
 };
 
 export type SessionState = {
   review: Review;
-  /** Code of every file that has a finding, for showing findings in place. */
   code: Map<string, CodeInfo>;
   items: FindingView[];
   rules: Map<string, RuleRef>;
-  /** Keys (`path#Section`) of rules turned off for this repository. */
   disabledRules: string[];
-  /** Findings the AI is writing a fix for right now (in the background). */
   drafting: string[];
-  /** Findings the agent reported that crit did not keep, with why. */
   omitted: string[];
   busy?: string;
   notice?: string;
   error?: string;
 };
 
-/** Opens content in $EDITOR and returns the edited text, or undefined if unchanged/cancelled. */
 export type Editor = (content: string, filename: string) => Promise<string | undefined>;
 
 export type SessionDeps = {
   store: SqliteStore;
   root: string;
   reviewId: string;
-  /** Provider used to evaluate proposals and answer questions; undefined = offline (no AI actions). */
   fixContext?: FixContext;
   editor: Editor;
   backupRoot: string;
   verifyCommands: string[];
   rebase?: Rebaser;
-  /** Re-review one file; returns the id of a temporary review holding the fresh findings. */
   recheck?: (file: string) => Promise<string>;
-  /** Put text on the clipboard; returns where it went. */
   copy?: (text: string) => string;
-  /** File text at the reviewed revision, and the lines the change added. */
   code?: { read: (path: string) => Promise<string>; added: (path: string) => Set<number> };
 };
 
-/**
- * State and actions behind the review screen. Holds no terminal code; the
- * Ink screens render `state` and call these actions.
- */
 export class ReviewSession {
   state!: SessionState;
   private readonly listeners = new Set<() => void>();
-  /** Hands the terminal to a child process (Ink's suspendTerminal); set by the app. */
   suspend: ((fn: () => Promise<void>) => Promise<void>) | undefined;
   private readonly deps: SessionDeps;
 
@@ -178,9 +159,7 @@ export class ReviewSession {
           lines: text.replace(/\n$/, "").split("\n"),
           added: source.added(file),
         });
-      } catch {
-        // a file that cannot be read is shown without its code
-      }
+      } catch {}
     }
   }
 
@@ -188,10 +167,9 @@ export class ReviewSession {
     return this.state.items.find((i) => i.finding.id === id);
   }
 
-  /** Wrap a slow action: show `busy`, reload after, surface errors as `error`. */
   private async run<T>(busy: string, fn: () => Promise<T>): Promise<T | undefined> {
     this.set({ busy, error: undefined, notice: undefined });
-    this.codeCache.clear(); // an apply or re-check changes the files
+    this.codeCache.clear();
     try {
       const r = await fn();
       await this.load();
@@ -210,11 +188,6 @@ export class ReviewSession {
     return this.deps.fixContext;
   }
 
-  /**
-   * Have the AI write a fix for a finding that has none, in the background: the
-   * screen stays usable, the card shows progress, and a notice says when it is
-   * ready. A few at a time, so a burst of requests cannot flood the agent.
-   */
   draftFix(id: string, instruction?: string) {
     const it = this.item(id);
     if (!it) return;
@@ -236,7 +209,6 @@ export class ReviewSession {
     }).then(
       async () => {
         this.draftingIds.delete(id);
-        // a new fix is a new proposal: the old agreement does not carry over
         if (instruction) await this.deps.store.findings.update(id, { selected: false });
         await this.load().catch(() => undefined);
         this.set({ notice: `Fix ready for “${finding.title}”. Space checks it.` });
@@ -260,7 +232,6 @@ export class ReviewSession {
       this.set({ notice: "This finding has no fix to apply. Press i to tell the AI the fix." });
       return;
     }
-    // Show the new state at once; the write follows. Nothing here waits on the AI or the files.
     const selected = !it.finding.selected;
     this.set({
       items: this.state.items.map((v) =>
@@ -313,7 +284,6 @@ export class ReviewSession {
     );
   }
 
-  /** Run something that needs the real terminal (an editor): the alternate screen is left and restored. */
   private async withTerminal<T>(fn: () => Promise<T>): Promise<T> {
     if (!this.suspend) return fn();
     let result!: T;
@@ -327,7 +297,6 @@ export class ReviewSession {
     return readFileSync(join(this.deps.root, file), "utf8");
   }
 
-  /** Open the patched file in $EDITOR; the edit becomes the user's fix. */
   async editFix(id: string) {
     const it = this.item(id)!;
     const original = this.current(it.finding.file);
@@ -353,7 +322,6 @@ export class ReviewSession {
     });
   }
 
-  /** Write your own version of the file in $EDITOR and have the AI check it. */
   async proposeFromEditor(id: string): Promise<ProposalOutcome | undefined> {
     const it = this.item(id)!;
     const original = this.current(it.finding.file);
@@ -380,8 +348,6 @@ export class ReviewSession {
         backupRoot: this.deps.backupRoot,
         ...(only ? { only } : {}),
         ...(this.deps.verifyCommands.length ? { verifyCommands: this.deps.verifyCommands } : {}),
-        // Fixes are applied exactly as shown. A fix that no longer applies cleanly is skipped;
-        // no AI is called here.
       });
       return r;
     }).then((r) => {
@@ -397,7 +363,6 @@ export class ReviewSession {
     });
   }
 
-  /** Apply just this finding's fix to the working tree, whether or not it is ticked. */
   async applyOne(id: string) {
     const it = this.item(id);
     if (!it) return;
@@ -408,7 +373,6 @@ export class ReviewSession {
     return this.apply({ kind: "worktree" }, [id]);
   }
 
-  /** Re-run review for one file and replace this review's open findings on it with the fresh ones. */
   recheck(id: string) {
     const it = this.item(id)!;
     if (!this.deps.recheck)
@@ -429,7 +393,6 @@ export class ReviewSession {
     await store.reviews.delete(temp);
   }
 
-  /** The finding as a prompt for another agent, on the clipboard. */
   copyPrompt(id: string) {
     const it = this.item(id);
     if (!it) return;
@@ -441,7 +404,6 @@ export class ReviewSession {
     this.notify(`Copied a prompt for “${it.finding.title}” (${text.length} chars) via ${via}.`);
   }
 
-  /** The rules this review used, with whether the user has turned each off. */
   ruleRows() {
     return [...this.state.rules.values()].map((ref) => {
       const key = ref.section ? `${ref.path}#${ref.section}` : ref.path;
@@ -449,11 +411,6 @@ export class ReviewSession {
     });
   }
 
-  /**
-   * Turn a rule off or on for this repository. Turning one off re-checks the
-   * files whose findings cite it; turning one on applies to the next review
-   * or re-check.
-   */
   async toggleRule(ruleId: string) {
     const row = this.ruleRows().find((r) => r.ref.id === ruleId);
     if (!row) return;

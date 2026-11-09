@@ -5,7 +5,6 @@ import { clipToks, highlightLine } from "../../../shared/lib/index.ts";
 import { SEV_COLOR, SEV_LABEL, T } from "../../../shared/lib/index.ts";
 import { wrapText } from "../../../shared/lib/index.ts";
 
-/** A piece of styled text. Rows are arrays of these, so their width is known. */
 export type Seg = { t: string; color?: string; dim?: boolean; bold?: boolean; inverse?: boolean };
 export type Line = Seg[];
 
@@ -22,21 +21,17 @@ export const STATE_GLYPH = {
 const SEVERITY_WORD = { critical: "CRIT", major: "MAJ", minor: "MIN", nit: "NIT" } as const;
 
 export type CardOptions = {
-  /** Total card width including its border. */
   width: number;
   focused: boolean;
   expanded: boolean;
   fixTab: "ai" | "user";
-  /** A fix is being written: show this spinner frame in place of the fix line. */
   drafting?: string;
 };
 
-/** Wrap a whole line into rows no wider than `w`, keeping one style. */
 function wrapped(text: string, w: number, style: Omit<Seg, "t"> = {}, indent = ""): Line[] {
   return wrapText(text, w - indent.length).map((l) => [{ t: indent + l, ...style }]);
 }
 
-/** The lines of a fix patch as colored rows (new-side line numbers). */
 export function patchLines(patch: string, w: number): Line[] {
   const rows: { n: number; sign: string; text: string; path: string | undefined }[] = [];
   for (const file of parseUnifiedDiff(patch)) {
@@ -66,7 +61,6 @@ export function patchLines(patch: string, w: number): Line[] {
         : r.sign === "-"
           ? { t: gutter, color: T.red }
           : { t: gutter, dim: true };
-    // Removed lines stay red; added and context lines are syntax colored.
     const body: Seg[] =
       r.sign === "-"
         ? [{ t: clip(r.text, room), color: T.red }]
@@ -79,7 +73,6 @@ export function patchLines(patch: string, w: number): Line[] {
   });
 }
 
-/** Checkbox (agree with the fix) and title. */
 function titleLine(item: FindingView, w: number): Line {
   const tri = triage(item);
   const box = tri === "accepted" ? "[x]" : tri === "pending" && item.fix ? "[ ]" : "   ";
@@ -89,7 +82,6 @@ function titleLine(item: FindingView, w: number): Line {
   ];
 }
 
-/** What the card says inside its border (without the border). */
 export function cardBody(item: FindingView, state: SessionState, o: CardOptions): Line[] {
   const f = item.finding;
   const w = Math.max(16, o.width - 4);
@@ -213,7 +205,6 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
                 ["i", "change the fix"],
               ]
             : [["i", "tell the AI the fix"]];
-    // Drop hints from the end until they fit the card.
     const size = (ks: [string, string][]) =>
       ks.reduce((n, [k, l], i) => n + (i ? 2 : 0) + k.length + l.length + 3, 0);
     while (keys.length > 1 && size(keys) > w) keys.pop();
@@ -222,14 +213,12 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
       { t: `[${k}]`, bold: true, color: T.cyan },
       { t: ` ${label}`, dim: true },
     ]);
-    // An expanded card can be taller than the screen: keep the keys at its top, in view.
     if (o.expanded) out.splice(1, 0, hint);
     else out.push(hint);
   }
   return out;
 }
 
-/** The card with its rounded border, one `Line` per terminal row. */
 export function boxCard(item: FindingView, state: SessionState, o: CardOptions): Line[] {
   const f = item.finding;
   const tri = triage(item);

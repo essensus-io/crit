@@ -5,10 +5,8 @@ import type { Option } from "./prompter.ts";
 export const CLI_DEFAULT = "__cli_default__";
 const CUSTOM = "__custom__";
 const SAME = "__same__";
-/** Above this many options a plain list is unusable; offer search instead. */
 const SEARCH_ABOVE = 12;
 
-/** The CLI's own model list (or the static fallback), behind a spinner since it shells out. */
 export async function loadModels(
   ctx: CliContext,
   factory: AdapterFactory,
@@ -55,7 +53,6 @@ async function customName(ctx: CliContext, current: string | null): Promise<stri
   ).trim();
 }
 
-/** Choose a model for a provider; `null` means the CLI's own default. */
 export async function askModel(
   ctx: CliContext,
   factory: AdapterFactory,
@@ -82,10 +79,6 @@ export async function askModel(
   return { model, ...(info ? { info } : {}), models };
 }
 
-/**
- * Choose a reasoning effort from what the model accepts (an invalid value makes
- * the CLI fail). Skipped when the CLI has none (Cursor encodes effort in the model id).
- */
 export async function askEffort(
   ctx: CliContext,
   factory: AdapterFactory,
@@ -110,7 +103,6 @@ export async function askEffort(
   return chosen === CLI_DEFAULT ? null : chosen;
 }
 
-/** Choose a cheaper model for the skeptic, repo map and drafts; `null` = same as the main model. */
 export async function askFastModel(
   ctx: CliContext,
   opts: { label: string; command: string; current: string | null | undefined; models: ModelInfo[] },

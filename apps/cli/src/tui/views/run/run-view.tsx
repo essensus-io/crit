@@ -23,10 +23,6 @@ type Props = {
   switcher?: Switcher;
 };
 
-/**
- * While a review runs: the progress screen, then the review screen. `enter`
- * opens the findings found so far; `q` stops the review.
- */
 export const RunView = (props: Props) => {
   const app = useApp();
   const { width, height } = useScreen();
@@ -62,7 +58,6 @@ export const RunView = (props: Props) => {
     if (open && reviewId && !session) void props.makeSession(reviewId).then(setSession);
   }, [open, reviewId, session, props]);
 
-  // What the user picked on this screen, as the difference from what the run started with.
   const now = props.switcher?.current();
   const was = initial.current;
   const selection: Selection = {};

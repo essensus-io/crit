@@ -20,7 +20,6 @@ describe("highlight", () => {
     expect(colorOfText(lines[0]!, "42")).toBe(T.orange);
     expect(colorOfText(lines[0]!, "// the answer")).toBe(T.gray);
     expect(colorOfText(lines[1]!, '"hi"')).toBe(T.mint);
-    // the pieces put back together are the source line
     expect(lines[0]!.map((k) => k.t).join("")).toBe("const answer = 42; // the answer");
   });
 

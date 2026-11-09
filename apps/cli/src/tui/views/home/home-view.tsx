@@ -64,12 +64,10 @@ const optionsFor = (base: string | undefined): Option[] => [
   },
 ];
 
-/** The scope row that matches a spec, so `crit review src` opens with it selected. */
 const indexOfSpec = (spec: ScopeSpec | undefined) =>
   spec ? Math.max(0, ["branch", "staged", "commit", "project", "paths"].indexOf(spec.kind)) : 0;
 type Props = {
   info: HomeInfo;
-  /** Branches the review can be compared against (b changes it). */
   bases?: { ref: string; ahead: number }[];
   recent: RecentReview[];
   initialSpec?: ScopeSpec | undefined;
@@ -78,11 +76,6 @@ type Props = {
   onDone: (choice: HomeChoice) => void;
 };
 
-/**
- * The start screen: pick what to review, see what it would cost, and start it
- * yourself. Nothing runs until you press enter. Past reviews are listed to the
- * right and open with enter.
- */
 export const HomeView = (props: Props) => {
   const app = useApp();
   const { width, height } = useScreen();

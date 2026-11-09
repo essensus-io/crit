@@ -144,7 +144,6 @@ describe("runReview with the fake provider", () => {
       runs: [
         reviewRun([
           { tool: "report_finding", args: refundFinding() },
-          // duplicate of the first (same file, anchor, category) → merged
           {
             tool: "report_finding",
             args: refundFinding({
@@ -155,9 +154,7 @@ describe("runReview with the fake provider", () => {
             }),
           },
           { tool: "report_finding", args: swallowFinding },
-          // not in scope
           { tool: "report_finding", args: { ...swallowFinding, file: "README.md" } },
-          // bad patch twice → kept without fix
           {
             tool: "report_finding",
             args: {
@@ -244,7 +241,6 @@ describe("runReview with the fake provider", () => {
     const rules = o.events.find((e) => e.type === "rules")!;
     expect(rules.type === "rules" && rules.attached.map((r) => r.id)).toEqual(["R1"]);
 
-    // The reviewer got the rules and the diff; the skeptic got the findings block.
     const reviewTask = adapter.calls[0]!.task;
     expect(reviewTask.prompt).toContain("### R1 Validate money inputs at the boundary");
     expect(reviewTask.prompt).toContain("+  } catch (e) {}");
@@ -263,7 +259,6 @@ describe("runReview with the fake provider", () => {
     const first = await runReview(options(adapter));
     const o2 = options(adapter);
     const second = await runReview(o2);
-    // Every file is answered by the cache: no shards, no agent calls, verdicts kept.
     expect(second.shards).toEqual([]);
     expect(second.review.summary).toMatch(/^All 2 files are unchanged since their last review/);
     expect(adapter.calls.filter((c) => c.task.kind === "review")).toHaveLength(1);
@@ -275,7 +270,6 @@ describe("runReview with the fake provider", () => {
     expect(o2.events).toContainEqual({ type: "cache", files: 2, findings: 1 });
     expect((await store.reviews.get(first.review.id))?.status).toBe("superseded");
 
-    // Edit one file: only that file is reviewed again; the other still comes from the cache.
     repo.write({ "src/api/payments.ts": `${PAYMENTS_FEATURE}// edited\n` });
     const third = await runReview(options(fake(script)));
     expect(third.shards).toHaveLength(1);
@@ -445,7 +439,6 @@ describe("runReview with the fake provider", () => {
     o.config.shardTokens = 5;
     o.config.concurrency = 1;
     const r = await runReview(o);
-    // a wait longer than maxRateLimitWaitMs is not retried, and no further shard starts
     expect(calls).toBe(1);
     expect(r.shards.map((s) => s.status)).toEqual(["failed", "queued"]);
     expect(r.review.status).toBe("partial");
@@ -511,7 +504,7 @@ describe("runReview with the fake provider", () => {
     const spent = o.events
       .filter((e) => e.type === "usage")
       .map((e) => (e as { spent: number }).spent);
-    expect(spent).toEqual([910, 1950]); // running figure, then the final one
+    expect(spent).toEqual([910, 1950]);
     const ratio = Number(await store.kv.get("cost-ratio:fake"));
     expect(ratio).toBeCloseTo((3 + 1950 / r.shards[0]!.estimatedTokens) / 2, 1);
   });
@@ -702,7 +695,6 @@ describe("Intake", () => {
       (await err({ range: { start: 1, end: 1 }, anchor: "export async function refund" }))[0],
     ).toBeUndefined();
 
-    // A long file on main where the branch only changes the last line.
     repo.git("checkout", "-q", "main");
     const long = Array.from({ length: 30 }, (_, n) => `export const v${n + 1} = ${n + 1};`).join(
       "\n",

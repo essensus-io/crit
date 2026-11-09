@@ -8,7 +8,6 @@ export type DryRunInfo = {
   config: ResolvedConfig;
 };
 
-/** What a review would do and cost, without calling any agent. */
 export function dryRunJson(prep: Prepared, info: DryRunInfo) {
   const reasons = new Map<string, number>();
   for (const s of prep.scope.skipped) reasons.set(s.reason, (reasons.get(s.reason) ?? 0) + 1);

@@ -1,10 +1,3 @@
-/**
- * SQLite tables. Portability rules (so a Postgres schema is a mechanical copy):
- * - ids are UUIDv7 text made in code, never auto-increment
- * - timestamps are integer milliseconds
- * - JSON is stored as text
- * - no SQLite-only SQL in queries
- */
 import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const repos = sqliteTable(
@@ -26,7 +19,6 @@ export const reviews = sqliteTable(
     repoId: text("repo_id")
       .notNull()
       .references(() => repos.id, { onDelete: "cascade" }),
-    /** ScopeSpec JSON */
     scope: text("scope").notNull(),
     scopeKind: text("scope_kind").notNull(),
     scopeLabel: text("scope_label").notNull(),
@@ -35,7 +27,6 @@ export const reviews = sqliteTable(
     headSha: text("head_sha"),
     provider: text("provider").notNull(),
     model: text("model"),
-    /** Lens[] JSON */
     lenses: text("lenses").notNull(),
     status: text("status").notNull(),
     supersededBy: text("superseded_by"),
@@ -58,7 +49,6 @@ export const shards = sqliteTable(
       .notNull()
       .references(() => reviews.id, { onDelete: "cascade" }),
     label: text("label").notNull(),
-    /** string[] JSON */
     files: text("files").notNull(),
     lenses: text("lenses").notNull(),
     status: text("status").notNull(),
@@ -122,7 +112,6 @@ export const fixes = sqliteTable(
     evaluation: text("evaluation"),
     evaluationReason: text("evaluation_reason"),
     overridden: integer("overridden", { mode: "boolean" }).notNull(),
-    /** VerifyResult JSON */
     verify: text("verify"),
     active: integer("active", { mode: "boolean" }).notNull(),
     createdAt: integer("created_at").notNull(),
@@ -161,10 +150,8 @@ export const suppressions = sqliteTable(
 export const cacheEntries = sqliteTable(
   "cache_entries",
   {
-    /** hash of (content hash, rules hash, lens, provider, model) */
     key: text("key").primaryKey(),
     reviewId: text("review_id").references(() => reviews.id, { onDelete: "set null" }),
-    /** Cached FindingInput[] JSON plus shard summary */
     value: text("value").notNull(),
     transcriptPath: text("transcript_path"),
     createdAt: integer("created_at").notNull(),
@@ -186,7 +173,6 @@ export const events = sqliteTable(
   (t) => [index("events_review_idx").on(t.reviewId, t.createdAt)],
 );
 
-/** Small derived caches: rule section tags by content hash, repo map summaries by commit. */
 export const kv = sqliteTable("kv", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),

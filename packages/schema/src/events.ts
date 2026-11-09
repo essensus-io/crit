@@ -2,10 +2,6 @@ import type { Finding, SkepticResult } from "./finding.ts";
 import type { ResolvedScope, Shard } from "./review.ts";
 import type { Rule } from "./rule.ts";
 
-/**
- * Events emitted by core while a review runs. Shells (CLI, TUI, future web)
- * render these; core never prints or prompts.
- */
 export type ReviewEvent =
   | {
       type: "review-started";
@@ -31,7 +27,6 @@ export type ReviewEvent =
   | {
       type: "usage";
       task: "review" | "skeptic" | "map";
-      /** Effective tokens spent so far in this review, and the budget it stops at. */
       spent: number;
       budget: number;
     }
@@ -45,7 +40,6 @@ export type ReviewEvent =
       reviewId: string;
       findings: Finding[];
       durationMs: number;
-      /** Why the review stopped early, if it did. */
       partial?: string;
     }
   | { type: "review-failed"; reviewId: string; error: string };

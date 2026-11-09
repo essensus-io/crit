@@ -1,18 +1,15 @@
 import { addUsage, type AgentEvent, type AgentTask, emptyUsage } from "@crit/schema";
 
-/** What core needs from an adapter: the ProviderAdapter contract, structurally. */
 export interface AgentRunner {
   readonly capabilities: { mcp: boolean; nativeContext: import("@crit/schema").RuleSourceKind[] };
   run(task: AgentTask, signal: AbortSignal): AsyncIterable<AgentEvent>;
 }
 
 export type AgentOutcome = {
-  /** Final assistant message, if any. */
   message?: string;
   exitCode: number;
   errors: string[];
   rateLimited?: { retryAfterMs?: number };
-  /** Fresh (uncached) input tokens. */
   inputTokens: number;
   outputTokens: number;
   cachedInputTokens: number;
@@ -20,7 +17,6 @@ export type AgentOutcome = {
   ok: boolean;
 };
 
-/** Drive one agent run to completion, forwarding progress. */
 export async function runAgent(
   agent: AgentRunner,
   task: AgentTask,
@@ -35,7 +31,6 @@ export async function runAgent(
     cachedInputTokens: 0,
     ok: false,
   };
-  // A run reports cumulative partial usage while it works and final usage at the end; final wins.
   let running = emptyUsage();
   let final: ReturnType<typeof emptyUsage> | undefined;
   try {

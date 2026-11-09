@@ -15,7 +15,6 @@ import { z } from "zod";
 
 export type ScopeView = {
   label: string;
-  /** Files findings may be reported on; hunks are new-file line ranges for diff scopes. */
   files: { path: string; status: string; hunks?: { start: number; lines: number }[] }[];
   notes: string;
 };
@@ -26,7 +25,6 @@ export type ReportResult =
   | { accepted: true; id: string; warnings?: string[] }
   | { accepted: false; errors: string[] };
 
-/** The review-side implementation of one session's tools. */
 export interface SessionHandler {
   getScope(): Promise<ScopeView>;
   getRules(ids?: string[]): Promise<RuleView[]>;
@@ -42,7 +40,6 @@ export const TOOL_NAMES = [
   "finish",
 ] as const;
 
-/** Turn Zod issues into lines an agent can act on: `range.end: Too small: expected …`. */
 export function formatIssues(error: z.ZodError): string[] {
   return error.issues.map((i) => {
     const path = i.path.length ? i.path.join(".") : "(root)";
@@ -106,7 +103,6 @@ function toolList() {
   ];
 }
 
-/** An MCP server exposing crit's four tools, backed by a session handler. */
 export function createCritMcpServer(
   handler: SessionHandler,
   info = { name: "crit", version: "0.0.0" },

@@ -9,7 +9,6 @@ import { streamProcess } from "../process.ts";
 
 export const CODEX_TESTED = { min: "0.160.0", max: "0.199.999" };
 
-/** TOML value for a `-c key=value` override (JSON strings and arrays are valid TOML). */
 const toml = (v: string | string[]) => JSON.stringify(v);
 
 export type CodexInvocation = {
@@ -20,12 +19,6 @@ export type CodexInvocation = {
   cleanupDir: string;
 };
 
-/**
- * `codex exec --json --sandbox read-only`, ephemeral and without the user's
- * config.toml (auth still comes from CODEX_HOME). AGENTS.md loading is turned
- * off (`project_doc_max_bytes=0`) so crit inlines the rules itself. Codex has
- * no system-prompt flag, so crit's instructions lead the stdin prompt.
- */
 export function buildCodexInvocation(
   profile: Pick<ProviderProfile, "command" | "model" | "effort">,
   task: AgentTask,
@@ -49,15 +42,12 @@ export function buildCodexInvocation(
     'approval_policy="never"',
     "-c",
     "project_doc_max_bytes=0",
-    // Measured with `codex debug prompt-input`: the plugin runtime (JS tools) and apps add ~2.8k
-    // tokens to every turn (16.8k -> 14.4k) and crit uses neither.
     "--disable",
     "plugins",
     "--disable",
     "apps",
   ];
   if (task.mcp && task.mcpSession) {
-    // Only crit's own tools are pre-approved; shell commands stay in the read-only sandbox.
     args.push(
       "-c",
       `mcp_servers.crit.command=${toml(task.mcp.command)}`,
@@ -109,7 +99,6 @@ const short = (s: string, n = 70) => (s.length > n ? `${s.slice(0, n - 1)}…` :
 const USAGE_LIMIT = /usage limit|rate limit|too many requests|429|quota/i;
 const NOT_LOGGED_IN = /not logged in|login|unauthori[sz]ed|401|api key|authentication/i;
 
-/** Turn `codex exec --json` lines into AgentEvents. Stateful per run. */
 export class CodexStreamParser {
   readonly stderr: string[] = [];
   private lastMessage: string | undefined;
@@ -172,7 +161,6 @@ export class CodexStreamParser {
         if (u)
           out.push({
             type: "usage",
-            // Codex counts cached tokens inside input_tokens.
             inputTokens: Math.max(0, (u.input_tokens ?? 0) - (u.cached_input_tokens ?? 0)),
             outputTokens: (u.output_tokens ?? 0) + (u.reasoning_output_tokens ?? 0),
             cachedInputTokens: u.cached_input_tokens ?? 0,
@@ -252,7 +240,6 @@ export class CodexAdapter implements ProviderAdapter {
   }
 }
 
-/** No fixed list: Codex model names change often; setup offers the CLI default or a custom name. */
 const codexFactoryModels: string[] = [];
 
 export const codexFactory: AdapterFactory = {
@@ -264,7 +251,6 @@ export const codexFactory: AdapterFactory = {
   models: codexFactoryModels,
   listModels: ({ command, env, timeoutMs }) => codexModels(command, env, timeoutMs),
   efforts: ["low", "medium", "high", "xhigh", "max"],
-  // crit runs Codex with --ignore-user-config, so a model set in ~/.codex/config.toml does not apply.
   defaultModelNote: "Codex built-in default; your ~/.codex/config.toml is not used",
   create: (profile, env) => new CodexAdapter(profile, env),
 };

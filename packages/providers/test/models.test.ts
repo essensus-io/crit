@@ -23,7 +23,7 @@ describe("parseCodexModels (recorded `codex debug models`)", () => {
   it("offers only the models the CLI lists, in its priority order, with their efforts", () => {
     expect(models.length).toBeGreaterThanOrEqual(6);
     expect(models.every((m) => m.id && m.label)).toBe(true);
-    expect(models.map((m) => m.id)).not.toContain("gpt-reserve"); // visibility: hide
+    expect(models.map((m) => m.id)).not.toContain("gpt-reserve");
     const sol = models.find((m) => m.id === "gpt-6.1-sol")!;
     expect(sol).toMatchObject({ label: "GPT-6.1-Sol", defaultEffort: "low" });
     expect(sol.efforts).toEqual(["low", "medium", "high", "xhigh", "max", "ultra"]);

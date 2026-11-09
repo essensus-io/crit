@@ -8,7 +8,6 @@ import { makeSwitcher } from "./make-switcher.ts";
 import { renderFullScreen } from "./render-full-screen.tsx";
 import { summaryLine } from "./summary-line.ts";
 
-/** `crit open` in a terminal: the review screen for a saved review. With `home`, q goes back to the start screen. */
 export const openTui = async (
   ctx: CliContext,
   store: SqliteStore,

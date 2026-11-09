@@ -168,7 +168,6 @@ describe("ConfigFile and resolveConfig", () => {
     expect(r.severityThreshold).toBe("major");
     expect(r.base).toBe("dev");
     expect(r.provider).toBe("me");
-    // defaults are not mutated
     expect(DEFAULT_CONFIG.ignore).toEqual([]);
   });
 });

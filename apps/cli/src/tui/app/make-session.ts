@@ -20,7 +20,6 @@ import { type Editor, ReviewSession } from "../features/review-session/index.ts"
 import { type Choice, type Switcher } from "../features/model-switching/index.ts";
 import { terminalEditor } from "./terminal-editor.ts";
 
-/** The provider run for a choice: the saved profile with this session's model and effort. */
 function runFor(ctx: CliContext, file: ProvidersFile, c: Choice): ProviderRun {
   const base = file.providers.find((p) => p.name === c.provider) ?? file.providers[0]!;
   const profile = { ...base, model: c.model, effort: c.effort };
@@ -37,7 +36,6 @@ export async function makeSession(
 ): Promise<ReviewSession> {
   const providers = loadProviders(ctx.paths);
   const review = await store.reviews.get(reviewId);
-  // The code the findings are about, shown in place; works without a provider.
   const scope = review
     ? await resolveScope({
         cwd: root,
@@ -55,7 +53,6 @@ export async function makeSession(
   let recheck: ((file: string) => Promise<string>) | undefined;
   let rebase;
   if (providers?.providers.some((p) => p.enabled) && review) {
-    // AI actions start on the evaluate role; the switcher moves them to what the user picks.
     const evaluator = resolveProvider(providers, { role: "evaluate" }).profile;
     const holder = {
       run: { profile: evaluator, adapter: adapterFor(ctx, evaluator) } as ProviderRun,
@@ -111,7 +108,6 @@ export async function makeSession(
   });
   await session.load();
   if (review && fixContext) {
-    // Tell the user once if their agent CLI is newer or older than what crit was tested with.
     void ctx.registry
       .create(fixContext.provider.profile, { env: ctx.env, tmpDir: ctx.paths.cache })
       .detect()

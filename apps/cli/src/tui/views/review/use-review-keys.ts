@@ -36,7 +36,6 @@ type Props = {
   back: () => void;
 };
 
-/** Every key of the review screen: what it does for the finding under the cursor. */
 export const useReviewKeys = ({
   session,
   state,
@@ -63,7 +62,6 @@ export const useReviewKeys = ({
   quit,
   back,
 }: Props) => {
-  // Moving between files jumps to the first finding of the next or previous one.
   const moveFile = (delta: number) => {
     if (!current) return;
     const at = files.indexOf(current.finding.file);
@@ -71,7 +69,6 @@ export const useReviewKeys = ({
     const first = items.findIndex((i) => i.finding.file === target);
     if (first >= 0) setCursor(first);
   };
-  // enter: apply everything checked, once every finding has been looked at.
   const finish = () => {
     const open = items.filter((i) => triage(i) !== "applied" && triage(i) !== "dismissed");
     const unseen = open.filter((i) => !seen.has(i.finding.id) && i !== current);
@@ -94,7 +91,6 @@ export const useReviewKeys = ({
     (typed, key) => {
       const input = typed.toLowerCase();
       if (busy) return;
-      // A message stays until the next key, then gives the line back to progress.
       if (state.notice || state.error) session.notify(undefined);
       if (screen === "proposal" && outcome && current) {
         if (key.escape || input === "q") return setScreen("stream");
@@ -149,10 +145,9 @@ export const useReviewKeys = ({
       if (input === "i") return setMode("instruct");
       if (input === "x") return void session.applyOne(id);
       if (input === " ") {
-        // space: "fix this". Check the fix and go on; no fix yet: the AI writes one, checked when ready.
         if (triage(current) === "dismissed") return void session.restore(id);
         const next = () => move(cursor + 1);
-        if (current.finding.selected) return void session.toggle(id); // again: uncheck
+        if (current.finding.selected) return void session.toggle(id);
         if (current.fix) {
           void session.toggle(id).then(next);
           return;

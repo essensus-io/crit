@@ -361,7 +361,7 @@ describe("draftAiFix", () => {
     ctx.provider.profile.fastModel = "tiny";
     const fix = await draftAiFix(ctx, finding);
     expect(fix).toMatchObject({ author: "ai", active: true, summary: `Fix: ${finding.title}` });
-    expect(fix.evaluation).toBeUndefined(); // no second model pass judging it
+    expect(fix.evaluation).toBeUndefined();
     expect(await ctx.store.fixes.active(finding.id)).toMatchObject({ id: fix.id });
     expect(ctx.fake.calls).toHaveLength(1);
     const task = ctx.fake.calls[0]!.task;

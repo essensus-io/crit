@@ -29,7 +29,6 @@ export function adapterFor(ctx: CliContext, profile: ProviderProfile): ProviderA
 
 export type TestResult = { ok: true; ms: number } | { ok: false; ms: number; error: string };
 
-/** Run a short test prompt; failures carry a fix (e.g. "run `claude` once to log in"). */
 export async function testProvider(ctx: CliContext, profile: ProviderProfile): Promise<TestResult> {
   const factory = ctx.registry.get(profile.type);
   const t0 = ctx.now();
@@ -82,7 +81,6 @@ export function nonInteractiveSetupError(): CliError {
   });
 }
 
-/** Load providers.json, running first-run setup when it does not exist. */
 export async function ensureProviders(ctx: CliContext, continuing: string): Promise<ProvidersFile> {
   const existing = loadProviders(ctx.paths);
   if (existing && existing.providers.length > 0) return existing;
@@ -98,7 +96,6 @@ const validateName = (file: ProvidersFile, except?: string) => (v: string) => {
   return undefined;
 };
 
-/** Ask for a profile's name, model, reasoning effort and cheaper model. */
 export async function profilePrompts(
   ctx: CliContext,
   file: ProvidersFile,
@@ -159,10 +156,6 @@ async function testAndReport(ctx: CliContext, profiles: ProviderProfile[]): Prom
   s.stop(`Testing providers\n${lines.map((l) => c.dim(l)).join("\n")}`, failed);
 }
 
-/**
- * First run: detect agent CLIs, pick which to add, name + model for each,
- * pick the default, test each, save. Then the original command continues.
- */
 export async function firstRun(ctx: CliContext, continuing: string): Promise<ProvidersFile> {
   const p = ctx.prompter;
   p.intro("crit · first run: let's add a provider");
@@ -224,7 +217,6 @@ export async function firstRun(ctx: CliContext, continuing: string): Promise<Pro
   return file;
 }
 
-/** Interactive add or edit of one profile. Flags skip the matching prompts. */
 export async function editProfileFlow(
   ctx: CliContext,
   file: ProvidersFile,
@@ -244,7 +236,6 @@ export async function editProfileFlow(
   let effort: string | null = existing.effort ?? null;
   let fastModel: string | null = existing.fastModel ?? null;
   if (factory && ctx.interactive) {
-    // Prompt only for what the flags did not set; the model list is loaded once.
     let models: ModelInfo[] | undefined;
     let info: ModelInfo | undefined;
     if (flags.model !== undefined) model = flags.model;

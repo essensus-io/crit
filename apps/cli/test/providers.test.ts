@@ -48,11 +48,7 @@ describe.skipIf(!posix)("first run", () => {
     t = testContext({
       cwd: repo.root,
       interactive: true,
-      answers: [
-        ["test-agent"], // which providers
-        "claude", // name
-        "fake-large", // model
-      ],
+      answers: [["test-agent"], "claude", "fake-large"],
     });
     t.script({
       runs: [
@@ -230,7 +226,6 @@ describe("crit providers", () => {
 
     const i = testContext({
       interactive: true,
-      // model, effort, cheaper model, enabled, roles, test now
       answers: ["CLI default", "low", "fake-small", false, ["evaluate"], true],
     });
     i.ctx.paths = t.ctx.paths;

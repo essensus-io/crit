@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-/** Adapter types shipped in v1. Others (e.g. "opencode") register later; profiles accept any string. */
 export const KNOWN_PROVIDER_TYPES = ["claude-code", "codex", "cursor"] as const;
 export type KnownProviderType = (typeof KNOWN_PROVIDER_TYPES)[number];
 
@@ -14,14 +13,10 @@ export const ProviderProfile = z.object({
   name: ProviderName,
   type: z.string().min(1),
   command: z.string().min(1),
-  /** null = the CLI's own default model. */
   model: z.string().nullable().default(null),
-  /** Reasoning effort (low, medium, high, xhigh, max); null = the CLI's own default. */
   effort: z.string().nullable().optional(),
-  /** Cheaper model for the skeptic, repo map and draft tasks; null = use `model`. */
   fastModel: z.string().nullable().optional(),
   enabled: z.boolean().default(true),
-  /** Extra environment for this profile's CLI, e.g. CLAUDE_CONFIG_DIR to use another account. */
   env: z.record(z.string(), z.string()).optional(),
 });
 export type ProviderProfile = z.infer<typeof ProviderProfile>;
@@ -33,7 +28,6 @@ export type Role = z.infer<typeof Role>;
 export const Roles = z.partialRecord(Role, ProviderName);
 export type Roles = z.infer<typeof Roles>;
 
-/** ~/.config/crit/providers.json */
 export const ProvidersFile = z
   .object({
     $schema: z.string().optional(),

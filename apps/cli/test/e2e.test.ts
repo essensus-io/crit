@@ -1,7 +1,3 @@
-/**
- * End-to-end: spawn the built CLI (dist/index.js) with a temporary crit home
- * and the fake provider, the way a user runs it. No network, real git.
- */
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -185,8 +181,6 @@ describe("built CLI", () => {
     const client = new Client({ name: "e2e", version: "1" });
     try {
       await client.connect(
-        // Started like Codex does: a reduced environment without CRIT_HOME, so the
-        // sessions folder must come from --sessions-dir (regression).
         new StdioClientTransport({
           command: process.execPath,
           args: [CLI, "mcp", "--session", host.sessionId, "--sessions-dir", sessions],

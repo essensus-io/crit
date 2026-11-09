@@ -2,7 +2,6 @@ import * as p from "@clack/prompts";
 
 export type Option<T> = { value: T; label: string; hint?: string; disabled?: boolean };
 
-/** Step-by-step prompts behind an interface so setup flows can be tested. */
 export interface Prompter {
   intro(message: string): void;
   outro(message: string): void;
@@ -18,7 +17,6 @@ export interface Prompter {
     validate?: (v: string) => string | undefined;
   }): Promise<string>;
   select<T>(opts: { message: string; options: Option<T>[]; initialValue?: T }): Promise<T>;
-  /** A searchable list: type to filter (for long lists such as Cursor's ~270 models). */
   autocomplete<T>(opts: {
     message: string;
     options: Option<T>[];
@@ -124,11 +122,6 @@ export class ClackPrompter implements Prompter {
 
 type Answer = string | boolean | string[] | ((question: string) => unknown);
 
-/**
- * Prompter for tests: answers come from a queue (in order) and every message
- * is recorded. A missing answer takes the initial value, so tests only script
- * what they change.
- */
 export class ScriptedPrompter implements Prompter {
   readonly log: string[] = [];
   private readonly answers: Answer[];

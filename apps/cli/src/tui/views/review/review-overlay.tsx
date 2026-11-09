@@ -21,7 +21,6 @@ type Props = {
   done: () => void;
 };
 
-/** A full-screen menu or picker for the current mode (help, actions, options, rules); undefined when none applies. */
 export const reviewOverlay = ({
   mode,
   current,

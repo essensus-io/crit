@@ -1,4 +1,3 @@
-/** Live smoke test through the real Cursor agent CLI (JSON fallback). Opt-in: `pnpm test:live`. */
 import { describe, expect, it } from "vitest";
 import { CursorAdapter, which } from "../../src/index.ts";
 import type { AgentEvent } from "@crit/schema";

@@ -87,16 +87,13 @@ const BY_EXTENSION: Record<string, keyof typeof LANGUAGES> = {
   sql: "sql",
 };
 
-/** A piece of one line with its color. */
 export type Tok = { t: string; color?: string };
 
-/** The language for a file name, or undefined when crit has no grammar for it. */
 export function languageOf(file: string): string | undefined {
   const ext = file.split(".").pop()?.toLowerCase();
   return ext && file.includes(".") ? BY_EXTENSION[ext] : undefined;
 }
 
-// Token colors from the palette; anything not listed stays the default text color.
 const COLORS: [RegExp, string][] = [
   [/^hljs-(comment|quote|doctag)/, T.gray],
   [/^hljs-(keyword|selector-tag|meta-keyword)/, T.lav],
@@ -122,7 +119,6 @@ const ENTITIES: Record<string, string> = {
 };
 const decode = (s: string) => s.replace(/&(amp|lt|gt|quot|#x27|#39);/g, (m) => ENTITIES[m] ?? m);
 
-/** highlight.js HTML to colored pieces per line; a token that spans lines keeps its color on each. */
 function toLines(html: string): Tok[][] {
   const lines: Tok[][] = [[]];
   const stack: (string | undefined)[] = [];
@@ -146,11 +142,6 @@ function toLines(html: string): Tok[][] {
 
 const MAX_LINES = 20_000;
 
-/**
- * Colors for every line of a file, highlighted as one document so strings and
- * comments that span lines come out right. Undefined for unknown languages and
- * very large files (the caller shows plain text).
- */
 export function highlightFile(file: string, lines: string[]): Tok[][] | undefined {
   const language = languageOf(file);
   if (!language || lines.length > MAX_LINES) return undefined;
@@ -161,7 +152,6 @@ export function highlightFile(file: string, lines: string[]): Tok[][] | undefine
         ignoreIllegals: true,
       }).value,
     );
-    // Same number of lines as the source, so a line number indexes the result.
     while (out.length < lines.length) out.push([]);
     return out.slice(0, lines.length);
   } catch {
@@ -169,7 +159,6 @@ export function highlightFile(file: string, lines: string[]): Tok[][] | undefine
   }
 }
 
-/** One line on its own (fix patches); no state carries over from other lines. */
 export function highlightLine(file: string | undefined, line: string): Tok[] {
   const language = file ? languageOf(file) : undefined;
   if (!language) return [{ t: line }];
@@ -184,7 +173,6 @@ export function highlightLine(file: string | undefined, line: string): Tok[] {
   }
 }
 
-/** Clip pieces to `n` characters, ending with an ellipsis when cut. */
 export function clipToks(toks: Tok[], n: number): Tok[] {
   const out: Tok[] = [];
   let left = n;

@@ -190,7 +190,6 @@ describe("patches", () => {
       ok: false,
       error: expect.stringMatching(/not a unified diff/),
     });
-    // --recount tolerates wrong hunk counts from agents
     expect(
       (await checkPatch(repo.root, good.replace("@@ -1,2 +1,2 @@", "@@ -1,5 +1,7 @@"))).ok,
     ).toBe(true);

@@ -6,7 +6,6 @@ export type ParsedHunk = {
   newStart: number;
   newLines: number;
   header: string;
-  /** Body lines including their ' ', '+', '-' or '\' prefix. */
   body: string[];
 };
 
@@ -28,11 +27,6 @@ function stripPrefix(p: string): string | null {
   return unq.replace(/^[ab]\//, "");
 }
 
-/**
- * Parse a unified diff (git or plain). Handles adds, deletes, renames, binary
- * markers and "\ No newline at end of file". Lines are split on \n only;
- * CRLF content keeps its \r.
- */
 export function parseUnifiedDiff(diff: string): ParsedFile[] {
   const files: ParsedFile[] = [];
   const lines = diff.split("\n");
@@ -81,7 +75,6 @@ export function parseUnifiedDiff(diff: string): ParsedFile[] {
       } else if (c === "-") remainingOld--;
       else if (c === "+") remainingNew--;
       else if (c !== "\\") {
-        // Malformed / truncated hunk: stop consuming body lines.
         hunk = undefined;
         i--;
         continue;
@@ -146,15 +139,12 @@ export function parseUnifiedDiff(diff: string): ParsedFile[] {
   return files;
 }
 
-/** Path a file diff applies to: the new path, or the old one for deletions. */
 export const diffPath = (f: ParsedFile): string => (f.newPath ?? f.oldPath)!;
 
-/** New-file line ranges touched by a file diff. */
 export function hunksOf(f: ParsedFile): Hunk[] {
   return f.hunks.map((h) => ({ start: h.newStart, lines: h.newLines }));
 }
 
-/** Lines (1-based, new side) that a file diff adds. */
 export function addedLines(f: ParsedFile): Set<number> {
   const out = new Set<number>();
   for (const h of f.hunks) {

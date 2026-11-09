@@ -93,7 +93,7 @@ describe("createSwitcher", () => {
     expect(await sw.efforts()).toEqual(["low", "high"]);
     sw.setModel("m2");
     expect(await sw.efforts()).toEqual(["low", "medium", "high", "xhigh"]);
-    sw.setModel(null); // CLI default: the first model that reports efforts
+    sw.setModel(null);
     expect((await sw.efforts()).length).toBeGreaterThan(0);
   });
 
@@ -124,7 +124,6 @@ describe("createSwitcher", () => {
       ],
     });
     const sw = createSwitcher(t.ctx, FILE, { depth: "standard" }, { provider: "a" });
-    // someone adds a role on disk after the switcher was created
     const onDisk = loadProviders(t.ctx.paths)!;
     saveProviders(t.ctx.paths, { ...onDisk, roles: { skeptic: "b" } });
     sw.setModel("m2");

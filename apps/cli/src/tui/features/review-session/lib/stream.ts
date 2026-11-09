@@ -6,13 +6,11 @@ import { T } from "../../../shared/lib/index.ts";
 export type StreamRow = {
   kind: "file" | "code" | "gap" | "card";
   line: Line;
-  /** The finding a card (or its highlighted code) belongs to. */
   findingId?: string;
 };
 
 export type Stream = {
   rows: StreamRow[];
-  /** First row of each finding's card, and its last row. */
   card: Map<string, { from: number; to: number }>;
 };
 
@@ -26,16 +24,10 @@ export type StreamInput = {
   expanded: ReadonlySet<string>;
   fixTab: "ai" | "user";
   width: number;
-  /** Findings a fix is being written for, and the spinner frame to show on them. */
   drafting?: ReadonlySet<string>;
   spin?: string;
 };
 
-/**
- * Everything the stream shows, as rows: for each file with findings, the code
- * around each finding (changed lines marked), long unchanged stretches folded,
- * and each finding as a card right under the lines it is about.
- */
 export function buildStream(input: StreamInput): Stream {
   const { items, state, code, current, expanded, fixTab, width, drafting, spin } = input;
   const rows: StreamRow[] = [];
@@ -80,7 +72,6 @@ export function buildStream(input: StreamInput): Stream {
       start: Math.min(total, Math.max(1, it.finding.range.start)),
       end: Math.min(total, Math.max(1, it.finding.range.end)),
     });
-    // Windows of code around the findings; windows that touch merge into one.
     const windows: { s: number; e: number }[] = [];
     for (const it of list) {
       const r = range(it);

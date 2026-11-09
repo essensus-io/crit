@@ -2,22 +2,14 @@ import { type Lens, SEVERITY_ORDER, type Severity } from "@crit/schema";
 
 export type ListFilter = {
   tab: "findings" | "filtered";
-  /** Show this severity and above; undefined = all. */
   severity?: Severity;
   lens?: Lens;
-  /** Substring of the file path. */
   file?: string;
   search?: string;
-  /** Only findings that have a proposed fix. */
   hasFix?: boolean;
-  /** Only findings you have not ticked, skipped or applied yet. */
   pending?: boolean;
 };
 
-/**
- * The search box: free text plus `sev:major`, `lens:security`, `file:cart`
- * and `is:filtered`. Anything else is matched against title and path.
- */
 export function parseQuery(query: string): ListFilter {
   const f: ListFilter = { tab: "findings" };
   const words: string[] = [];

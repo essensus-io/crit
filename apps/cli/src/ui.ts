@@ -5,7 +5,6 @@ type Style = Parameters<typeof styleText>[0];
 
 export type Colors = ReturnType<typeof colors>;
 
-/** Color helpers that turn into plain text when color is off. */
 export function colors(enabled: boolean) {
   const c = (style: Style) => (s: string) =>
     enabled ? styleText(style, s, { validateStream: false }) : s;
@@ -38,7 +37,6 @@ export function severityColor(c: Colors, s: Severity) {
   return s === "critical" ? c.red : s === "major" ? c.yellow : s === "minor" ? c.cyan : c.gray;
 }
 
-/** "1m42s", "4.2s", "850ms" */
 export function duration(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)}ms`;
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
@@ -47,7 +45,6 @@ export function duration(ms: number): string {
   return s ? `${m}m${String(s).padStart(2, "0")}s` : `${m}m`;
 }
 
-/** "today 14:02", "yesterday 17:15", "Nov 1" */
 export function when(ts: number, now: number): string {
   const d = new Date(ts);
   const n = new Date(now);
@@ -66,7 +63,6 @@ export function when(ts: number, now: number): string {
 export const visibleLength = (s: string) => stripVTControlCharacters(s).length;
 const pad = (s: string, w: number) => s + " ".repeat(Math.max(0, w - visibleLength(s)));
 
-/** Left-aligned columns, two spaces apart. */
 export function table(rows: string[][], indent = "  "): string {
   const widths: number[] = [];
   for (const r of rows)

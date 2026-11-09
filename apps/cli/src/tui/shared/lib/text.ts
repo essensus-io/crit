@@ -1,7 +1,6 @@
 export const truncate = (s: string, n: number) =>
   s.length > n ? `${s.slice(0, Math.max(0, n - 1))}…` : s;
 
-/** Word-wrap plain text to `width` columns; words longer than a line are split. */
 export function wrapText(text: string, width: number): string[] {
   const w = Math.max(10, width);
   const out: string[] = [];

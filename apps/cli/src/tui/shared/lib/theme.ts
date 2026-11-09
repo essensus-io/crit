@@ -1,4 +1,3 @@
-/** One palette for every screen, after the reference dashboard: mint, orange, lavender, on the terminal's own background. */
 export const T = {
   mint: "#86efac",
   orange: "#fb923c",
@@ -19,7 +18,6 @@ export const SEV_COLOR = {
 } as const;
 export const SEV_LABEL = { critical: "CRIT", major: "MAJ", minor: "MIN", nit: "NIT" } as const;
 
-/** Dashed box-drawing set used by every panel and flow connector. */
 export const DASH = {
   topLeft: "┌",
   top: "╌",

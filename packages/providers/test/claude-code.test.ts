@@ -49,7 +49,6 @@ const profile: ProviderProfile = {
 describe("Claude Code stream-json contract (recorded transcripts)", () => {
   it("maps a review run with MCP tool calls to AgentEvents", () => {
     const all = replay("review.jsonl");
-    // Running usage (one per API call) is checked separately; the rest is the contract.
     const events = all.filter((e) => !(e.type === "usage" && e.partial));
     expect(events.map((e) => e.type)).toEqual([
       "session",
@@ -69,13 +68,11 @@ describe("Claude Code stream-json contract (recorded transcripts)", () => {
       (e): e is Extract<AgentEvent, { type: "usage" }> => e.type === "usage" && e.partial === true,
     );
     expect(partials.length).toBeGreaterThan(2);
-    // cumulative: output never goes down, and the final figure matches the last running one
     const outs = partials.map((e) => e.outputTokens ?? 0);
     expect(outs).toEqual([...outs].sort((a, b) => a - b));
     const final = events.find((e) => e.type === "usage") as Extract<AgentEvent, { type: "usage" }>;
     expect(final.partial).toBeUndefined();
     expect(final.cachedInputTokens).toBeGreaterThan(0);
-    // streamed per-message output counts are provisional; the final result is authoritative
     expect(final.outputTokens).toBeGreaterThanOrEqual(partials.at(-1)!.outputTokens ?? 0);
     expect(
       events.filter((e) => e.type === "tool").map((e) => (e as { name: string }).name),
@@ -272,7 +269,6 @@ describe("buildClaudeInvocation", () => {
     expect(inv.files.find((f) => f.path.endsWith("system.md"))!.content).toBe(
       "You are a reviewer.",
     );
-    // replaces the default system prompt instead of appending to it
     expect(flag("--system-prompt-file")).toBe(join(inv.cleanupDir, "system.md"));
     expect(inv.args).not.toContain("--append-system-prompt-file");
     expect(flag("--mcp-config")).toBe(join(inv.cleanupDir, "mcp.json"));
@@ -302,8 +298,7 @@ describe("buildClaudeInvocation", () => {
     const shell = build("shell", ["pnpm test"]);
     expect(shell.tools).toBe("Read,Grep,Glob,Bash");
     expect(shell.allowed).toEqual(expect.arrayContaining(["Bash(git diff:*)", "Bash(pnpm test)"]));
-    expect(build().tools).toBe("Read,Grep,Glob,Bash"); // default keeps the shell
-    // no tools and no MCP (a skeptic on a JSON-only run): no allowlist flag at all
+    expect(build().tools).toBe("Read,Grep,Glob,Bash");
     const bare = buildClaudeInvocation(profile, task({ access: "none" }), "/tmp/x");
     expect(bare.args).not.toContain("--allowedTools");
     expect(bare.args[bare.args.indexOf("--tools") + 1]).toBe("");
@@ -341,7 +336,6 @@ describe("ClaudeCodeAdapter", () => {
   it.skipIf(process.platform === "win32")(
     "spawns the CLI, streams events and cleans up temp files",
     async () => {
-      // A stand-in `claude` that checks its stdin and replays the recorded transcript.
       const bin = join(dir, "claude");
       writeFileSync(
         bin,

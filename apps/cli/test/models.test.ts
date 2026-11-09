@@ -131,7 +131,6 @@ describe("choosing models, effort and a cheaper model", () => {
     expect(await t.run("providers", "add")).toBe(0);
     expect(saved(t).providers[0].model).toBe("my-private-model");
 
-    // editing: the saved model is not in the list but stays selectable ("current")
     const e = testContext({
       interactive: true,
       models: SHORT,

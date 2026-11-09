@@ -10,10 +10,6 @@ type Props = {
   children?: ReactNode;
 };
 
-/**
- * A dashed panel with its title in the top border, like the reference
- * dashboard. `width` must be given; `height` (when set) includes the border.
- */
 export const Panel = ({ title, tone = "mint", width, height, children }: Props) => {
   const color = T[tone];
   const label = title ? ` ${truncate(title, Math.max(1, width - 6))} ` : "";

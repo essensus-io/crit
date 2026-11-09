@@ -87,7 +87,7 @@ describe("start screen", () => {
     expect(f).toContain("today 14:02 · 3 findings · open");
     expect(f).toContain("j/k choose · enter start · tab recent reviews · o model & depth · q quit");
     await sleep(200);
-    expect(done).toEqual([]); // only an estimate was made: no review without enter
+    expect(done).toEqual([]);
     expect(estimate).toHaveBeenCalledTimes(1);
     expect(estimate).toHaveBeenCalledWith({ kind: "branch", base: "origin/develop" });
     app.unmount();

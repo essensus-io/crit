@@ -1,4 +1,3 @@
-/** An error with a message meant for the user and an exit code. */
 export class CliError extends Error {
   override name = "CliError";
   readonly exitCode: number;
@@ -14,9 +13,7 @@ export const EXIT = {
   ok: 0,
   error: 1,
   usage: 2,
-  /** --fail-on threshold met */
   findings: 3,
-  /** The review stopped early (budget or rate limit); findings so far were kept. */
   partial: 4,
   cancelled: 130,
 } as const;

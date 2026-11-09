@@ -215,18 +215,17 @@ describe("review stream", () => {
     expect(f).toContain("crit · review");
     expect(f).toContain("feature/payments → main · claude (opus)");
     expect(f).toContain("▍ src/payments.ts  2 findings");
-    expect(f).toMatch(/2 ▎\+\s+if \(amount > order\.capturedAmount\) \{/); // changed line, in the focused range
+    expect(f).toMatch(/2 ▎\+\s+if \(amount > order\.capturedAmount\) \{/);
     expect(f).toMatch(/╭─ ✓ CRIT · correctness ─+╮/);
     expect(f).toContain("Refund amount not validated");
     expect(f).toContain("Validate against captured minus refunded");
-    expect(f).toContain("[x] Refund amount not validated"); // ticked: you agree with the fix
+    expect(f).toContain("[x] Refund amount not validated");
     expect(f).toContain("[space] uncheck  [i] change the fix");
     expect(f).toContain("1 of 2 looked at · 1 accepted");
     expect(f).toContain("+1 filtered");
     expect(f).toContain(
       "j/k next · space uncheck · i change the fix · enter apply 1 checked · q quit · ? help",
     );
-    // the code lines come before the card that is about them
     expect(f.indexOf("if (amount > order.capturedAmount)")).toBeLessThan(
       f.indexOf("Refund amount not validated"),
     );
@@ -263,11 +262,10 @@ describe("review stream", () => {
     await app.press("j", "a");
     await until(app.lastFrame, "No fix yet. What should the fix do?");
     await sleep(80);
-    await app.press(ENTER); // empty: let the AI decide
-    // no blocking screen: the stream stays, and the fix lands without any check round
+    await app.press(ENTER);
     const f = await until(app.lastFrame, "Fix ready for “Unused import”");
     expect(f).not.toContain("ACCEPTED");
-    expect(f).toContain("the fix"); // the card opened on its fix
+    expect(f).toContain("the fix");
     expect(f).toContain("Fix: Unused import");
     expect(f).toContain("[space] check to apply");
     await app.press("a");
@@ -295,7 +293,6 @@ describe("review stream", () => {
     const f = await until(app.lastFrame, /writing a fix…/);
     expect(f).toMatch(/[|/\\-] writing a fix…/);
     expect(f).toMatch(/writing 1 fix/);
-    // still usable: move, and ask for the same fix again
     await app.press("k", "j", "i");
     await until(app.lastFrame, "What should the fix do?");
     await sleep(80);
@@ -344,13 +341,11 @@ describe("review stream", () => {
     expect(f).toMatch(/2 - +if \(amount > order\.capturedAmount\) \{/);
     expect(f).toMatch(/2 \+ +if \(amount <= 0/);
     expect(f).toContain("[space] uncheck");
-    // one finding has not been looked at: enter says so, moves there, and applies nothing
     await app.press(ENTER);
     await until(app.lastFrame, "1 finding not looked at yet");
     expect(readFileSync(join(repo.root, "src/payments.ts"), "utf8")).not.toContain(
       "order.refundedAmount",
     );
-    // now every finding has been seen: enter applies what is checked
     await app.press(ENTER);
     await until(app.lastFrame, "Applied 1 · crit undo restores the files");
     expect(readFileSync(join(repo.root, "src/payments.ts"), "utf8")).toContain(
@@ -365,12 +360,12 @@ describe("review stream", () => {
         runs: [{ match: { kind: "draft-fix" }, message: `\`\`\`diff\n${USER_PATCH}\`\`\`` }],
       }),
     );
-    await app.press("a"); // uncheck the first fix
+    await app.press("a");
     await until(app.lastFrame, "1 of 2 looked at · 0 accepted");
     await app.press(" ");
-    await until(app.lastFrame, "2/2"); // checked, and on to the next finding
+    await until(app.lastFrame, "2/2");
     expect((await store.findings.get(ids["Refund amount not validated"]!))!.selected).toBe(true);
-    await app.press(" "); // no fix here: ask the AI for one
+    await app.press(" ");
     await until(app.lastFrame, "[x] Unused import", 10_000);
     expect(await store.fixes.active(ids["Unused import"]!)).toMatchObject({ author: "ai" });
     app.unmount();
@@ -612,7 +607,6 @@ describe("actions menu", () => {
   });
 });
 
-/** Open the options menu, wait for it, then press one of its letters. */
 async function options(
   app: { press: (...k: string[]) => Promise<void>; lastFrame: () => string | undefined },
   letter: string,
@@ -622,7 +616,6 @@ async function options(
   await app.press(letter);
 }
 
-/** A switcher over two profiles, without any agent CLI behind it. */
 function stubSwitcher(): Switcher & { log: string[] } {
   const log: string[] = [];
   const profiles = [
@@ -705,10 +698,9 @@ describe("run progress", () => {
       emit({ type: "rate-limited", shardId: "a", retryAfterMs: 30000 });
       emit({ type: "review-done", reviewId: "r", findings: [], durationMs: 1 });
       await until(app.lastFrame, "Provider rate limited");
-      // P opens the provider picker; "Connect another provider…" leaves for the setup flow
       app.stdin.write("p");
       await until(app.lastFrame, "Connect another provider");
-      await sleep(80); // let the picker attach its key handler
+      await sleep(80);
       for (const ch of "connect") app.stdin.write(ch);
       await sleep();
       app.stdin.write(ENTER);
@@ -809,9 +801,9 @@ describe("run progress", () => {
     expect(f).toContain("■ claude sonnet");
     expect(f).toMatch(/┌╌ scope ╌+┐/);
     expect(f).toContain("2 files");
-    expect(f).toMatch(/┌╌ src\/api ╌+┐/); // the running shard's card
+    expect(f).toMatch(/┌╌ src\/api ╌+┐/);
     expect(f).toContain("correctness, security");
-    expect(f).toContain("1 attached"); // the rules node
+    expect(f).toContain("1 attached");
     expect(f).toContain("── session log");
     expect(f).toMatch(/\d\d:\d\d:\d\d src\/api\s+reading Cart.tsx/);
     expect(f).toContain("[provider: claude]");
@@ -858,7 +850,7 @@ describe("switching model, provider, effort and depth", () => {
     for (const ch of "other") app.stdin.write(ch);
     await sleep();
     app.stdin.write(ENTER);
-    await until(app.lastFrame, "Model name › sonnet"); // pre-filled with the current model
+    await until(app.lastFrame, "Model name › sonnet");
     await app.press(..."\u007F".repeat(6), ..."my-model", ENTER);
     await until(app.lastFrame, "Model: claude · my-model");
     expect(sw.current().model).toBe("my-model");
@@ -876,10 +868,10 @@ describe("switching model, provider, effort and depth", () => {
     app.stdin.write(ENTER);
     await until(app.lastFrame, "add a provider");
     await sleep(100);
-    app.stdin.write(ENTER); // Claude Code
+    app.stdin.write(ENTER);
     await until(app.lastFrame, "Name for this setup");
     await sleep(80);
-    app.stdin.write(ENTER); // the suggested name
+    app.stdin.write(ENTER);
     await until(app.lastFrame, "CLAUDE_CONFIG_DIR");
     await sleep(80);
     for (const ch of "/tmp/work") app.stdin.write(ch);
@@ -901,7 +893,7 @@ describe("switching model, provider, effort and depth", () => {
     app.stdin.write(ENTER);
     await until(app.lastFrame, "Yes, remove codex");
     await sleep(100);
-    expect(sw.log).toHaveLength(1); // nothing removed before the answer
+    expect(sw.log).toHaveLength(1);
     for (const ch of "Yes") app.stdin.write(ch);
     await sleep();
     app.stdin.write(ENTER);
@@ -917,8 +909,8 @@ describe("switching model, provider, effort and depth", () => {
     await until(app.lastFrame, "provider");
     await sleep(100);
     expect(app.lastFrame()).toContain("codex");
-    expect(app.lastFrame()).not.toContain("Connect another provider"); // only on the run screen
-    await sleep(80); // let the picker attach its key handler
+    expect(app.lastFrame()).not.toContain("Connect another provider");
+    await sleep(80);
     for (const ch of "codex") app.stdin.write(ch);
     await sleep();
     app.stdin.write(ENTER);
@@ -928,7 +920,7 @@ describe("switching model, provider, effort and depth", () => {
     await options(app, "e");
     await until(app.lastFrame, "reasoning effort");
     await sleep(100);
-    app.stdin.write("\u001B[B"); // down: low
+    app.stdin.write("\u001B[B");
     await sleep(100);
     app.stdin.write(ENTER);
     await until(app.lastFrame, "effort low");
@@ -938,7 +930,7 @@ describe("switching model, provider, effort and depth", () => {
     await until(app.lastFrame, "review depth");
     await sleep(100);
     expect(app.lastFrame()).toContain("lenses split, skeptic checks all, high effort");
-    await sleep(80); // let the picker attach its key handler
+    await sleep(80);
     for (const ch of "deep") app.stdin.write(ch);
     await sleep();
     app.stdin.write(ENTER);
@@ -946,7 +938,7 @@ describe("switching model, provider, effort and depth", () => {
     expect(sw.current().depth).toBe("deep");
 
     await options(app, "m");
-    await until(app.lastFrame, "model · codex"); // the model list loads asynchronously
+    await until(app.lastFrame, "model · codex");
     await sleep(100);
     await app.press(ESC);
     await until(app.lastFrame, "of 2 looked at");
@@ -1000,7 +992,7 @@ describe("switching model, provider, effort and depth", () => {
     await until(app.lastFrame, "Provider rate limited");
     app.stdin.write("m");
     await until(app.lastFrame, "model · claude");
-    await sleep(80); // let the picker attach its key handler
+    await sleep(80);
     for (const ch of "haiku") app.stdin.write(ch);
     await sleep();
     app.stdin.write(ENTER);
@@ -1008,7 +1000,7 @@ describe("switching model, provider, effort and depth", () => {
     expect(app.lastFrame()).toContain("changed; r retries");
     app.stdin.write("d");
     await until(app.lastFrame, "review depth");
-    await sleep(80); // let the picker attach its key handler
+    await sleep(80);
     for (const ch of "quick") app.stdin.write(ch);
     await sleep();
     app.stdin.write(ENTER);
@@ -1079,7 +1071,7 @@ describe("full-screen layout", () => {
       expect(Math.max(...lines.map((l) => l.length))).toBeLessThanOrEqual(w);
       expect(app.lastFrame()).toContain("812k");
       expect(app.lastFrame()).toContain("/ 2M");
-      expect(app.lastFrame()).toMatch(/log line 59/); // the log follows the newest line
+      expect(app.lastFrame()).toMatch(/log line 59/);
       expect(app.lastFrame()).not.toContain("log line 0\n");
       expect(h < 24 || /\+ \d+ more: ✓ \d+ · queued \d+/.test(app.lastFrame()!)).toBe(true);
       app.unmount();
@@ -1096,14 +1088,13 @@ describe("full-screen layout", () => {
     await until(app.lastFrame, "Sentence number 0");
     expect(app.lastFrame()!.split("\n").length).toBeLessThanOrEqual(30);
     expect(app.lastFrame()).not.toContain("Sentence number 59");
-    expect(app.lastFrame()).toContain("┃"); // scrollbar thumb
+    expect(app.lastFrame()).toContain("┃");
     const PGDN = "\u001B[6~";
     const PGUP = "\u001B[5~";
     for (let i = 0; i < 6 && !app.lastFrame()!.includes("Sentence number 59"); i++)
       await app.press(PGDN);
     await until(app.lastFrame, "Sentence number 59");
     expect(app.lastFrame()!.split("\n").length).toBeLessThanOrEqual(30);
-    // arrows scroll lines and never move the cursor to another finding
     await app.press("\u001B[A");
     expect(app.lastFrame()).toContain("1/2");
     for (let i = 0; i < 8; i++) await app.press(PGUP);
@@ -1167,7 +1158,6 @@ describe("copy as prompt and the rules panel", () => {
     expect(text).toContain("- Validate money inputs at the boundary (.cursor/rules/payments.mdc)");
     expect(text).toContain("Suggested fix: Validate against captured minus refunded");
     expect(text).toContain("```diff");
-    // from the detail screen too
     await app.press(ENTER, "y");
     expect(copied).toHaveLength(2);
     app.unmount();
@@ -1194,7 +1184,6 @@ describe("copy as prompt and the rules panel", () => {
     expect(rechecked).toEqual(["src/payments.ts"]);
     expect(s.state.disabledRules).toEqual([".cursor/rules/payments.mdc"]);
     expect(s.ruleRows()[0]).toMatchObject({ disabled: true });
-    // back on: no re-check, applies next time
     await options(app, "r");
     await until(app.lastFrame, "[ ] R4");
     await app.press(ENTER);
@@ -1248,7 +1237,6 @@ describe("re-run the review", () => {
   });
 });
 
-/** A second and third finding in other files, so there is somewhere to navigate to. */
 async function addFiles() {
   const base = (await store.findings.get(ids["Unused import"]!))!;
   for (const [file, title] of [
@@ -1269,7 +1257,6 @@ async function addFiles() {
 }
 
 describe("moving between files", () => {
-  // files sort by name: cart.ts, payments.ts (two findings), user.ts
   it("] and [ and tab jump to the next and previous file's first finding", async () => {
     await addFiles();
     const app = await mount(session(), undefined, "of 4 looked at");
@@ -1280,7 +1267,7 @@ describe("moving between files", () => {
     await app.press(TAB);
     await until(app.lastFrame, "src/user.ts  4/4");
     await app.press("]");
-    expect(app.lastFrame()).toContain("src/user.ts  4/4"); // stops at the last file
+    expect(app.lastFrame()).toContain("src/user.ts  4/4");
     await app.press("[");
     await until(app.lastFrame, "src/payments.ts  2/4");
     await app.press("[");
@@ -1294,18 +1281,18 @@ describe("moving between files", () => {
     await app.press("h");
     await until(app.lastFrame, "j/k previous / next file");
     await app.press("j");
-    await until(app.lastFrame, "src/payments.ts  2/4"); // no enter needed
+    await until(app.lastFrame, "src/payments.ts  2/4");
     await app.press("j");
     await until(app.lastFrame, "src/user.ts  4/4");
     await app.press("k", "k");
     await until(app.lastFrame, "src/cart.ts  1/4");
-    await app.press("\u001B[C"); // right arrow: back to the code
+    await app.press("\u001B[C");
     await until(app.lastFrame, "j/k next ·");
-    await app.press("\u001B[D"); // left arrow: files list
+    await app.press("\u001B[D");
     await until(app.lastFrame, "j/k previous / next file");
     await app.press(ENTER);
     const f = await until(app.lastFrame, "j/k next ·");
-    expect(f).toContain("src/cart.ts  1/4"); // still on the file you jumped to
+    expect(f).toContain("src/cart.ts  1/4");
     app.unmount();
   });
 });
@@ -1341,7 +1328,6 @@ describe("going through the fixes", () => {
   });
 
   it("x applies just this fix, leaving the other agreed fixes alone", async () => {
-    // a second agreed fix, so there is something to leave alone
     await store.findings.update(ids["Unused import"]!, { selected: true });
     await store.fixes.create({
       id: newId(),
@@ -1370,10 +1356,10 @@ describe("going through the fixes", () => {
     const app = await mount(session());
     await app.press("j", "x");
     await until(app.lastFrame, "This finding has no fix to apply yet.");
-    expect(readFileSync(join(repo.root, "src/payments.ts"), "utf8")).toBe(CODE); // nothing changed
+    expect(readFileSync(join(repo.root, "src/payments.ts"), "utf8")).toBe(CODE);
     expect(await store.findings.get(ids["Unused import"]!)).toMatchObject({
       status: "open",
-      selected: false, // and nothing got ticked or dismissed
+      selected: false,
     });
     app.unmount();
   });

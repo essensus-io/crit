@@ -1,7 +1,3 @@
-/**
- * Live suite: a full `crit review` through the built CLI on each installed
- * agent CLI (your own logins). Opt-in: `pnpm test:live`. Never in CI.
- */
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

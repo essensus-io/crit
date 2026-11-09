@@ -5,7 +5,6 @@ type Props = {
   width: number;
 };
 
-/** `[key: value] [key: value]` on one line, clipped to the width. */
 export const StatusBar = ({ items, width }: Props) => {
   let used = 0;
   const shown: typeof items = [];

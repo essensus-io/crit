@@ -5,10 +5,8 @@ export type PatchCheck =
   | { ok: true; patch: string; files: string[] }
   | { ok: false; error: string };
 
-/** Ensure a patch ends with a newline and uses a/ b/ prefixes (some agents omit them). */
 export function normalizePatch(patch: string): string {
   let p = patch.replace(/\r\n/g, "\n");
-  // Strip a surrounding ``` fence if the agent wrapped the diff.
   p = p.replace(/^```(?:diff|patch)?\n/, "").replace(/\n```\s*$/, "\n");
   const lines = p.split("\n");
   const fixed = lines.map((l) => {
@@ -21,10 +19,6 @@ export function normalizePatch(patch: string): string {
   return p;
 }
 
-/**
- * Agents sometimes write hunks without context lines; git only applies those
- * with --unidiff-zero. Positions are still safe: intake checked the anchor.
- */
 function applyFlags(patch: string): string[] {
   const flags = ["--recount", "--whitespace=nowarn"];
   const hunks = parseUnifiedDiff(patch).flatMap((f) => f.hunks);
@@ -32,10 +26,6 @@ function applyFlags(patch: string): string[] {
   return flags;
 }
 
-/**
- * `git apply --check` against the working tree. Returns the normalized patch
- * and the files it touches, or git's error.
- */
 export async function checkPatch(root: string, patch: string): Promise<PatchCheck> {
   const p = normalizePatch(patch);
   const files = parseUnifiedDiff(p);
@@ -48,7 +38,6 @@ export async function checkPatch(root: string, patch: string): Promise<PatchChec
   return { ok: true, patch: p, files: files.map(diffPath) };
 }
 
-/** Apply a patch to the working tree (or `--reverse`). */
 export async function applyPatch(
   root: string,
   patch: string,

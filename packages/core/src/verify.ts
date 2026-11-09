@@ -1,10 +1,8 @@
 import { spawn } from "node:child_process";
 import type { VerifyResult } from "@crit/schema";
 
-/** Keep the end of long output; that is where errors are. */
 const tail = (s: string, max = 4000) => (s.length > max ? `…${s.slice(-max)}` : s);
 
-/** Run one shell command in `cwd`, capturing combined output. */
 export function runShell(
   command: string,
   cwd: string,
@@ -38,7 +36,6 @@ export function runShell(
   });
 }
 
-/** Run `verify.commands` in order; stops at the first failure. */
 export async function runVerify(
   commands: string[],
   cwd: string,

@@ -8,10 +8,6 @@ const TOOLS: [string, string[]][] = [
   ["clip", []],
 ];
 
-/**
- * Copy text to the system clipboard. Falls back to the terminal's OSC 52
- * sequence, which works over ssh in most modern terminals. Returns how it was copied.
- */
 export function copyToClipboard(
   text: string,
   write: (s: string) => void = (s) => process.stdout.write(s),

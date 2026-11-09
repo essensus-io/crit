@@ -21,7 +21,6 @@ export const mcpCommand = (ctx: CliContext) =>
     },
   });
 
-/** `crit init`: an optional .crit/config.json for team settings. */
 export async function init(
   ctx: CliContext,
   opts: { force?: boolean; provider?: string } = {},

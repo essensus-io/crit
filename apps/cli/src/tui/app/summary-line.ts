@@ -1,7 +1,6 @@
 import { formatTokens, shortId } from "@crit/schema";
 import { listHistory, type SqliteStore } from "@crit/store";
 
-/** The one line left in the terminal after the screen closes. */
 export async function summaryLine(
   store: SqliteStore,
   reviewId: string,

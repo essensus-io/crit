@@ -6,7 +6,6 @@ import { lineCount, locateAnchor } from "./anchor.ts";
 import { fingerprint } from "./fingerprint.ts";
 import { checkPatch } from "./patch.ts";
 
-/** Lines around a hunk that still count as "on the change". */
 export const HUNK_SLACK = 3;
 
 export type IntakeResult =
@@ -15,22 +14,18 @@ export type IntakeResult =
       finding: FindingInput;
       fingerprint: string;
       warnings: string[];
-      /** Matched a dismissed fingerprint, or below the severity threshold: acknowledged, not stored. */
       dropped?: "suppressed" | "below-threshold";
     }
   | { accepted: false; errors: string[] };
 
 export type IntakeOptions = {
   scope: ResolvedScope;
-  /** Rule ids the agent may cite. */
   ruleIds: Set<string>;
   suppressed: Set<string>;
   severityThreshold?: Severity;
-  /** Check patches with git apply (default true). */
   checkPatches?: boolean;
 };
 
-/** Read a file at the reviewed revision: the commit for commit scopes, the index for staged, else the working tree. */
 export async function readAtRevision(
   scope: ResolvedScope,
   path: string,
@@ -54,10 +49,6 @@ function normalizePath(root: string, file: string): string {
   return f.replace(/^(\.\/|a\/|b\/)/, "");
 }
 
-/**
- * Validates findings from one agent run. Keeps per-run state: a fix whose
- * patch fails is sent back once; the second failure keeps the finding without a fix.
- */
 export class Intake {
   private readonly patchFailures = new Map<string, number>();
   private readonly reportable: Map<string, ResolvedScope["files"][number]>;

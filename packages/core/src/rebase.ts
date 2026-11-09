@@ -6,7 +6,6 @@ import type { ProviderRun } from "./pipeline/run.ts";
 export const DRAFT_FIX_SYSTEM = `You are crit. You write minimal unified diffs. You never edit files yourself.
 Reply with ONLY the unified diff in a \`\`\`diff block: headers --- a/<path> and +++ b/<path>, correct @@ hunk headers, and at least 3 lines of context.`;
 
-/** Pull a unified diff out of a model reply. */
 export function extractDiff(text: string): string | undefined {
   const fenced = /```(?:diff|patch)?\s*\n([\s\S]*?)```/.exec(text)?.[1];
   const body = fenced ?? text;
@@ -16,7 +15,6 @@ export function extractDiff(text: string): string | undefined {
   return `${diff}\n`;
 }
 
-/** A rebaser that asks the agent to rewrite a conflicting fix on top of the current file. */
 export function agentRebaser(
   provider: ProviderRun,
   root: string,

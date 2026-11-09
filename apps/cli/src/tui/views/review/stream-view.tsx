@@ -12,7 +12,6 @@ import { truncate } from "../../shared/lib/index.ts";
 import { useTick } from "../../shared/hooks/index.ts";
 type RowProps = { line: Line };
 
-/** A row of styled segments as one terminal line. */
 const Row = ({ line }: RowProps) => {
   return (
     <Text>
@@ -31,7 +30,6 @@ const Row = ({ line }: RowProps) => {
   );
 };
 
-/** Drop the least important hints, in this order, until the line fits. */
 const fitKeys = (keys: [string, string][], width: number): [string, string][] => {
   const size = (ks: [string, string][]) =>
     ks.reduce((n, [k, l], i) => n + (i ? 3 : 0) + k.length + l.length + 1, 1);
@@ -44,7 +42,6 @@ const fitKeys = (keys: [string, string][], width: number): [string, string][] =>
   return out;
 };
 
-/** What is left to do, for the line under the panels. */
 export const progressOf = (items: FindingView[]) => {
   const live = items.filter((i) => triage(i) !== "applied");
   const reviewed = live.filter((i) => triage(i) !== "pending").length;
@@ -66,13 +63,9 @@ type StreamViewProps = {
   width: number;
   height: number;
   prompt?: React.ReactNode;
-  /** Another screen has the keys (a menu, a prompt): the stream does not react to them. */
   idle: boolean;
-  /** Show the re-run hint. */
   canRerun?: boolean;
-  /** q goes back to the start screen (instead of quitting). */
   canGoBack?: boolean;
-  /** Findings the cursor has been on. */
   seenCount?: number;
 };
 
@@ -92,7 +85,6 @@ export const StreamView = (props: StreamViewProps) => {
   const rows = panelH - 2;
   const innerW = rightW - 4;
   const tree = fileTree(state);
-  // the files list follows the finding you are on, so it always shows where you are
   const fileCursor = Math.max(
     0,
     tree.findIndex((r) => r.file !== undefined && r.file === current?.finding.file),
@@ -110,7 +102,7 @@ export const StreamView = (props: StreamViewProps) => {
         current: current?.finding.id,
         expanded: props.expanded,
         fixTab: props.fixTab,
-        width: innerW - 1, // the scrollbar takes the last column
+        width: innerW - 1,
         drafting,
         ...(spin ? { spin } : {}),
       }),

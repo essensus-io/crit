@@ -1,14 +1,8 @@
 import { createHash } from "node:crypto";
 import { type Finding, SEVERITY_ORDER } from "@crit/schema";
 
-/** Collapse whitespace so reformatting does not change a fingerprint. */
 export const normalizeCode = (s: string) => s.replace(/\s+/g, " ").trim();
 
-/**
- * Stable identity of a finding across runs and shards: file, normalized code
- * snippet and category. Line numbers are left out so edits elsewhere in the
- * file do not change it.
- */
 export function fingerprint(f: Pick<Finding, "file" | "anchor" | "category">): string {
   return createHash("sha256")
     .update(`${f.file}\n${normalizeCode(f.anchor)}\n${f.category}`)
@@ -25,7 +19,6 @@ const words = (s: string) =>
       .filter((w) => w.length > 2),
   );
 
-/** Jaccard similarity of title words, 0..1. */
 export function titleSimilarity(a: string, b: string): number {
   const wa = words(a);
   const wb = words(b);
@@ -37,7 +30,6 @@ export function titleSimilarity(a: string, b: string): number {
 
 const rank = (f: Finding) => SEVERITY_ORDER.indexOf(f.severity);
 
-/** Prefer the more severe, then more confident, then the one with more detail. */
 function better(a: Finding, b: Finding): Finding {
   if (rank(a) !== rank(b)) return rank(a) < rank(b) ? a : b;
   if (a.confidence !== b.confidence) return a.confidence > b.confidence ? a : b;
@@ -46,14 +38,9 @@ function better(a: Finding, b: Finding): Finding {
 
 export type MergeResult = {
   findings: Finding[];
-  /** Ids of findings folded into another one; delete these. */
   removed: string[];
 };
 
-/**
- * Merge duplicates across shards and lenses by fingerprint, then group findings
- * on overlapping lines of the same file with similar titles.
- */
 export function mergeFindings(input: Finding[], similarity = 0.5): MergeResult {
   const byFp = new Map<string, Finding[]>();
   for (const f of input) byFp.set(f.fingerprint, [...(byFp.get(f.fingerprint) ?? []), f]);
@@ -74,7 +61,6 @@ export function mergeFindings(input: Finding[], similarity = 0.5): MergeResult {
       a.file.localeCompare(b.file) || a.range.start - b.range.start || a.id.localeCompare(b.id),
   );
 
-  // Group overlapping + similar findings (union-find over pairs in the same file).
   const parent = new Map(merged.map((f) => [f.id, f.id]));
   const root = (id: string): string => {
     let r = id;

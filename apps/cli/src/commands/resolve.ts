@@ -3,7 +3,6 @@ import type { SqliteStore } from "@crit/store";
 import type { CliContext } from "../context.ts";
 import { CliError } from "../errors.ts";
 
-/** A review by id, prefix or short id; the latest review of this repo when no ref is given. */
 export async function resolveReview(
   _ctx: CliContext,
   store: SqliteStore,

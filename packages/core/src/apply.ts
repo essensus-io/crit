@@ -25,7 +25,6 @@ export type Planned = { finding: Finding; fix: Fix };
 
 export type Overlap = { file: string; a: string; b: string };
 
-/** Old-side line ranges a patch touches, per file. */
 function touched(patch: string): Map<string, [number, number][]> {
   const out = new Map<string, [number, number][]>();
   for (const f of parseUnifiedDiff(normalizePatch(patch))) {
@@ -39,7 +38,6 @@ function touched(patch: string): Map<string, [number, number][]> {
   return out;
 }
 
-/** Pairs of fixes whose hunks touch overlapping lines of the same file. */
 export function findOverlaps(items: Planned[]): Overlap[] {
   const spans = items.map((i) => ({ id: i.finding.id, t: touched(i.fix.patch) }));
   const out: Overlap[] = [];
@@ -56,7 +54,6 @@ export function findOverlaps(items: Planned[]): Overlap[] {
   return out;
 }
 
-/** Ask the agent to rewrite a fix so it applies on top of the current file. Returns a new patch or undefined. */
 export type Rebaser = (
   item: Planned,
   current: Record<string, string>,
@@ -86,7 +83,6 @@ type Manifest = {
 
 const hash = (s: string | Buffer) => createHash("sha256").update(s).digest("hex");
 
-/** Fixes that apply would write: checked, open findings with an active fix. */
 export async function plannedFixes(store: Repositories, reviewId: string): Promise<Planned[]> {
   const out: Planned[] = [];
   for (const f of await store.findings.listByReview(reviewId)) {
@@ -142,11 +138,6 @@ async function applyAll(
   return applied;
 }
 
-/**
- * Apply checked fixes. Overlaps are detected first; a fix that no longer
- * applies after another is handed to `rebase`. A backup (applied patch plus the
- * original bytes of every touched file) is written before the tree changes.
- */
 export async function applyFixes(opts: {
   store: Repositories;
   reviewId: string;
@@ -169,7 +160,6 @@ export async function applyFixes(opts: {
     rebased: [],
   };
   if (items.length === 0) return result;
-  // Apply fixes bottom-up within a file so earlier hunks do not shift later ones.
   items.sort(
     (a, b) =>
       a.finding.file.localeCompare(b.finding.file) || b.finding.range.start - a.finding.range.start,
@@ -215,7 +205,6 @@ export async function applyFixes(opts: {
     }
     if (result.applied.length === 0) await gitRaw(opts.root, ["branch", "-D", branch]);
   } else {
-    // Back up every file any planned fix may touch, before writing.
     const files = [
       ...new Set(
         items.flatMap((i) => [
@@ -285,11 +274,6 @@ export type UndoResult = {
   reviewId: string;
 };
 
-/**
- * Undo the latest apply of a review (or of any review in `reviewIds`, newest
- * first). Restores the backed-up files byte for byte. Refuses when a file
- * changed after the apply, unless `force`.
- */
 export async function undoApply(opts: {
   store: Repositories;
   reviewIds: string[];

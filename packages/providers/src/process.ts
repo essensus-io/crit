@@ -3,7 +3,6 @@ import { accessSync, constants, statSync } from "node:fs";
 import { delimiter, isAbsolute, join } from "node:path";
 import { x } from "tinyexec";
 
-/** Find an executable on PATH (with PATHEXT on Windows). */
 export function which(command: string, env: NodeJS.ProcessEnv = process.env): string | undefined {
   const exts =
     process.platform === "win32"
@@ -31,7 +30,6 @@ export function which(command: string, env: NodeJS.ProcessEnv = process.env): st
   return undefined;
 }
 
-/** `<command> --version`, first semver-looking token; undefined on failure. */
 export async function commandVersion(
   command: string,
   env: NodeJS.ProcessEnv = process.env,
@@ -55,10 +53,6 @@ export type LineEvent =
   | { kind: "stderr"; line: string }
   | { kind: "exit"; code: number; signal: string | null; timedOut: boolean };
 
-/**
- * Spawn a CLI and yield its stdout/stderr lines as they arrive, then the exit.
- * Aborting the signal or hitting the timeout kills the process tree root.
- */
 export async function* streamProcess(opts: {
   command: string;
   args: string[];

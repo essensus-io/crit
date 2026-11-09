@@ -20,16 +20,10 @@ type Props = {
   onExit?: () => void;
   switcher?: Switcher;
   onConnect?: () => void;
-  /** Leave and review the same scope again; unchanged files come from the cache. */
   onRerun?: (fresh: boolean) => void;
-  /** Go back to the start screen. When set, q goes back instead of quitting. */
   onBack?: () => void;
 };
 
-/**
- * The interactive review screen: one stream of code with a card under every
- * finding. Keys are in `use-review-keys`, the prompts and menus in their own files.
- */
 export const ReviewView = ({ session, onExit, switcher, onConnect, onRerun, onBack }: Props) => {
   const app = useApp();
   useEffect(() => {
@@ -56,16 +50,13 @@ export const ReviewView = ({ session, onExit, switcher, onConnect, onRerun, onBa
   const items = useMemo(() => visibleItems(state, filter), [state, filter]);
   const current = items[Math.min(cursor, Math.max(0, items.length - 1))];
   const busy = Boolean(state.busy);
-  // The finding you are on is always open; the rest are one line.
   const expanded = useMemo<ReadonlySet<string>>(
     () => new Set(current ? [current.finding.id] : []),
     [current?.finding.id],
   );
-  // The fix tab follows the active fix: yours after you proposed one, the AI's otherwise.
   useEffect(() => {
     if (current?.fix) setFixTab(current.fix.author === "user" ? "user" : "ai");
   }, [current?.finding.id, current?.fix?.id]);
-  // Findings you have looked at: enter finishes only when you have been through all of them.
   const [seen, setSeen] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => {
     const id = current?.finding.id;
@@ -85,7 +76,6 @@ export const ReviewView = ({ session, onExit, switcher, onConnect, onRerun, onBa
     if (cursor >= items.length && items.length > 0) setCursor(items.length - 1);
   }, [items.length, cursor]);
 
-  // A fix you asked for with space is checked as soon as it is written.
   useEffect(() => {
     for (const id of wanted.current) {
       if (state.drafting.includes(id)) continue;
@@ -97,7 +87,6 @@ export const ReviewView = ({ session, onExit, switcher, onConnect, onRerun, onBa
     }
   }, [state]);
 
-  // A fix that finishes while you are on its finding opens the card: that diff is what you approve.
   const wasDrafting = useRef<string[]>([]);
   const wanted = useRef(new Set<string>());
   useEffect(() => {

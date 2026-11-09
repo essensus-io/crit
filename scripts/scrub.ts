@@ -1,4 +1,3 @@
-/** Keys in agent init events that describe the recording machine, not the protocol. */
 const DROP_KEYS = new Set([
   "memory_paths",
   "messaging_socket_path",
@@ -12,10 +11,6 @@ const DROP_KEYS = new Set([
   "product_feedback_disabled",
 ]);
 
-/**
- * Make a recorded transcript safe to commit: replace local paths with stable
- * placeholders and drop machine-specific keys. Non-JSON lines are kept as is.
- */
 export function scrubTranscript(
   lines: string[],
   opts: { repo: string; home: string; extra?: string[]; user?: string },

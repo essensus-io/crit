@@ -7,10 +7,8 @@ type Props = {
   initial?: string;
 };
 
-/** One-line text input: type, backspace, enter submits, esc cancels. */
 export const TextInput = ({ label, onSubmit, onCancel, initial = "" }: Props) => {
   const [value, setValue] = useState(initial);
-  // Keys can arrive faster than renders (pastes); keep the latest value in a ref.
   const ref = useRef(initial);
   const update = (v: string) => {
     ref.current = v;

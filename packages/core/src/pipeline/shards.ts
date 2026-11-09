@@ -23,7 +23,6 @@ export type PlannedShard = {
   estimatedTokens: number;
 };
 
-/** Package folder (nearest marker file) or top-level folder of a path. */
 export function groupKey(root: string, path: string): string {
   const parts = path.split("/");
   for (let i = parts.length - 1; i >= 1; i--) {
@@ -33,11 +32,6 @@ export function groupKey(root: string, path: string): string {
   return parts.length > 1 ? parts[0]! : ".";
 }
 
-/**
- * Token estimate per file. Diff scopes count the diff only: the agent reviews
- * from it and reads a file only to check a suspicion. Whole-file scopes count
- * the file, which is inlined into the prompt.
- */
 export function fileTokens(scope: ResolvedScope): Map<string, number> {
   const diffChars = new Map<string, number>();
   if (scope.diff !== undefined)
@@ -50,11 +44,6 @@ export function fileTokens(scope: ResolvedScope): Map<string, number> {
   );
 }
 
-/**
- * Group files by package or top-level folder into shards of about
- * `shardTokens`. A scope under the limit is one shard. Groups are kept
- * together when they fit; oversized groups are split in path order.
- */
 export function planShards(scope: ResolvedScope, shardTokens: number): PlannedShard[] {
   const tokens = fileTokens(scope);
   const files = scope.files
@@ -71,7 +60,6 @@ export function planShards(scope: ResolvedScope, shardTokens: number): PlannedSh
     groups.set(k, [...(groups.get(k) ?? []), f]);
   }
 
-  // Split oversized groups into numbered chunks; keep the rest whole.
   type Piece = PlannedShard & { split: boolean };
   const pieces: Piece[] = [];
   for (const [key, list] of [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))) {
@@ -97,7 +85,6 @@ export function planShards(scope: ResolvedScope, shardTokens: number): PlannedSh
     );
   }
 
-  // Pack whole groups together (first fit, in order) so small folders share a run.
   const shards: Piece[] = [];
   for (const p of pieces) {
     const fit = p.split
@@ -113,19 +100,11 @@ export function planShards(scope: ResolvedScope, shardTokens: number): PlannedSh
 }
 
 export type DepthProfile = {
-  /** Lenses this depth reviews. */
   lenses: Lens[];
-  /** Split big shards into a correctness/security pass and a quality pass. */
   split: boolean;
-  /** Which findings the skeptic checks: none, all but nits, or every one. */
   skeptic: "off" | "no-nits" | "all";
 };
 
-/**
- * What each depth buys: quick reviews only correctness and security with no
- * skeptic; standard reviews every configured lens in one pass per shard and
- * skips nits in the skeptic; deep splits big shards by lens and checks all.
- */
 export function depthProfile(config: { lenses: Lens[]; depth: Depth }): DepthProfile {
   if (config.depth === "quick") {
     const core = config.lenses.filter((l) => l === "correctness" || l === "security");
@@ -139,11 +118,6 @@ export function depthProfile(config: { lenses: Lens[]; depth: Depth }): DepthPro
   return { lenses: config.lenses, split: false, skeptic: "no-nits" };
 }
 
-/**
- * Lens groups per shard. One pass with every lens unless `split` is on and the
- * shard is at least half full, when it becomes a correctness/security pass and
- * a quality pass.
- */
 export function lensGroups(
   lenses: Lens[],
   shardTokens: number,
@@ -160,7 +134,6 @@ export function lensGroups(
 
 export type PlannedRun = PlannedShard & { lenses: Lens[] };
 
-/** Every agent run a review will make: shards × lens groups, for the configured depth. */
 export function planRuns(
   scope: ResolvedScope,
   config: { shardTokens: number; lenses: Lens[]; depth: Depth },
@@ -173,7 +146,6 @@ export function planRuns(
   );
 }
 
-/** Rough wall-clock estimate for confirming whole-project reviews. */
 export function estimateDurationMs(runs: number, concurrency: number, perRunMs = 90_000): number {
   return Math.ceil(runs / Math.max(1, concurrency)) * perRunMs;
 }

@@ -25,7 +25,6 @@ const STATUS_TONE: Record<Shard["status"], Tone> = {
 };
 type FlowProps = { active: boolean; tick: number };
 
-/** A short connector with a dot that travels along it while work is running. */
 const Flow = ({ active, tick }: FlowProps) => {
   const cells = ["╌", "╌", "╌", "╌", "▶"];
   const dot = active ? tick % 4 : -1;
@@ -65,7 +64,6 @@ type ProgressViewProps = {
   notice?: string;
 };
 
-/** The run dashboard: pipeline, shard cards, tokens, session log, status bar. */
 export const ProgressView = ({
   progress,
   width,
@@ -93,7 +91,6 @@ export const ProgressView = ({
   const model = selection.model !== undefined ? selection.model : progress.model;
   const eff = selection.effort !== undefined ? selection.effort : effort;
 
-  // Layout: header 1 · flow 4 · cards · tokens 1 · log header 1 · log ≥3 · status 1 · footer 2
   const fixed = 1 + (showFlow ? 4 : 0) + 1 + 1 + 1 + 2;
   const cols = width >= 100 ? 3 : 2;
   const room = Math.floor(Math.max(0, Math.min(11, height - fixed - 4)) / 5) * 5;

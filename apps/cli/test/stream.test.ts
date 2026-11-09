@@ -62,11 +62,11 @@ describe("buildStream", () => {
     expect(rows[0]).toContain("a.ts");
     expect(gaps(s.rows)).toEqual(["⋯ 16 unchanged lines", "⋯ 76 unchanged lines"]);
     const codeRows = s.rows.filter((r) => r.kind === "code").map((r) => text(r.line));
-    expect(codeRows).toHaveLength(8); // 17..24 = range ±3
-    expect(codeRows[3]).toMatch(/20 ▎\+ line 20/); // changed + in the focused range
+    expect(codeRows).toHaveLength(8);
+    expect(codeRows[3]).toMatch(/20 ▎\+ line 20/);
     expect(codeRows[0]).toContain("17");
     const card = s.card.get("f1")!;
-    expect(rows[card.from - 1]).toContain("line 21"); // directly after the finding's last line
+    expect(rows[card.from - 1]).toContain("line 21");
     expect(rows[card.from]).toContain("╭─ ○ MAJ · correctness");
     expect(rows[card.to]).toMatch(/^ ╰─+╯$/);
   });
@@ -86,10 +86,9 @@ describe("buildStream", () => {
     const s = build([view("f1", 1)], new Map([["a.ts", info]]));
     const rows = s.rows.filter((r) => r.kind === "code");
     const keyword = (r: { line: Line }) => r.line.find((g) => g.t === "const");
-    expect(keyword(rows[0]!)).toMatchObject({ color: "#a5b4fc" }); // in the finding's range: full color
+    expect(keyword(rows[0]!)).toMatchObject({ color: "#a5b4fc" });
     expect(keyword(rows[0]!)?.dim).toBeUndefined();
-    expect(keyword(rows[3]!)).toMatchObject({ color: "#a5b4fc", dim: true }); // context: dimmed
-    // an unknown language is plain text, not an error
+    expect(keyword(rows[3]!)).toMatchObject({ color: "#a5b4fc", dim: true });
     const plain = build(
       [view("p", 1, 1, { file: "notes.xyz" })],
       new Map([["notes.xyz", code(3)]]),
@@ -113,7 +112,7 @@ describe("buildStream", () => {
   it("clamps findings past the end of the file and handles a one-line file", () => {
     const s = build([view("x", 50, 60)], new Map([["a.ts", code(5)]]));
     const codeRows = s.rows.filter((r) => r.kind === "code");
-    expect(codeRows).toHaveLength(4); // lines 2..5: the window is cut at the end of the file
+    expect(codeRows).toHaveLength(4);
     expect(s.card.get("x")!.from).toBeGreaterThan(
       s.rows.findIndex((r) => text(r.line).includes("line 5")),
     );

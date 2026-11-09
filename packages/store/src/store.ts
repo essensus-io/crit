@@ -39,10 +39,6 @@ export type CacheEntry = {
   createdAt: number;
 };
 
-/**
- * Every read and write goes through these repositories. A Postgres store would
- * implement the same interface; nothing outside this package touches SQL.
- */
 export interface Repositories {
   repos: {
     upsert(input: { root: string; remoteUrl: string | null; name: string }): Promise<Repo>;
@@ -53,14 +49,11 @@ export interface Repositories {
   reviews: {
     create(review: Review): Promise<Review>;
     get(id: string): Promise<Review | undefined>;
-    /** Full id, id prefix, or the 4-char short id shown in history. */
     resolve(ref: string, repoId?: string): Promise<Review[]>;
     latest(repoId: string): Promise<Review | undefined>;
     update(id: string, patch: ReviewPatch): Promise<Review>;
-    /** Mark older finished reviews of the same repo, branch and scope as superseded by `review`. */
     markSuperseded(review: Review): Promise<string[]>;
     delete(id: string): Promise<void>;
-    /** Delete reviews started before `before` (ms). Returns the ids deleted. */
     deleteOlderThan(before: number, repoId?: string): Promise<string[]>;
   };
   shards: {
@@ -73,12 +66,10 @@ export interface Repositories {
     get(id: string): Promise<Finding | undefined>;
     listByReview(reviewId: string): Promise<Finding[]>;
     update(id: string, patch: FindingPatch): Promise<Finding>;
-    /** Move a finding (with its fixes and thread) to another review. */
     reassign(id: string, reviewId: string): Promise<void>;
     delete(id: string): Promise<void>;
   };
   fixes: {
-    /** Adds a fix; if it is active, every other fix of the finding becomes inactive. */
     create(fix: Fix): Promise<Fix>;
     get(id: string): Promise<Fix | undefined>;
     listByFinding(findingId: string): Promise<Fix[]>;
@@ -464,7 +455,6 @@ export function createRepositories(db: Db): Repositories {
 
 export type SqliteStore = Repositories & { connection: Connection; db: Db; close(): void };
 
-/** Open the SQLite store at `path` (":memory:" for tests). Migrations run on open. */
 export function openStore(path: string = ":memory:"): SqliteStore {
   const connection = openDatabase(path);
   return {

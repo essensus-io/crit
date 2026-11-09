@@ -357,7 +357,6 @@ describe("fake provider", () => {
       expect(events[2]).toEqual({ type: "progress", text: "report_finding: Recorded finding f1." });
       expect(reported).toHaveLength(1);
       expect(fake.calls[0]!.run).toBeDefined();
-      // consumed: a second run has no script left
       const again = await collect(fake.run(task(), new AbortController().signal));
       expect(again).toEqual([
         { type: "error", message: "fake provider: no scripted run for review" },
