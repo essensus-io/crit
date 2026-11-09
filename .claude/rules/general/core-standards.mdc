@@ -7,6 +7,8 @@ alwaysApply: true
 
 crit is a TypeScript (strict, ESM, Node 24) pnpm + Turborepo monorepo. Formatting and lint are owned by
 `oxfmt` (100 columns) and `oxlint`; run `pnpm check`. Do not argue with the formatter.
+`oxlint` also enforces kebab-case file names, no default exports (config files excepted), no import
+cycles, `type` over `interface`, no `any`, and no `console` in packages.
 
 ## Naming
 
