@@ -1,0 +1,65 @@
+---
+description: Code style, naming and quality bar for every TypeScript file in crit
+alwaysApply: true
+---
+
+# Core standards
+
+crit is a TypeScript (strict, ESM, Node 24) pnpm + Turborepo monorepo. Formatting and lint are owned by
+`oxfmt` (100 columns) and `oxlint`; run `pnpm check`. Do not argue with the formatter.
+
+## Naming
+
+- Files and folders: **kebab-case**, including React components (`review-view.tsx`, `use-switching.tsx`).
+  Tests mirror the file under test: `src/pipeline/intake.ts` → `test/intake.test.ts`. Cross-cutting suites
+  (`e2e`, `commands`) are named for what they cover.
+- A file is named for what it contains, not for its role in a layer: no `misc.ts`, `shared.ts`,
+  `utils.ts`, `helpers.ts`, `types.ts` catch-alls. If you cannot name the file, the code has no single purpose.
+- Identifiers state their role: `finding`, `reviewId`, `shardFiles`. Avoid cryptic names (`a`, `v`, `r`, `e`,
+  `t`, `s`, `k`, `fn`, `cb`, `x`). A one-letter name is fine only for an index in a loop of a few lines.
+- Booleans read as questions: `isDrafting`, `hasFix`, `canRerun`.
+- Callbacks passed as props or options are `onSomething`.
+
+## Language
+
+- Functions and plain objects over classes. Model state with closures, factories (`createSwitcher`,
+  `createReviewSession`) and discriminated unions. The only classes allowed are `Error` subclasses, because
+  `instanceof` checks need them.
+- `type` over `interface`. Derive types from zod schemas (`z.infer`) instead of writing them twice.
+- No `any`. `unknown` only at a trust boundary, and parse it with zod right there.
+- Prefer discriminated unions with a `kind`/`type` field and exhaustive `switch` (no default that hides a
+  missing case) over booleans that combine into impossible states.
+- Named exports only. Default exports are not used.
+- `async`/`await`; never leave a promise floating (`void` it on purpose, with the error handled).
+- No magic numbers or strings: name them as constants next to where they are used.
+
+## Shape of code
+
+- Early returns and guard clauses; at most 2 levels of nesting.
+- A function does one thing: aim for under ~40 lines. A file aims for under ~300 lines; past ~400 it must be
+  split by responsibility, not by arbitrary line count.
+- Pure functions for decisions (`buildStream`, `parseQuery`, `fitKeys`); side effects (fs, git, processes,
+  database, terminal) live at the edges and are passed in, so the pure part is testable without mocks.
+- No duplicated logic: the second copy is the signal to extract. No premature abstraction either: extract on
+  the second use, not the first.
+- No dead code, commented-out code, or unused exports. Delete it; git remembers.
+
+## Comments
+
+- Comment **why**, never **what**: a non-obvious constraint, a workaround with its cause, an invariant.
+  If a comment restates the next line or a section banner (`// ---- helpers ----`), delete it.
+- Public functions of a package get a one-line doc comment only when the name and types do not say enough.
+- No TODO without an issue or a concrete next step.
+
+## Errors
+
+- Expected failures (bad user input, missing provider, git conflicts) are values or typed errors with a
+  message that says how to fix it. Do not swallow errors: an empty `catch` needs a comment saying why it is safe.
+- Never `console.log` in packages. Output goes through the CLI's `ctx.out` / `ctx.err`.
+
+## Imports
+
+- Import from a package's public entry (`@crit/core`), never from its internals (`@crit/core/src/...`).
+- Inside a package use relative imports with the `.ts` extension (the repo runs TS natively).
+- `index.ts` files are **thin re-export barrels**, no logic. Do not create a barrel for a folder with a
+  single file.

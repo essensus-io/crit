@@ -1,0 +1,25 @@
+---
+description: How to write and run tests in crit (Vitest, fake provider, Ink)
+globs: "**/*.test.ts,**/*.test.tsx"
+paths:
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+alwaysApply: false
+---
+
+# Testing
+
+- Runner: Vitest. `pnpm test` (all), `pnpm vitest run <path>`, `pnpm test:coverage` (thresholds are enforced).
+- Never call a real agent CLI or the network in a normal test. Use `FakeAdapter` / `AgentRunner` fakes from
+  `@crit/providers` and temp git repos from `@crit/testkit`. Tests that need a real CLI live in
+  `packages/providers/test/live` behind `CRIT_LIVE=1`.
+- Never touch the real crit database or `providers.json`: tests build their own context in a temp dir.
+- Tests mirror the source layout: `build-stream.ts` → `build-stream.test.ts`. Cross-cutting suites (`e2e`,
+  `commands`) are named for what they cover.
+- Test behaviour through the public function, not internals. One behaviour per `it`, named as a sentence
+  (`it("skips a fix that no longer applies cleanly")`).
+- Every `it` must assert something (`expect-expect` is a lint error). Waiting for output is not an assertion.
+- Ink tests: wait for text, never for time. Use the shared `until(frame, text)` helper; a key pressed before
+  its listener attaches is lost, so wait for the screen that owns the key before pressing it.
+- Bug fixes start with a failing test that reproduces the bug.
+- Pure UI logic (`buildStream`, `parseQuery`, `fitKeys`) is tested as plain functions; only wiring needs Ink.

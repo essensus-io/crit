@@ -1,0 +1,55 @@
+---
+description: Package and app layout, dependency direction, and where new code belongs
+alwaysApply: true
+---
+
+# Monorepo structure
+
+```
+apps/cli            the `crit` binary: argument parsing, terminal UI, wiring. No domain logic.
+packages/schema     zod schemas + inferred types + generated JSON Schema. Depends on nothing internal.
+packages/store      SQLite persistence (Drizzle, node:sqlite) and repositories. Depends on schema.
+packages/mcp        the MCP server agents talk to. Depends on schema.
+packages/providers  adapters for Claude Code, Codex, Cursor (+ fake). Depends on schema, store, mcp.
+packages/core       the review pipeline: scope, diff, rules, intake, fixes, apply. Depends on schema, store, mcp.
+packages/testkit    test helpers (temp git repos, fixtures). Used only from tests.
+packages/config     shared tsconfig. No code.
+```
+
+## Dependency direction (enforced by review, not just by taste)
+
+`schema` ← `store`, `mcp` ← `core`, `providers` ← `apps/cli`
+
+- A package never imports from a package to its right. `core` does **not** import `providers`: the adapter is
+  injected (`ProviderRun`, `AgentRunner`). `apps/cli` is the only place that wires them together.
+- `apps/cli` contains no business rules. If a command needs a decision (what to review, how to merge
+  findings, how to apply a patch), it belongs in `core`, with a test there.
+- A type used by two packages lives in `schema`. Do not export types from `store` or `core` for others to
+  depend on.
+- New dependencies: justify in the PR; prefer the platform (`node:` modules) over a package.
+
+## Layout inside a package
+
+- Group by **domain**, not by technical role. `core/src/pipeline`, `core/src/rules`, not `core/src/services`
+  or `core/src/helpers`.
+- One folder per concept once it has 3+ files, with an `index.ts` barrel as its only public surface.
+- Keep a file next to what uses it. Promote to a higher level only when a second consumer appears.
+
+## apps/cli layout (target)
+
+```
+src/main.ts            entry: parse argv, build the context, dispatch
+src/context.ts         CliContext: paths, env, prompter, store, registry
+src/commands/<name>/   one folder per command: command.ts (citty), run.ts (logic)
+src/tui/               the terminal UI, laid out as FSD: app, views, features, shared (see the tui rules)
+src/lib/               cross-command helpers with a real name (clipboard, errors, report)
+```
+
+A command file parses arguments and calls one function. It stays under ~150 lines. Anything longer is
+logic that moves into `run.ts` or into `packages/core`. Commands reach the UI only through
+`await import("../tui/index.ts")`.
+
+## Where tests live
+
+`<package>/test/*.test.ts`. Pure logic gets unit tests next to its package; terminal UI gets Ink tests in
+`apps/cli/test`. See the testing rule.

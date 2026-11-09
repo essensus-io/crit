@@ -1,0 +1,64 @@
+---
+description: Conventions for Ink/React components in apps/cli/src/tui (props, handlers, rendering, splitting)
+globs: apps/cli/src/tui/**/*.tsx
+paths:
+  - "apps/cli/src/tui/**/*.tsx"
+alwaysApply: false
+---
+
+# Components (Ink + React)
+
+## Naming and exports
+
+- File names are **kebab-case** and match the component: `finding-card-view.tsx` → `FindingCardView`.
+  Hooks: `use-switching.tsx` → `useSwitching`. Views end in `-view`.
+- **Named exports**, **arrow functions** for components and local helpers. No `export default`.
+- One exported component per file. Small private pieces that only serve it (a row, a skeleton) stay in the
+  same file.
+
+## Props
+
+- Extract props into a named type before the component. Use `Props` unless a file has several props types.
+- Destructure in the parameter list.
+
+```tsx
+// good
+type Props = {
+  title: string;
+  width: number;
+  onClose: () => void;
+};
+
+export const HelpView = ({ title, width, onClose }: Props) => { ... };
+
+// avoid: inline object type in the signature, or `props.x` all through the body
+```
+
+## Handlers
+
+- Callbacks passed as props are `onSomething` (`onPick`, `onCancel`, `onDone`).
+- Inside a component, name the function after what it does for the user (`checkFix`, `startReview`); it
+  may be passed to an `onX` prop.
+- `useInput` handlers dispatch, they do not contain logic: look the key up in a keymap, call a named action.
+
+## Rendering
+
+- Optional content: `{condition && <X />}`. Do not write `{condition ? <X /> : null}`. A ternary is for when
+  both branches render something.
+- No logic in JSX beyond that: compute values above the return and give them names.
+- Rows of text are computed by pure functions (`buildStream`, `cardBody`) and rendered by the component; the
+  component does not assemble strings by hand.
+
+## State
+
+- Minimise `useEffect` and `useState`. Prefer values derived during render (`useMemo` for the expensive
+  ones) over state synchronised by an effect.
+- Shared or domain state belongs to the slice's `model` and is read with `useSyncExternalStore`; local UI
+  state (cursor, open menu, typed text) stays in the view.
+- An effect that talks to the outside world cleans up after itself (unsubscribe, clear timers).
+
+## Size
+
+- A component file is under ~250 lines. When a view mixes layout, key handling and derived data, split it:
+  keymap and actions into their own files, derived data into `features/<slice>/lib`, repeated blocks into
+  `shared/ui`.

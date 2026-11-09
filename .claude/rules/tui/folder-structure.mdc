@@ -1,0 +1,93 @@
+---
+description: Feature-Sliced Design layout for the terminal UI in apps/cli/src/tui (shared, features, views, app)
+globs: apps/cli/src/tui/**
+paths:
+  - "apps/cli/src/tui/**"
+alwaysApply: false
+---
+
+# TUI folder structure (FSD)
+
+The terminal UI is a React app (Ink), so it is organised like our React apps: Feature-Sliced Design with
+four layers. Imports only go **down** the list: `app` → `views` → `features` → `shared`.
+
+```
+apps/cli/src/tui/
+  app/        entrypoints: what a command calls to put a screen on the terminal
+  views/      one folder per screen area; composes features and shared UI
+  features/   one folder per domain slice, with segments
+  shared/     cross-cutting UI primitives, hooks, helpers, theme
+```
+
+## shared
+
+Infrastructure and primitives only, nothing that knows about reviews, findings or providers.
+
+- `shared/ui` — reusable terminal components, one per file: `panel.tsx`, `picker.tsx`, `menu.tsx`,
+  `viewport.tsx`, `footer.tsx`, `text-input.tsx`, `spinner.tsx`, `screen.tsx`.
+- `shared/hooks` — generic hooks: `use-tick.ts`, `use-screen.ts`.
+- `shared/lib` — pure helpers: `text.ts` (truncate, wrap), `highlight.ts`, `theme.ts` (colour tokens).
+- If two features need the same helper or component, promote it to `shared` and delete the copies. A helper
+  that exists twice (e.g. `truncate`) is a refactor task, not a style choice.
+- Barrels: `shared/ui/index.ts`, `shared/hooks/index.ts`, `shared/lib/index.ts`.
+
+## features
+
+A feature is a domain slice: `features/<domain>/`. Segments inside it:
+
+- `ui/` presentational components of the slice (`finding-card-view.tsx`).
+- `lib/` pure logic only, one function per file where practical (`build-stream.ts`, `parse-query.ts`,
+  `reduce-progress.ts`).
+- `hooks/` hooks that hold the slice's behaviour (`use-switching.tsx`).
+- `model/` state and actions of the slice, i.e. the stateful object a UI reads (`review-session.ts`).
+- `index.ts` is the slice's public surface. Nothing outside the slice imports from `ui/`, `lib/`, `hooks/` or
+  `model/` directly.
+- A feature does not import another feature. If two slices must work together, a **view** composes them;
+  if they share a type, move the type to `@crit/schema` or `shared`.
+
+Slices in crit: `review-session` (session model, finding prompt), `review-filter` (query parsing, triage,
+file tree), `finding-stream` (stream rows, finding card), `model-switching` (switcher, pickers),
+`run-progress` (progress state and reducer), `review-history` (comparison of past reviews).
+
+## views
+
+A view is a screen or overlay that composes features and shared UI. It owns layout and key handling and holds
+no domain logic.
+
+- File naming: `<name>-view.tsx` exporting `<Name>View` (`home-view.tsx` → `HomeView`). Not `*Screen`, `*App`.
+- Group by area: `views/home`, `views/review`, `views/run`, `views/history`.
+  Example: `views/review/review-view.tsx`, `views/review/proposal-view.tsx`, `views/review/help-view.tsx`.
+- Each area has an `index.ts` barrel; `views/index.ts` re-exports the areas.
+- A view that grows past ~250 lines is split into smaller components in the same folder, and its key
+  handling into a keymap (see the terminal rule).
+
+## app
+
+The equivalent of routes: thin wiring between a CLI command and a view.
+
+- `app/render-full-screen.tsx`, `app/launch-home.tsx`, `app/launch-review.tsx`, `app/launch-run.tsx`,
+  `app/launch-history.tsx`, plus the helpers they need (`make-session.ts`, `make-switcher.ts`,
+  `terminal-editor.ts`, `summary-line.ts`).
+- `app/index.ts` is the only thing the commands import (`await import("../tui/index.ts")`, lazily, so Ink
+  is loaded only when a UI is shown).
+- No domain logic here and no JSX beyond mounting a view.
+
+## Imports and barrels
+
+- Cross-layer and cross-slice imports go through the barrel (`../../shared/ui/index.ts`). Inside one
+  folder, import files directly (`./panel.tsx`).
+- Inside `shared/ui`, import siblings directly, never through the folder's own barrel (avoids cycles).
+- `index.ts` files are thin re-exports. When you add a file to a folder, extend its barrel in the same change.
+- Tests live in `apps/cli/test`, named after the file under test (`build-stream.test.ts`), and import through
+  the barrels like production code.
+
+## Adding code: where does it go?
+
+| You are adding                                          | Put it in                                       |
+| ------------------------------------------------------- | ----------------------------------------------- |
+| A box, list, prompt or key bar usable by any screen     | `shared/ui`                                     |
+| A pure function that decides what to show for a finding | `features/<slice>/lib`                          |
+| State the screen reads and actions it calls             | `features/<slice>/model`                        |
+| A new screen or overlay                                 | `views/<area>/<name>-view.tsx`                  |
+| A new way to start a screen from a command              | `app/launch-<name>.tsx`                         |
+| Something two slices need                               | `shared`, or a view that composes both slices   |

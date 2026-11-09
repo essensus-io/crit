@@ -1,0 +1,24 @@
+---
+description: Terminal-specific rules for the Ink UI: full screen, widths, keys, slow work
+globs: apps/cli/src/tui/**
+paths:
+  - "apps/cli/src/tui/**"
+alwaysApply: false
+---
+
+# Terminal rules (Ink 8)
+
+- Everything renders inside the alternate screen at exactly `useScreen()` width and height. Never print with
+  `console.log` while Ink is mounted; surface messages as a notice in state.
+- Never assume a width: truncate (`wrap="truncate"`), pad, or measure with `lineLen`. Every row must fit; a
+  layout is correct at 80 columns and at 200.
+- Colours and glyphs come from `shared/lib/theme.ts`. No hard-coded colours in components.
+- **Keys are case-insensitive.** Lower-case the input once and bind lower-case letters only; no action may
+  need Shift. Arrows work wherever `j`/`k` do. Every bound key appears in the footer or the help view, and
+  both stay in sync with the handler (a key that exists only in code is a bug).
+- Anything that can take longer than ~100 ms (an agent, git, the filesystem) runs in the background with a
+  visible spinner. The UI never blocks, and never waits on the AI to toggle a checkbox.
+- Destructive actions (delete a provider, apply fixes) say what will happen and ask once; the default
+  answer is the safe one.
+- Test with ink-testing-library: wait for text, never for time; a key pressed before its listener attached is
+  lost, so wait for the screen that owns the key first.

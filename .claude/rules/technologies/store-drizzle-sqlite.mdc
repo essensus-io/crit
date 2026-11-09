@@ -1,0 +1,19 @@
+---
+description: Database conventions for packages/store (Drizzle ORM on node:sqlite)
+globs: packages/store/**
+paths:
+  - "packages/store/**"
+alwaysApply: false
+---
+
+# Store (Drizzle + node:sqlite)
+
+- The schema is `src/db/schema.ts`. A schema change is a migration generated with drizzle-kit; never edit a
+  generated migration by hand and never change the database outside a migration.
+- Repositories (`store.reviews`, `store.findings`, …) are the only way the rest of the code touches the
+  database. No raw SQL or Drizzle tables outside `packages/store`.
+- Rows are mapped to schema types in `mappers.ts`; callers never see a row shape.
+- Timestamps are integer milliseconds. Ids are time-ordered strings from `newId`.
+- JSON columns are parsed with the zod schema from `@crit/schema` on read.
+- Writes that must stay consistent go in one transaction.
+- The cache and `events` tables are append-only logs for the review; do not rewrite history, add a new row.

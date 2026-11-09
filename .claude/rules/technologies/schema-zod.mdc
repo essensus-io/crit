@@ -1,0 +1,18 @@
+---
+description: Conventions for zod schemas and generated JSON Schema in packages/schema
+globs: packages/schema/**
+paths:
+  - "packages/schema/**"
+alwaysApply: false
+---
+
+# Schema (zod)
+
+- `packages/schema` is the single source of truth for every shape that crosses a boundary: findings, fixes,
+  reviews, events, config, providers, MCP payloads.
+- Write the zod schema, export the inferred type with the same name (`Finding` schema + `Finding` type).
+- Optional with a default (`.default()`) beats optional-and-undefined: callers should not guess.
+- Public JSON Schemas are generated (`pnpm --filter @crit/schema generate`) into `json/`. After changing a
+  schema, regenerate and commit the result; the "are up to date" test fails otherwise.
+- Backwards compatibility: stored data and config files outlive releases. Add fields as optional; renaming
+  or removing one needs a migration.
