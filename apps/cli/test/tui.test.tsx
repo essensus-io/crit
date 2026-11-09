@@ -370,6 +370,15 @@ describe("review stream", () => {
     app.unmount();
   });
 
+  it("the arrow keys move between findings like j and k", async () => {
+    const app = await mount(session());
+    await app.press("\u001B[B");
+    await until(app.lastFrame, "2/2");
+    await app.press("\u001B[A");
+    expect(await until(app.lastFrame, "1/2")).toContain("j/k next");
+    app.unmount();
+  });
+
   it("space checks and unchecks the fix; enter with nothing checked says so", async () => {
     const app = await mount(session());
     await app.press(" ");

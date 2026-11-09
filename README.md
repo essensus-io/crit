@@ -58,23 +58,23 @@ right now; press `?` for all of them.
 It runs on the terminal's alternate screen: your terminal's own scrollback is
 untouched and comes back when you leave, and only the panels inside crit scroll.
 
-| Key                   | Does                                                                                                                            |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `j` `k`               | next / previous finding                                                                                                         |
-| `space`               | check the fix to apply it (again to uncheck). Unchecked fixes are left alone                                                    |
-| `d`                   | skip: dismiss with a reason, remembered as a false positive (again to restore)                                                  |
-| `enter`               | apply every checked fix, once you have been through all findings (it tells you if some were not looked at)                      |
-| `i`                   | propose your fix: tell the AI what it should be; it writes it in the background, then check it or not                           |
-| `x`                   | apply just this fix now                                                                                                         |
-| `r`                   | re-run the review of this scope, reviewing every file again (no cache)                                                          |
-| `↑` `↓` `PgUp` `PgDn` | scroll the code (the mouse wheel too)                                                                                           |
-| `/`                   | search: words, `sev:major`, `lens:security`, `file:cart`, `has:fix`, `is:pending`, `is:filtered`                                |
-| `.`                   | actions: propose a fix, edit it in `$EDITOR`, ask a question, re-check the file, copy as a prompt, use my fix                   |
-| `o`                   | options: model, provider, reasoning effort, depth, save as default, rules on/off                                                |
-| `y`                   | copy the finding as a prompt for another agent                                                                                  |
-| `tab` `]` `[`         | next / previous file (`h` `l` or the arrows switch between the files list and the code; in the list `j` `k` jump between files) |
-| `g`                   | first finding                                                                                                                   |
-| `?` `q`               | help · back to the start screen (quit when opened with `crit open`)                                                             |
+| Key             | Does                                                                                                                            |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `j` `k` `↑` `↓` | next / previous finding (the mouse wheel too)                                                                                   |
+| `space`         | check the fix to apply it (again to uncheck). Unchecked fixes are left alone                                                    |
+| `d`             | skip: dismiss with a reason, remembered as a false positive (again to restore)                                                  |
+| `enter`         | apply every checked fix, once you have been through all findings (it tells you if some were not looked at)                      |
+| `i`             | propose your fix: tell the AI what it should be; it writes it in the background, then check it or not                           |
+| `x`             | apply just this fix now                                                                                                         |
+| `r`             | re-run the review of this scope, reviewing every file again (no cache)                                                          |
+| `PgUp` `PgDn`   | scroll the code                                                                                                                 |
+| `/`             | search: words, `sev:major`, `lens:security`, `file:cart`, `has:fix`, `is:pending`, `is:filtered`                                |
+| `.`             | actions: propose a fix, edit it in `$EDITOR`, ask a question, re-check the file, copy as a prompt, use my fix                   |
+| `o`             | options: model, provider, reasoning effort, depth, save as default, rules on/off                                                |
+| `y`             | copy the finding as a prompt for another agent                                                                                  |
+| `tab` `]` `[`   | next / previous file (`h` `l` or the arrows switch between the files list and the code; in the list `j` `k` jump between files) |
+| `g`             | first finding                                                                                                                   |
+| `?` `q`         | help · back to the start screen (quit when opened with `crit open`)                                                             |
 
 Model, provider, effort and depth apply to the _next_ ask, proposal or re-check. While
 a review runs, `m` `P` `E` `D` `S` change the next run instead and `r` retries with

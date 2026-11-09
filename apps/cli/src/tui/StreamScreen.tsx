@@ -210,6 +210,7 @@ export function StreamScreen(props: {
               height={rows}
               width={innerW}
               vim={false}
+              arrows={false}
               active={props.focus === "stream" && props.idle}
               {...(span && current
                 ? {

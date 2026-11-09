@@ -161,6 +161,7 @@ export function Viewport({
   follow = false,
   resetKey,
   vim = true,
+  arrows = true,
   reveal,
 }: {
   lines: ReactNode[];
@@ -172,6 +173,8 @@ export function Viewport({
   resetKey?: string;
   /** j/k/g/G scroll too. Off when those keys belong to the screen. */
   vim?: boolean;
+  /** ↑/↓ scroll a line. Off when the screen uses them for something else. */
+  arrows?: boolean;
   /** When `key` changes, scroll just enough to show rows `from`..`to`. */
   reveal?: { key: string; from: number; to: number };
 }) {
@@ -203,8 +206,8 @@ export function Viewport({
         pinned.current = follow && next >= max;
         setOffset(next);
       };
-      if (key.upArrow || (vim && input === "k")) return move(shown - 1);
-      if (key.downArrow || (vim && input === "j")) return move(shown + 1);
+      if ((arrows && key.upArrow) || (vim && input === "k")) return move(shown - 1);
+      if ((arrows && key.downArrow) || (vim && input === "j")) return move(shown + 1);
       if (key.pageUp || (key.ctrl && input === "u")) return move(shown - Math.max(1, height - 1));
       if (key.pageDown || (key.ctrl && input === "d")) return move(shown + Math.max(1, height - 1));
       if (key.home || (vim && input === "g")) return move(0);

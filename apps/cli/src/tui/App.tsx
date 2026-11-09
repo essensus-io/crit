@@ -220,8 +220,8 @@ export function ReviewApp({
         if (input === "k" || key.upArrow) return moveFile(-1);
         return;
       }
-      if (input === "j" || input === "n") return move(cursor + 1);
-      if (input === "k") return move(cursor - 1);
+      if (input === "j" || input === "n" || key.downArrow) return move(cursor + 1);
+      if (input === "k" || key.upArrow) return move(cursor - 1);
       if (input === "]") return moveFile(1);
       if (input === "[") return moveFile(-1);
       if (input === "g") return move(0);
