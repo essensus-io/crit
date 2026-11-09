@@ -1,32 +1,20 @@
 import type { ProposalOutcome } from "@crit/core";
-import { Box, useApp, useInput } from "ink";
+import { Box, useApp } from "ink";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Choice, TextInput } from "../../shared/ui/index.ts";
-import { parseQuery, triage, visibleItems } from "../../features/review-session/index.ts";
-import { HelpView } from "./help-view.tsx";
-import { ProposalView } from "./proposal-view.tsx";
+import { type Switcher, useSwitching } from "../../features/model-switching/index.ts";
+import {
+  parseQuery,
+  type ReviewSession,
+  visibleItems,
+} from "../../features/review-session/index.ts";
 import { useScreen } from "../../shared/ui/index.ts";
-import type { ReviewSession } from "../../features/review-session/index.ts";
+import { ProposalView } from "./proposal-view.tsx";
+import type { ReviewInput, ReviewMode } from "./review-mode.ts";
+import { reviewOverlay } from "./review-overlay.tsx";
+import { reviewPrompt } from "./review-prompt.tsx";
 import { StreamView } from "./stream-view.tsx";
-import { describeChoice, type Switcher } from "../../features/model-switching/index.ts";
-import { useSwitching } from "../../features/model-switching/index.ts";
-import { Menu, type MenuItem, Picker } from "../../shared/ui/index.ts";
+import { useReviewKeys } from "./use-review-keys.ts";
 
-type Mode =
-  | "none"
-  | "help"
-  | "actions"
-  | "options"
-  | "rules"
-  | "search"
-  | "dismiss"
-  | "propose"
-  | "describe"
-  | "ask"
-  | "reply"
-  | "apply"
-  | "instruct"
-  | "rerun";
 type Props = {
   session: ReviewSession;
   onExit?: () => void;
@@ -40,7 +28,7 @@ type Props = {
 
 /**
  * The interactive review screen: one stream of code with a card under every
- * finding. a / d triage, enter expands, `.` and `o` open the menus.
+ * finding. Keys are in `use-review-keys`, the prompts and menus in their own files.
  */
 export const ReviewView = ({ session, onExit, switcher, onConnect, onRerun, onBack }: Props) => {
   const app = useApp();
@@ -59,12 +47,10 @@ export const ReviewView = ({ session, onExit, switcher, onConnect, onRerun, onBa
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const [focus, setFocus] = useState<"files" | "stream">("stream");
-  const [mode, setMode] = useState<Mode>("none");
+  const [mode, setMode] = useState<ReviewMode>("none");
   const [fixTab, setFixTab] = useState<"ai" | "user">("ai");
   const [outcome, setOutcome] = useState<ProposalOutcome | undefined>();
-  const [lastInput, setLastInput] = useState<
-    { kind: "patch"; patch: string } | { kind: "description"; text: string } | undefined
-  >();
+  const [lastInput, setLastInput] = useState<ReviewInput>();
 
   const filter = useMemo(() => parseQuery(query), [query]);
   const items = useMemo(() => visibleItems(state, filter), [state, filter]);
@@ -132,373 +118,73 @@ export const ReviewView = ({ session, onExit, switcher, onConnect, onRerun, onBa
     app.exit();
   };
   const files = useMemo(() => [...new Set(items.map((i) => i.finding.file))], [items]);
-  // Moving between files jumps to the first finding of the next or previous one.
-  const moveFile = (delta: number) => {
-    if (!current) return;
-    const at = files.indexOf(current.finding.file);
-    const target = files[Math.max(0, Math.min(files.length - 1, at + delta))];
-    const first = items.findIndex((i) => i.finding.file === target);
-    if (first >= 0) setCursor(first);
-  };
   const showOutcome = (o: ProposalOutcome | undefined) => {
     if (!o) return;
     setOutcome(o);
     setScreen("proposal");
   };
-  // enter: apply everything checked, once every finding has been looked at.
-  const finish = () => {
-    const open = items.filter((i) => triage(i) !== "applied" && triage(i) !== "dismissed");
-    const unseen = open.filter((i) => !seen.has(i.finding.id) && i !== current);
-    if (unseen.length > 0) {
-      const at = items.findIndex((i) => i.finding.id === unseen[0]!.finding.id);
-      if (at >= 0) setCursor(at);
-      return session.notify(
-        `${unseen.length} finding${unseen.length === 1 ? "" : "s"} not looked at yet. j moves on; check with space or leave unchecked.`,
-      );
-    }
-    const n = state.items.filter(
-      (v) => v.finding.selected && v.finding.status === "open" && v.fix,
-    ).length;
-    if (n === 0) return session.notify("Nothing is checked, so nothing to apply. q goes back.");
-    void session.apply({ kind: "worktree" });
-  };
-  const move = (to: number) => setCursor(Math.max(0, Math.min(items.length - 1, to)));
+  const done = () => setMode("none");
   const idle = mode === "none" && !switching.modal && !busy;
 
-  useInput(
-    (typed, key) => {
-      const input = typed.toLowerCase();
-      if (busy) return;
-      // A message stays until the next key, then gives the line back to progress.
-      if (state.notice || state.error) session.notify(undefined);
-      if (screen === "proposal" && outcome && current) {
-        if (key.escape || input === "q") return setScreen("stream");
-        if (key.return && outcome.evaluation.verdict === "concerns" && !outcome.finalRound)
-          return setMode("reply");
-        if (input === "u" && outcome.evaluation.verdict !== "accepted") {
-          void session.useAnyway(outcome.fix.id).then(() => setScreen("stream"));
-          return;
-        }
-        if (input === "k") {
-          void session.keepAi(current.finding.id).then(() => setScreen("stream"));
-          return;
-        }
-        return;
-      }
-      if (input === "q") return onBack ? back() : quit();
-      if (input === "?") return setMode("help");
-      if (input === "/") return setMode("search");
-      if (input === "o") return setMode("options");
-      if (input === "r" && onRerun) return setMode("rerun");
-      if (key.escape) {
-        if (query) {
-          setQuery("");
-          return setCursor(0);
-        }
-        return;
-      }
-      if (input === "h" || key.leftArrow) return setFocus("files");
-      if (input === "l" || key.rightArrow) return setFocus("stream");
-      if (focus === "files") {
-        if (key.escape || key.return) return setFocus("stream");
-        if (input === "j" || key.downArrow) return moveFile(1);
-        if (input === "k" || key.upArrow) return moveFile(-1);
-        return;
-      }
-      if (input === "j" || input === "n" || key.downArrow) return move(cursor + 1);
-      if (input === "k" || key.upArrow) return move(cursor - 1);
-      if (input === "]") return moveFile(1);
-      if (input === "[") return moveFile(-1);
-      if (input === "g") return move(0);
-      if (input === "p") return setMode("apply");
-      if (!current) return;
-      const id = current.finding.id;
-      if (key.tab && key.shift) return moveFile(-1);
-      if (key.tab)
-        return current.aiFix && current.userFix
-          ? setFixTab((t) => (t === "ai" ? "user" : "ai"))
-          : moveFile(1);
-      if (key.return) return finish();
-      if (input === "y") return void session.copyPrompt(id);
-      if (input === ".") return setMode("actions");
-      if (input === "i") return setMode("instruct");
-      if (input === "x") return void session.applyOne(id);
-      if (input === " ") {
-        // space: "fix this". Check the fix and go on; no fix yet: the AI writes one, checked when ready.
-        if (triage(current) === "dismissed") return void session.restore(id);
-        const next = () => move(cursor + 1);
-        if (current.finding.selected) return void session.toggle(id); // again: uncheck
-        if (current.fix) {
-          void session.toggle(id).then(next);
-          return;
-        }
-        if (state.drafting.includes(id))
-          return session.notify("Already writing a fix for this one.");
-        wanted.current.add(id);
-        session.draftFix(id);
-        return next();
-      }
-      if (input === "a") {
-        if (triage(current) === "dismissed") return void session.restore(id);
-        if (!current.fix && !current.finding.selected) return setMode("instruct");
-        return void session.toggle(id);
-      }
-      if (input === "d")
-        return triage(current) === "dismissed" ? void session.restore(id) : setMode("dismiss");
-    },
-    { isActive: mode === "none" && !switching.modal },
-  );
+  useReviewKeys({
+    session,
+    state,
+    items,
+    files,
+    current,
+    cursor,
+    query,
+    focus,
+    screen,
+    outcome,
+    seen,
+    wanted,
+    busy,
+    isActive: mode === "none" && !switching.modal,
+    canRerun: Boolean(onRerun),
+    canGoBack: Boolean(onBack),
+    setCursor,
+    setQuery,
+    setFocus,
+    setFixTab,
+    setMode,
+    setScreen,
+    quit,
+    back,
+  });
 
-  const done = () => setMode("none");
-  let prompt: React.ReactNode = null;
-  if (mode === "search")
-    prompt = (
-      <TextInput
-        label="/"
-        initial={query}
-        onCancel={done}
-        onSubmit={(v) => {
-          setQuery(v.trim());
-          setCursor(0);
-          done();
-        }}
-      />
-    );
-  if (mode === "instruct" && current)
-    prompt = (
-      <TextInput
-        label={
-          current.fix
-            ? "Tell the AI how the fix should change ›"
-            : "No fix yet. What should the fix do? (enter alone: let the AI decide) ›"
-        }
-        onCancel={done}
-        onSubmit={(text) => {
-          done();
-          session.draftFix(current.finding.id, text.trim() || undefined);
-        }}
-      />
-    );
-  if (mode === "dismiss" && current)
-    prompt = (
-      <Choice
-        label="Dismiss:"
-        options={[
-          ["f", "false positive"],
-          ["w", "won't fix"],
-          ["l", "later"],
-        ]}
-        onCancel={done}
-        onPick={(k) => {
-          done();
-          void session.dismiss(
-            current.finding.id,
-            k === "f" ? "false-positive" : k === "w" ? "wont-fix" : "later",
-          );
-        }}
-      />
-    );
-  if (mode === "propose" && current)
-    prompt = (
-      <Choice
-        label="Propose a fix:"
-        options={[
-          ["w", "describe it in words"],
-          ["e", "write it in $EDITOR"],
-        ]}
-        onCancel={done}
-        onPick={(k) => {
-          if (k === "w") return setMode("describe");
-          done();
-          void session.proposeFromEditor(current.finding.id).then((o) => {
-            if (o && lastInput === undefined) setLastInput({ kind: "patch", patch: o.fix.patch });
-            showOutcome(o);
-          });
-        }}
-      />
-    );
-  if (mode === "describe" && current)
-    prompt = (
-      <TextInput
-        label="Describe your fix ›"
-        onCancel={done}
-        onSubmit={(text) => {
-          done();
-          if (!text.trim()) return;
-          void session.propose(current.finding.id, { kind: "description", text }).then((o) => {
-            if (o) setLastInput({ kind: "patch", patch: o.fix.patch });
-            showOutcome(o);
-          });
-        }}
-      />
-    );
-  if (mode === "ask" && current)
-    prompt = (
-      <TextInput
-        label="Ask ›"
-        onCancel={done}
-        onSubmit={(q) => {
-          done();
-          if (q.trim()) {
-            void session.ask(current.finding.id, q.trim());
-          }
-        }}
-      />
-    );
-  if (mode === "reply" && current && outcome)
-    prompt = (
-      <TextInput
-        label="you ›"
-        onCancel={done}
-        onSubmit={(answer) => {
-          done();
-          if (!answer.trim()) return;
-          void session
-            .propose(
-              current.finding.id,
-              lastInput ?? { kind: "patch", patch: outcome.fix.patch },
-              answer.trim(),
-            )
-            .then(showOutcome);
-        }}
-      />
-    );
-  if (mode === "apply") {
-    const n = state.items.filter(
-      (v) => v.finding.selected && v.finding.status === "open" && v.fix,
-    ).length;
-    prompt = (
-      <Choice
-        enterPicksFirst
-        label={n === 0 ? "Nothing accepted yet." : `Apply ${n} accepted fix${n === 1 ? "" : "es"}:`}
-        options={
-          n === 0
-            ? []
-            : [
-                ["y", "to the working tree"],
-                ["b", "to a new branch"],
-              ]
-        }
-        onCancel={done}
-        onPick={(k) => {
-          done();
-          void session.apply(k === "b" ? { kind: "branch" } : { kind: "worktree" });
-        }}
-      />
-    );
-  }
-
-  if (mode === "rerun" && onRerun)
-    prompt = (
-      <Choice
-        label={`Re-run the review of ${state.review.scopeLabel}? Every file is reviewed again, without the cache.`}
-        options={[["y", "yes, re-run"]]}
-        onCancel={done}
-        onPick={() => {
-          done();
-          onRerun(true);
-          app.exit();
-        }}
-      />
-    );
-
-  if (mode === "help") return <HelpView width={width} height={height} onClose={done} />;
-  if (mode === "actions" && current) {
-    const items2: MenuItem[] = [
-      { key: "p", label: "Propose a different fix", hint: "in $EDITOR or in words" },
-      ...(current.fix ? [{ key: "e", label: "Edit the fix in $EDITOR" }] : []),
-      { key: "w", label: "Ask a question about this finding" },
-      { key: "r", label: "Re-check this file", hint: "runs the reviewer again on it" },
-      { key: "y", label: "Copy as a prompt for another agent" },
-      ...(current.userFix && !current.userFix.active
-        ? [{ key: "u", label: "Use my fix instead of the AI's" }]
-        : []),
-      ...(current.aiFix && !current.aiFix.active ? [{ key: "k", label: "Keep the AI's fix" }] : []),
-      ...(outcome ? [{ key: "v", label: "View the last proposal check" }] : []),
-    ];
-    const id = current.finding.id;
-    return (
-      <Menu
-        title={`actions · ${current.finding.title}`}
-        items={items2}
-        width={width}
-        height={height}
-        onCancel={done}
-        onPick={(k) => {
-          done();
-          if (k === "p") setMode("propose");
-          else if (k === "e") void session.editFix(id);
-          else if (k === "w") setMode("ask");
-          else if (k === "r") void session.recheck(id);
-          else if (k === "y") session.copyPrompt(id);
-          else if (k === "u" && current.userFix) void session.useAnyway(current.userFix.id);
-          else if (k === "k") void session.keepAi(id);
-          else if (k === "v" && outcome) setScreen("proposal");
-        }}
-      />
-    );
-  }
-  if (mode === "options") {
-    const c = switcher?.current();
-    const opts2: MenuItem[] = [
-      ...(switcher && c
-        ? [
-            { key: "m", label: "Model", hint: c.model ?? "CLI default" },
-            { key: "p", label: "Provider", hint: c.provider },
-            { key: "e", label: "Reasoning effort", hint: c.effort ?? "CLI default" },
-            { key: "d", label: "Review depth", hint: c.depth },
-            { key: "s", label: "Save this as the default", hint: describeChoice(c) },
-          ]
-        : []),
-      ...(onRerun
-        ? [
-            {
-              key: "n",
-              label: "Re-run this review",
-              hint: "same scope; only changed files cost tokens",
-            },
-          ]
-        : []),
-      { key: "r", label: "Rules", hint: "turn rules on or off" },
-    ];
-    return (
-      <Menu
-        title="options · used by the next ask, proposal or re-check"
-        items={opts2}
-        width={width}
-        height={height}
-        onCancel={done}
-        onPick={(k) => {
-          done();
-          if (k === "r") return setMode("rules");
-          if (k === "n") return setMode("rerun");
-          const key = k as "m" | "p" | "e" | "d" | "s";
-          switching.open(key);
-        }}
-      />
-    );
-  }
-  if (mode === "rules") {
-    const rows = session.ruleRows();
-    return (
-      <Picker
-        title="rules in this review · enter toggles"
-        options={rows.map((r) => ({
-          value: r.ref.id,
-          label: `${r.disabled ? "[ ]" : "[x]"} ${r.ref.id}  ${r.ref.title}`,
-          hint: r.ref.path,
-        }))}
-        width={width}
-        height={height}
-        note="off = skipped from now on; its files are re-checked"
-        onPick={(id) => {
-          done();
-          void session.toggleRule(id);
-        }}
-        onCancel={done}
-      />
-    );
-  }
+  const prompt = reviewPrompt({
+    mode,
+    current,
+    state,
+    session,
+    query,
+    outcome,
+    lastInput,
+    ...(onRerun ? { onRerun } : {}),
+    setMode,
+    setQuery,
+    setCursor,
+    setLastInput,
+    showOutcome,
+    done,
+    exit: () => app.exit(),
+  });
+  const overlay = reviewOverlay({
+    mode,
+    current,
+    session,
+    switcher,
+    outcome,
+    width,
+    height,
+    hasRerun: Boolean(onRerun),
+    setMode,
+    setScreen,
+    openSwitching: switching.open,
+    done,
+  });
+  if (overlay) return overlay;
   if (switching.overlay) return switching.overlay;
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
