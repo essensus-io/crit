@@ -1,6 +1,6 @@
 import type { Depth } from "@crit/schema";
 import { Box, Text, useInput } from "ink";
-import { type ReactNode, useState } from "react";
+import { Fragment, type ReactNode, useState } from "react";
 import { TextInput } from "./components.tsx";
 import { useScreen } from "./screen.tsx";
 import { describeChoice, type Switcher } from "./switcher.ts";
@@ -9,11 +9,18 @@ import { Panel, Picker, type PickOption } from "./widgets.tsx";
 const DEFAULT = "__default__";
 const CUSTOM = "__custom__";
 const CONNECT = "__connect__";
+const ADD = "__add__";
+const REMOVE = "__remove__";
 
 type Stage =
   | { kind: "model"; options: PickOption<string>[]; live: boolean }
   | { kind: "custom-model" }
   | { kind: "provider"; options: PickOption<string>[] }
+  | { kind: "add-type" }
+  | { kind: "add-name"; type: string; accountVar?: string }
+  | { kind: "add-account"; type: string; name: string; accountVar: string }
+  | { kind: "remove" }
+  | { kind: "remove-confirm"; name: string }
   | { kind: "effort"; options: PickOption<string>[] }
   | { kind: "depth"; options: PickOption<Depth>[] };
 
@@ -52,6 +59,19 @@ export function useSwitching(opts: {
     onNotice(`${verb}: ${describeChoice(c)}. ${save} it as the default for ${c.provider}.`);
   };
 
+  // A new setup: add it, switch to it, and go straight to picking its model (saved with it).
+  const finishAdd = (type: string, name: string, account?: string) => {
+    try {
+      switcher!.add({ type, name, ...(account ? { account } : {}) });
+    } catch (err) {
+      setStage(undefined);
+      return onNotice((err as Error).message);
+    }
+    opts.onChange?.();
+    setStage(undefined);
+    onNotice(`Added ${name}. Pick its model with o, then m; s saves the choice.`);
+  };
+
   const trigger = (typed: string) => {
     if (!switcher) return;
     const input = typed.toLowerCase();
@@ -82,6 +102,14 @@ export function useSwitching(opts: {
             label: p.name,
             hint: `${p.type} · ${p.model ?? "default model"}`,
           })),
+          {
+            value: ADD,
+            label: "Add a provider or account…",
+            hint: "another login, or the same CLI with a different model",
+          },
+          ...(switcher.providers().length > 1
+            ? [{ value: REMOVE, label: "Remove a provider…", hint: "asks first" }]
+            : []),
           ...(opts.onConnect
             ? [{ value: CONNECT, label: "Connect another provider…", hint: "crit providers add" }]
             : []),
@@ -169,8 +197,109 @@ export function useSwitching(opts: {
           onPick={(v) => {
             close();
             if (v === CONNECT) return opts.onConnect?.();
+            if (v === ADD) return setStage({ kind: "add-type" });
+            if (v === REMOVE) return setStage({ kind: "remove" });
             switcher.setProvider(v);
             changed("Provider");
+          }}
+        />
+      );
+      break;
+    case "add-type":
+      overlay = (
+        <Picker
+          {...common}
+          title="add a provider"
+          options={switcher.types().map((t) => ({ value: t.type, label: t.label, hint: t.type }))}
+          onPick={(type) => {
+            const t = switcher.types().find((x) => x.type === type);
+            setStage({
+              kind: "add-name",
+              type,
+              ...(t?.accountVar ? { accountVar: t.accountVar } : {}),
+            });
+          }}
+        />
+      );
+      break;
+    case "add-name":
+      overlay = (
+        <Box flexDirection="column" width={screen.width} height={screen.height}>
+          <Panel title={`add ${stage.type}`} tone="lav" width={Math.min(screen.width - 2, 70)}>
+            <TextInput
+              label="Name for this setup ›"
+              initial={switcher.suggestName(stage.type)}
+              onCancel={close}
+              onSubmit={(v) => {
+                const name = v.trim();
+                if (!name) return close();
+                if (switcher.providers().some((p) => p.name === name)) {
+                  close();
+                  return onNotice(`A provider named ${name} already exists.`);
+                }
+                if (stage.accountVar)
+                  return setStage({
+                    kind: "add-account",
+                    type: stage.type,
+                    name,
+                    accountVar: stage.accountVar,
+                  });
+                finishAdd(stage.type, name);
+              }}
+            />
+          </Panel>
+          <Text dimColor> enter next · esc cancel</Text>
+        </Box>
+      );
+      break;
+    case "add-account":
+      overlay = (
+        <Box flexDirection="column" width={screen.width} height={screen.height}>
+          <Panel title={`add ${stage.name}`} tone="lav" width={Math.min(screen.width - 2, 78)}>
+            <TextInput
+              label={`Folder of another login (${stage.accountVar}), or enter for the same account ›`}
+              onCancel={close}
+              onSubmit={(v) => finishAdd(stage.type, stage.name, v.trim() || undefined)}
+            />
+          </Panel>
+          <Text dimColor> enter add · esc cancel</Text>
+        </Box>
+      );
+      break;
+    case "remove":
+      overlay = (
+        <Picker
+          {...common}
+          title="remove which provider?"
+          options={switcher.providers().map((p) => ({
+            value: p.name,
+            label: p.name,
+            hint: `${p.type} · ${p.model ?? "default model"}`,
+          }))}
+          onPick={(name) => setStage({ kind: "remove-confirm", name })}
+        />
+      );
+      break;
+    case "remove-confirm":
+      overlay = (
+        <Picker
+          {...common}
+          title={`remove ${stage.name}? This deletes its saved setup.`}
+          options={[
+            { value: "no", label: "No, keep it" },
+            { value: "yes", label: `Yes, remove ${stage.name}` },
+          ]}
+          initial="no"
+          onPick={(v) => {
+            close();
+            if (v !== "yes") return;
+            try {
+              switcher.remove(stage.name);
+              opts.onChange?.();
+              onNotice(`Removed ${stage.name}. Using ${switcher.current().provider}.`);
+            } catch (err) {
+              onNotice((err as Error).message);
+            }
           }}
         />
       );
@@ -206,5 +335,6 @@ export function useSwitching(opts: {
       );
       break;
   }
-  return { overlay, modal: true, open: trigger };
+  // a new key per stage: one picker must not inherit the previous one's search text
+  return { overlay: <Fragment key={stage.kind}>{overlay}</Fragment>, modal: true, open: trigger };
 }

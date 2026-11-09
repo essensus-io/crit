@@ -7,12 +7,11 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
     title: "Review",
     rows: [
       ["j / k", "next / previous finding"],
-      ["a / space", "agree with the fix: tick the box (again to untick)"],
-      ["i", "tell the AI what the fix should be (rewrites it; enter alone: let it decide)"],
+      ["space", "check the fix to apply it (again to uncheck; unchecked fixes are left alone)"],
+      ["i", "propose your fix: tell the AI what it should be, then check it or not"],
+      ["enter", "apply every checked fix, once you have been through all findings"],
       ["x", "apply just this fix now"],
-      ["p", "apply every ticked fix"],
       ["d", "skip: dismiss with a reason (again restores). Unticked = left alone"],
-      ["enter", "show or hide the full explanation, fix and thread"],
     ],
   },
   {
@@ -22,14 +21,14 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
       ["tab / ]", "next file (shift-tab or [ for the previous)"],
       ["h / l", "files list ⇄ code; in the list j/k jump between files"],
       ["/", "search: words, sev:major, lens:security, file:cart, has:fix, is:pending, is:filtered"],
-      ["g / G", "first / last finding"],
+      ["g", "first finding"],
     ],
   },
   {
     title: "More",
     rows: [
       [".", "actions: propose, edit, ask, re-check, use my fix"],
-      ["o", "options: model, provider, effort, depth, rules"],
+      ["o", "options: model, provider (add or remove a setup), effort, depth, rules"],
       ["y", "copy this finding as a prompt for another agent"],
       ["r", "re-run the review of this scope, without the cache"],
       ["q", "back to the start screen (quit when opened with crit open)"],

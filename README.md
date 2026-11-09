@@ -61,12 +61,11 @@ untouched and comes back when you leave, and only the panels inside crit scroll.
 | Key                   | Does                                                                                                                            |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | `j` `k`               | next / previous finding                                                                                                         |
-| `a` `space`           | agree with the fix: tick the box (again to untick). Unticked fixes are left alone                                               |
+| `space`               | check the fix to apply it (again to uncheck). Unchecked fixes are left alone                                                    |
 | `d`                   | skip: dismiss with a reason, remembered as a false positive (again to restore)                                                  |
-| `enter`               | show or hide the full explanation, fix and thread in place                                                                      |
-| `i`                   | tell the AI what the fix should be: it rewrites it in the background (enter alone: let it decide)                               |
+| `enter`               | apply every checked fix, once you have been through all findings (it tells you if some were not looked at)                      |
+| `i`                   | propose your fix: tell the AI what it should be; it writes it in the background, then check it or not                           |
 | `x`                   | apply just this fix now                                                                                                         |
-| `p`                   | apply every ticked fix (then `enter` for the working tree, or `b` for a new branch)                                             |
 | `r`                   | re-run the review of this scope, reviewing every file again (no cache)                                                          |
 | `↑` `↓` `PgUp` `PgDn` | scroll the code (the mouse wheel too)                                                                                           |
 | `/`                   | search: words, `sev:major`, `lens:security`, `file:cart`, `has:fix`, `is:pending`, `is:filtered`                                |
@@ -74,7 +73,7 @@ untouched and comes back when you leave, and only the panels inside crit scroll.
 | `o`                   | options: model, provider, reasoning effort, depth, save as default, rules on/off                                                |
 | `y`                   | copy the finding as a prompt for another agent                                                                                  |
 | `tab` `]` `[`         | next / previous file (`h` `l` or the arrows switch between the files list and the code; in the list `j` `k` jump between files) |
-| `g` `G`               | first / last finding                                                                                                            |
+| `g`                   | first finding                                                                                                                   |
 | `?` `q`               | help · back to the start screen (quit when opened with `crit open`)                                                             |
 
 Model, provider, effort and depth apply to the _next_ ask, proposal or re-check. While

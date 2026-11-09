@@ -21,6 +21,8 @@ export const ProviderProfile = z.object({
   /** Cheaper model for the skeptic, repo map and draft tasks; null = use `model`. */
   fastModel: z.string().nullable().optional(),
   enabled: z.boolean().default(true),
+  /** Extra environment for this profile's CLI, e.g. CLAUDE_CONFIG_DIR to use another account. */
+  env: z.record(z.string(), z.string()).optional(),
 });
 export type ProviderProfile = z.infer<typeof ProviderProfile>;
 export type ProviderProfileInput = z.input<typeof ProviderProfile>;

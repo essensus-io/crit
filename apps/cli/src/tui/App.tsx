@@ -75,7 +75,6 @@ export function ReviewApp({
   const [cursor, setCursor] = useState(0);
   const [focus, setFocus] = useState<"files" | "stream">("stream");
   const [mode, setMode] = useState<Mode>("none");
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [fixTab, setFixTab] = useState<"ai" | "user">("ai");
   const [outcome, setOutcome] = useState<ProposalOutcome | undefined>();
   const [lastInput, setLastInput] = useState<
@@ -86,6 +85,21 @@ export function ReviewApp({
   const items = useMemo(() => visibleItems(state, filter), [state, filter]);
   const current = items[Math.min(cursor, Math.max(0, items.length - 1))];
   const busy = Boolean(state.busy);
+  // The finding you are on is always open; the rest are one line.
+  const expanded = useMemo<ReadonlySet<string>>(
+    () => new Set(current ? [current.finding.id] : []),
+    [current?.finding.id],
+  );
+  // The fix tab follows the active fix: yours after you proposed one, the AI's otherwise.
+  useEffect(() => {
+    if (current?.fix) setFixTab(current.fix.author === "user" ? "user" : "ai");
+  }, [current?.finding.id, current?.fix?.id]);
+  // Findings you have looked at: enter finishes only when you have been through all of them.
+  const [seen, setSeen] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    const id = current?.finding.id;
+    if (id && !seen.has(id)) setSeen((s) => new Set(s).add(id));
+  }, [current?.finding.id]);
   const [, bump] = useState(0);
   const switching = useSwitching({
     switcher,
@@ -108,7 +122,6 @@ export function ReviewApp({
     const here = current?.finding.id;
     if (here && finished.includes(here) && current?.aiFix) {
       setFixTab("ai");
-      setExpanded((prev) => new Set(prev).add(here));
     }
   }, [state.drafting, current]);
 
@@ -129,20 +142,27 @@ export function ReviewApp({
     const first = items.findIndex((i) => i.finding.file === target);
     if (first >= 0) setCursor(first);
   };
-  const toggleExpanded = (id: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else {
-        next.add(id);
-        setFixTab(current?.fix?.author === "user" ? "user" : "ai");
-      }
-      return next;
-    });
   const showOutcome = (o: ProposalOutcome | undefined) => {
     if (!o) return;
     setOutcome(o);
     setScreen("proposal");
+  };
+  // enter: apply everything checked, once every finding has been looked at.
+  const finish = () => {
+    const open = items.filter((i) => triage(i) !== "applied" && triage(i) !== "dismissed");
+    const unseen = open.filter((i) => !seen.has(i.finding.id) && i !== current);
+    if (unseen.length > 0) {
+      const at = items.findIndex((i) => i.finding.id === unseen[0]!.finding.id);
+      if (at >= 0) setCursor(at);
+      return session.notify(
+        `${unseen.length} finding${unseen.length === 1 ? "" : "s"} not looked at yet. j moves on; check with space or leave unchecked.`,
+      );
+    }
+    const n = state.items.filter(
+      (v) => v.finding.selected && v.finding.status === "open" && v.fix,
+    ).length;
+    if (n === 0) return session.notify("Nothing is checked, so nothing to apply. q goes back.");
+    void session.apply({ kind: "worktree" });
   };
   const move = (to: number) => setCursor(Math.max(0, Math.min(items.length - 1, to)));
   const idle = mode === "none" && !switching.modal && !busy;
@@ -173,7 +193,6 @@ export function ReviewApp({
       if (input === "o") return setMode("options");
       if (input === "r" && onRerun) return setMode("rerun");
       if (key.escape) {
-        if (current && expanded.has(current.finding.id)) return toggleExpanded(current.finding.id);
         if (query) {
           setQuery("");
           return setCursor(0);
@@ -198,8 +217,10 @@ export function ReviewApp({
       const id = current.finding.id;
       if (key.tab && key.shift) return moveFile(-1);
       if (key.tab)
-        return expanded.has(id) ? setFixTab((t) => (t === "ai" ? "user" : "ai")) : moveFile(1);
-      if (key.return) return toggleExpanded(id);
+        return current.aiFix && current.userFix
+          ? setFixTab((t) => (t === "ai" ? "user" : "ai"))
+          : moveFile(1);
+      if (key.return) return finish();
       if (input === "y") return void session.copyPrompt(id);
       if (input === ".") return setMode("actions");
       if (input === "i") return setMode("instruct");
@@ -306,7 +327,6 @@ export function ReviewApp({
         onSubmit={(q) => {
           done();
           if (q.trim()) {
-            setExpanded((prev) => new Set(prev).add(current.finding.id));
             void session.ask(current.finding.id, q.trim());
           }
         }}
@@ -485,6 +505,7 @@ export function ReviewApp({
           idle={idle}
           canRerun={Boolean(onRerun)}
           canGoBack={Boolean(onBack)}
+          seenCount={items.filter((i) => seen.has(i.finding.id) || i === current).length}
         />
       ) : (
         <ProposalScreen

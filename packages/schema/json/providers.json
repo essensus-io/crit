@@ -62,6 +62,15 @@
           "enabled": {
             "default": true,
             "type": "boolean"
+          },
+          "env": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
         "required": [

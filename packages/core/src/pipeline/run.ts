@@ -138,7 +138,8 @@ export type Prepared = {
   estimatedTokens: number;
 };
 
-const fileCacheKey = (parts: unknown[]) => `file:${sha(JSON.stringify(["v1", ...parts]))}`;
+const fileCacheKey = (parts: unknown[]) =>
+  `file:${sha(JSON.stringify(["v2-skeptical-prompt", ...parts]))}`;
 
 /**
  * Everything a review decides before spending tokens: scope, rules, which files

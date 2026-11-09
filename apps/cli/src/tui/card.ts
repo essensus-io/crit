@@ -128,17 +128,29 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
     if (f.verdictReason)
       out.push([{ t: "Skeptic  ", dim: true }, { t: clip(f.verdictReason, w - 9) }]);
     out.push([{ t: `── fix ${"─".repeat(Math.max(0, w - 7))}`, color: T.lav }]);
-    const shown = o.fixTab === "user" ? item.userFix : item.aiFix;
+    const both = Boolean(item.aiFix && item.userFix);
+    const shown = both
+      ? o.fixTab === "user"
+        ? item.userFix
+        : item.aiFix
+      : (item.aiFix ?? item.userFix);
     out.push([
-      {
-        t: ` AI ${item.aiFix ? (item.fix?.id === item.aiFix.id ? "●" : "○") : "–"} `,
-        inverse: o.fixTab === "ai",
-      },
-      { t: " " },
-      {
-        t: ` yours ${item.userFix ? (item.fix?.id === item.userFix.id ? "●" : "○") : "–"} `,
-        inverse: o.fixTab === "user",
-      },
+      ...(both
+        ? [
+            {
+              t: ` AI ${item.fix?.id === item.aiFix?.id ? "●" : "○"} `,
+              inverse: o.fixTab === "ai",
+            },
+            { t: " " },
+            {
+              t: ` yours ${item.fix?.id === item.userFix?.id ? "●" : "○"} `,
+              inverse: o.fixTab === "user",
+            },
+            { t: "  tab switches", dim: true },
+          ]
+        : shown
+          ? [{ t: shown.author === "user" ? "yours" : "the fix", bold: true }]
+          : []),
       ...(shown?.evaluation
         ? [{ t: `  ${shown.evaluation}${shown.overridden ? " (used anyway)" : ""}`, dim: true }]
         : []),
@@ -150,7 +162,6 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
             },
           ]
         : []),
-      { t: item.userFix || o.fixTab === "user" ? "  tab switches" : "", dim: true },
     ]);
     if (shown) {
       out.push(...wrapped(shown.summary, w, { dim: true }));
@@ -158,11 +169,10 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
     } else
       out.push([
         {
-          t:
-            o.fixTab === "user"
-              ? "No fix of yours yet. Press . then p to propose one."
-              : "The reviewer proposed no fix.",
-          dim: true,
+          t: o.drafting
+            ? `${o.drafting} writing a fix…`
+            : "No fix yet. Press i and tell the AI what it should be.",
+          ...(o.drafting ? { color: T.orange } : { dim: true }),
         },
       ]);
     if (item.messages.length) {
@@ -196,24 +206,17 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
       state2 === "dismissed"
         ? [["d", "restore"]]
         : state2 === "applied"
-          ? [["enter", o.expanded ? "less" : "details"]]
+          ? []
           : item.fix
             ? [
-                ["a", state2 === "accepted" ? "uncheck" : "agree"],
-                ["i", "tell the AI"],
-                ["x", "apply this"],
-                ["d", "skip"],
-                ["enter", o.expanded ? "less" : "details"],
+                ["space", state2 === "accepted" ? "uncheck" : "check to apply"],
+                ["i", "change the fix"],
               ]
-            : [
-                ["i", "tell the AI the fix"],
-                ["d", "dismiss"],
-                ["enter", o.expanded ? "less" : "details"],
-              ];
+            : [["i", "tell the AI the fix"]];
     // Drop hints from the end until they fit the card.
     const size = (ks: [string, string][]) =>
       ks.reduce((n, [k, l], i) => n + (i ? 2 : 0) + k.length + l.length + 3, 0);
-    while (keys.length > 2 && size(keys) > w) keys.pop();
+    while (keys.length > 1 && size(keys) > w) keys.pop();
     const hint = keys.flatMap(([k, label], i): Seg[] => [
       ...(i ? [{ t: "  ", dim: true }] : []),
       { t: `[${k}]`, bold: true, color: T.cyan },

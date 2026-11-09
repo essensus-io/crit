@@ -189,7 +189,7 @@ const ENTER = "\r";
 const ESC = "\u001B";
 const TAB = "\t";
 
-async function mount(s: ReviewSession, switcher?: Switcher, ready = "of 2 reviewed") {
+async function mount(s: ReviewSession, switcher?: Switcher, ready = "of 2 looked at") {
   await s.load();
   const app = render(<ReviewApp session={s} {...(switcher ? { switcher } : {})} />);
   await until(app.lastFrame, ready);
@@ -212,16 +212,13 @@ describe("review stream", () => {
     expect(f).toMatch(/2 ▎\+\s+if \(amount > order\.capturedAmount\) \{/); // changed line, in the focused range
     expect(f).toMatch(/╭─ ✓ CRIT · correctness ─+╮/);
     expect(f).toContain("Refund amount not validated");
-    expect(f).toContain("why POST /refunds");
-    expect(f).toContain("fix Validate against captured minus refunded");
+    expect(f).toContain("Validate against captured minus refunded");
     expect(f).toContain("[x] Refund amount not validated"); // ticked: you agree with the fix
-    expect(f).toContain("[a] uncheck  [i] tell the AI  [x] apply this");
-    expect(f).toMatch(/╭─ ○ NIT · style · unsure ─+╮/);
-    expect(f).toContain("no fix yet · i tells the AI what it should be");
-    expect(f).toContain("1 of 2 reviewed · 1 accepted");
+    expect(f).toContain("[space] uncheck  [i] change the fix");
+    expect(f).toContain("1 of 2 looked at · 1 accepted");
     expect(f).toContain("+1 filtered");
     expect(f).toContain(
-      "j/k next · a uncheck · i tell the AI · x apply this · d skip · p apply all 1 · q quit · ? help",
+      "j/k next · space uncheck · i change the fix · enter apply 1 checked · q quit · ? help",
     );
     // the code lines come before the card that is about them
     expect(f.indexOf("if (amount > order.capturedAmount)")).toBeLessThan(
@@ -235,15 +232,15 @@ describe("review stream", () => {
     await app.press("j");
     await until(app.lastFrame, "[i] tell the AI the fix");
     expect(app.lastFrame()).toContain("2/2");
-    expect(app.lastFrame()).toContain("a get a fix ·");
+    expect(app.lastFrame()).toContain("i tell the AI the fix");
     await app.press("a");
     await until(app.lastFrame, "No fix yet. What should the fix do?");
     await app.press(ESC);
     await app.press("k", "a");
-    await until(app.lastFrame, "0 of 2 reviewed · 0 accepted");
+    await until(app.lastFrame, "2 of 2 looked at · 0 accepted");
     expect((await store.findings.get(ids["Refund amount not validated"]!))!.selected).toBe(false);
     await app.press("a");
-    await until(app.lastFrame, "1 of 2 reviewed · 1 accepted");
+    await until(app.lastFrame, "2 of 2 looked at · 1 accepted");
     await app.press("j");
     await until(app.lastFrame, "2/2");
     await app.press("g");
@@ -264,11 +261,11 @@ describe("review stream", () => {
     // no blocking screen: the stream stays, and the fix lands without any check round
     const f = await until(app.lastFrame, "Fix ready for “Unused import”");
     expect(f).not.toContain("ACCEPTED");
-    expect(f).toContain("AI ●"); // the card opened on its fix
+    expect(f).toContain("the fix"); // the card opened on its fix
     expect(f).toContain("Fix: Unused import");
-    expect(f).toContain("[a] agree");
+    expect(f).toContain("[space] check to apply");
     await app.press("a");
-    await until(app.lastFrame, "2 of 2 reviewed · 2 accepted");
+    await until(app.lastFrame, "2 of 2 looked at · 2 accepted");
     expect(await store.fixes.active(ids["Unused import"]!)).toMatchObject({ author: "ai" });
     app.unmount();
   });
@@ -318,36 +315,52 @@ describe("review stream", () => {
     await app.press("j", "d");
     await until(app.lastFrame, "Dismiss:");
     await app.press("f");
-    await until(app.lastFrame, "2 of 2 reviewed");
+    await until(app.lastFrame, "2 of 2 looked at");
     expect(app.lastFrame()).toMatch(/╭─ ✗ NIT/);
-    expect(app.lastFrame()).toContain("all triaged: p applies 1");
+    expect(app.lastFrame()).toContain("enter applies 1");
     const repoId = (await store.reviews.get(reviewId))!.repoId;
     expect((await store.suppressions.list(repoId)).map((s) => s.fingerprint)).toEqual([
       "fp-Unused import",
     ]);
     await app.press("d");
-    await until(app.lastFrame, "1 of 2 reviewed");
+    await until(app.lastFrame, "of 2 looked at");
     expect(await store.suppressions.list(repoId)).toEqual([]);
     app.unmount();
   });
 
-  it("enter shows the whole finding in place; tab switches the fix; esc folds it again", async () => {
+  it("the card you are on is open; enter refuses until you have been through every finding, then applies the checked ones", async () => {
     const app = await mount(session());
-    await app.press(ENTER);
     const f = await until(app.lastFrame, "Fails when");
     expect(f).toContain("refund() takes any amount from the request body.");
     expect(f).toContain("POST /refunds {orderId: 17, amount: 5000} on a 2000 capture");
     expect(f).toContain("Rule  R4 Validate money inputs at the boundary");
     expect(f).toContain(".cursor/rules/payments.mdc");
-    expect(f).toContain("AI ●   yours –");
     expect(f).toMatch(/2 - +if \(amount > order\.capturedAmount\) \{/);
     expect(f).toMatch(/2 \+ +if \(amount <= 0/);
-    expect(f).toContain("[enter] less");
-    await app.press(TAB);
-    await until(app.lastFrame, "No fix of yours yet");
-    await app.press(ESC);
-    await until(app.lastFrame, "[a] uncheck");
-    expect(app.lastFrame()).not.toContain("Fails when");
+    expect(f).toContain("[space] uncheck");
+    // one finding has not been looked at: enter says so, moves there, and applies nothing
+    await app.press(ENTER);
+    await until(app.lastFrame, "1 finding not looked at yet");
+    expect(readFileSync(join(repo.root, "src/payments.ts"), "utf8")).not.toContain(
+      "order.refundedAmount",
+    );
+    // now every finding has been seen: enter applies what is checked
+    await app.press(ENTER);
+    await until(app.lastFrame, "Applied 1 · crit undo restores the files");
+    expect(readFileSync(join(repo.root, "src/payments.ts"), "utf8")).toContain(
+      "order.refundedAmount",
+    );
+    app.unmount();
+  });
+
+  it("space checks and unchecks the fix; enter with nothing checked says so", async () => {
+    const app = await mount(session());
+    await app.press(" ");
+    await until(app.lastFrame, "1 of 2 looked at · 0 accepted");
+    await app.press("j", ENTER);
+    expect(await until(app.lastFrame, "Nothing is checked, so nothing to apply")).toContain(
+      "q goes back",
+    );
     app.unmount();
   });
 
@@ -367,7 +380,7 @@ describe("review stream", () => {
     expect(app.lastFrame()).toContain("Invented problem");
     expect(app.lastFrame()).toContain("already handled upstream".slice(0, 0) || "Invented problem");
     await app.press("/", ENTER, ESC);
-    await until(app.lastFrame, "1 of 2 reviewed");
+    await until(app.lastFrame, "of 2 looked at");
     app.unmount();
   });
 
@@ -403,13 +416,13 @@ describe("review stream", () => {
       "Review",
       "Move around",
       "More",
-      "apply every ticked fix",
+      "apply every checked fix",
       "actions:",
       "options:",
     ])
       expect(f).toContain(part);
     await app.press(ESC);
-    await until(app.lastFrame, "1 of 2 reviewed");
+    await until(app.lastFrame, "1 of 2 looked at");
     app.unmount();
   });
 
@@ -461,7 +474,7 @@ describe("actions menu", () => {
     };
     const app = await mount(session({ runs: [] }, editor));
     await app.press(".", "e");
-    await until(app.lastFrame, "your fix Edited fix");
+    await until(app.lastFrame, "Edited fix");
     expect(seen).toContain("order.refundedAmount");
     const active = await store.fixes.active(ids["Refund amount not validated"]!);
     expect(active).toMatchObject({ author: "user", summary: "Edited fix" });
@@ -578,7 +591,12 @@ async function options(
 }
 
 /** A switcher over two profiles, without any agent CLI behind it. */
-function stubSwitcher(): Switcher {
+function stubSwitcher(): Switcher & { log: string[] } {
+  const log: string[] = [];
+  const profiles = [
+    { name: "claude", type: "claude-code", model: "sonnet" as string | null, enabled: true },
+    { name: "codex", type: "codex", model: null as string | null, enabled: true },
+  ];
   let c: Choice = { provider: "claude", model: "sonnet", effort: null, depth: "standard" };
   const listeners = new Set<(x: Choice) => void>();
   const set = (patch: Partial<Choice>) => {
@@ -589,10 +607,26 @@ function stubSwitcher(): Switcher {
   return {
     current: () => c,
     subscribe: (fn) => (listeners.add(fn), () => void listeners.delete(fn)),
-    providers: () => [
-      { name: "claude", type: "claude-code", model: "sonnet", enabled: true },
-      { name: "codex", type: "codex", model: null, enabled: true },
+    log,
+    providers: () => profiles,
+    types: () => [
+      { type: "claude-code", label: "Claude Code", accountVar: "CLAUDE_CONFIG_DIR" },
+      { type: "cursor", label: "Cursor" },
     ],
+    suggestName: (type) => `${type}-2`,
+    add: ({ type, name, account }) => {
+      log.push(`add ${type} ${name} ${account ?? ""}`.trim());
+      profiles.push({ name, type, model: null, enabled: true });
+      return set({ provider: name, model: null, effort: null });
+    },
+    remove: (name) => {
+      log.push(`remove ${name}`);
+      profiles.splice(
+        profiles.findIndex((p) => p.name === name),
+        1,
+      );
+      if (c.provider === name) set({ provider: profiles[0]!.name });
+    },
     setProvider: (name) => set({ provider: name, model: null, effort: null }),
     models: async () => ({
       live: true,
@@ -754,7 +788,7 @@ describe("run progress", () => {
     await sleep();
     expect(stopped).toBe(true);
     app.stdin.write(ENTER);
-    await until(app.lastFrame, "of 2 reviewed");
+    await until(app.lastFrame, "of 2 looked at");
     app.unmount();
   });
 });
@@ -799,6 +833,51 @@ describe("switching model, provider, effort and depth", () => {
     app.unmount();
   });
 
+  it("the provider picker adds a setup (with another account) and removes one after asking", async () => {
+    const sw = stubSwitcher();
+    const app = await mount(session(), sw);
+    await options(app, "p");
+    await until(app.lastFrame, "Add a provider or account");
+    await sleep(100);
+    for (const ch of "add a") app.stdin.write(ch);
+    await sleep();
+    app.stdin.write(ENTER);
+    await until(app.lastFrame, "add a provider");
+    await sleep(100);
+    app.stdin.write(ENTER); // Claude Code
+    await until(app.lastFrame, "Name for this setup");
+    await sleep(80);
+    app.stdin.write(ENTER); // the suggested name
+    await until(app.lastFrame, "CLAUDE_CONFIG_DIR");
+    await sleep(80);
+    for (const ch of "/tmp/work") app.stdin.write(ch);
+    app.stdin.write(ENTER);
+    await until(app.lastFrame, "Added claude-code-2");
+    expect(sw.log).toEqual(["add claude-code claude-code-2 /tmp/work"]);
+    expect(sw.current().provider).toBe("claude-code-2");
+
+    await options(app, "p");
+    await until(app.lastFrame, "Remove a provider");
+    await sleep(100);
+    for (const ch of "remove") app.stdin.write(ch);
+    await sleep();
+    app.stdin.write(ENTER);
+    await until(app.lastFrame, "remove which provider?");
+    await sleep(100);
+    for (const ch of "codex") app.stdin.write(ch);
+    await sleep();
+    app.stdin.write(ENTER);
+    await until(app.lastFrame, "Yes, remove codex");
+    await sleep(100);
+    expect(sw.log).toHaveLength(1); // nothing removed before the answer
+    for (const ch of "Yes") app.stdin.write(ch);
+    await sleep();
+    app.stdin.write(ENTER);
+    await until(app.lastFrame, "Removed codex");
+    expect(sw.log).toEqual(["add claude-code claude-code-2 /tmp/work", "remove codex"]);
+    app.unmount();
+  });
+
   it("P switches provider, E sets an effort the model supports, D sets the depth, esc cancels", async () => {
     const sw = stubSwitcher();
     const app = await mount(session(), sw);
@@ -838,7 +917,7 @@ describe("switching model, provider, effort and depth", () => {
     await until(app.lastFrame, "model · codex"); // the model list loads asynchronously
     await sleep(100);
     await app.press(ESC);
-    await until(app.lastFrame, "of 2 reviewed");
+    await until(app.lastFrame, "of 2 looked at");
     app.unmount();
   });
 
@@ -982,7 +1061,6 @@ describe("full-screen layout", () => {
     ).join(" ");
     await store.findings.update(ids["Refund amount not validated"]!, { explanation: long });
     const app = await mount(session());
-    await app.press(ENTER);
     await until(app.lastFrame, "Sentence number 0");
     expect(app.lastFrame()!.split("\n").length).toBeLessThanOrEqual(30);
     expect(app.lastFrame()).not.toContain("Sentence number 59");
@@ -1101,7 +1179,7 @@ describe("re-run the review", () => {
     await s.load();
     let reran = 0;
     const app = render(<ReviewApp session={s} onRerun={() => reran++} />);
-    const f = await until(app.lastFrame, "of 2 reviewed");
+    const f = await until(app.lastFrame, "of 2 looked at");
     expect(f).toContain("r re-run review");
     await sleep(80);
     app.stdin.write("r");
@@ -1162,7 +1240,7 @@ describe("moving between files", () => {
   // files sort by name: cart.ts, payments.ts (two findings), user.ts
   it("] and [ and tab jump to the next and previous file's first finding", async () => {
     await addFiles();
-    const app = await mount(session(), undefined, "of 4 reviewed");
+    const app = await mount(session(), undefined, "of 4 looked at");
     await until(app.lastFrame, "src/cart.ts  1/4");
     await app.press("]");
     await until(app.lastFrame, "src/payments.ts  2/4");
@@ -1180,7 +1258,7 @@ describe("moving between files", () => {
 
   it("in the files list j/k jump between files at once, and the list follows where you are", async () => {
     await addFiles();
-    const app = await mount(session(), undefined, "of 4 reviewed");
+    const app = await mount(session(), undefined, "of 4 looked at");
     await app.press("h");
     await until(app.lastFrame, "j/k previous / next file");
     await app.press("j");
@@ -1206,7 +1284,7 @@ describe("going through the fixes", () => {
     expect(app.lastFrame()).toContain("[x] Refund amount not validated");
     await app.press("a");
     await until(app.lastFrame, "[ ] Refund amount not validated");
-    expect(app.lastFrame()).toContain("[a] agree");
+    expect(app.lastFrame()).toContain("[space] check to apply");
     await app.press(" ");
     await until(app.lastFrame, "[x] Refund amount not validated");
     app.unmount();
@@ -1273,7 +1351,7 @@ describe("going through the fixes", () => {
     await s.load();
     let went = 0;
     const withBack = render(<ReviewApp session={s} onBack={() => went++} />);
-    await until(withBack.lastFrame, "of 2 reviewed");
+    await until(withBack.lastFrame, "of 2 looked at");
     await sleep(80);
     withBack.stdin.write("q");
     await sleep(150);

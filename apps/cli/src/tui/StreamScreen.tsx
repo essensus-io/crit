@@ -33,7 +33,7 @@ function fitKeys(keys: [string, string][], width: number): [string, string][] {
   const size = (ks: [string, string][]) =>
     ks.reduce((n, [k, l], i) => n + (i ? 3 : 0) + k.length + l.length + 1, 1);
   const out = [...keys];
-  for (const drop of ["enter", "d", "i", "x", "?", "r"])
+  for (const drop of ["?", "r", "i"])
     if (size(out) > width) {
       const at = out.findIndex(([k]) => k === drop);
       if (at >= 0) out.splice(at, 1);
@@ -70,6 +70,8 @@ export function StreamScreen(props: {
   canRerun?: boolean;
   /** q goes back to the start screen (instead of quitting). */
   canGoBack?: boolean;
+  /** Findings the cursor has been on. */
+  seenCount?: number;
 }) {
   const { state, items, width, height } = props;
   const review = state.review;
@@ -131,14 +133,11 @@ export function StreamScreen(props: {
       : fitKeys(
           [
             ["j/k", "next"],
-            ["a", current.fix ? (current.finding.selected ? "uncheck" : "agree") : "get a fix"],
-            ["i", "tell the AI"],
-            ["x", "apply this"],
-            ["d", triage(current) === "dismissed" ? "restore" : "skip"],
-            ["enter", props.expanded.has(current.finding.id) ? "less" : "more"],
-            ...(p.applicable > 0
-              ? ([["p", `apply all ${p.applicable}`]] as [string, string][])
+            ...(current.fix
+              ? ([["space", current.finding.selected ? "uncheck" : "check"]] as [string, string][])
               : []),
+            ["i", current.fix ? "change the fix" : "tell the AI the fix"],
+            ["enter", p.applicable > 0 ? `apply ${p.applicable} checked` : "finish"],
             ...(props.canRerun ? ([["r", "re-run"]] as [string, string][]) : []),
             ["q", props.canGoBack ? "start screen" : "quit"],
             ["?", "help"],
@@ -232,7 +231,7 @@ export function StreamScreen(props: {
       ) : (
         <Text wrap="truncate">
           {" "}
-          <Text color={T.mint}>{`${p.reviewed} of ${p.total} reviewed`}</Text>
+          <Text color={T.mint}>{`${props.seenCount ?? p.reviewed} of ${p.total} looked at`}</Text>
           <Text dimColor> · </Text>
           <Text color={T.orange}>{`${p.accepted} accepted`}</Text>
           {drafting.size ? (
@@ -244,11 +243,11 @@ export function StreamScreen(props: {
             <Text color={T.yellow}>{`  ·  ${state.omitted.length} left out`}</Text>
           ) : null}
           {props.canRerun ? <Text dimColor>{"  ·  r re-run review"}</Text> : null}
-          {p.total > 0 && p.reviewed === p.total ? (
+          {p.total > 0 && (props.seenCount ?? 0) >= p.total ? (
             <Text dimColor>
               {p.applicable > 0
-                ? `  ·  all triaged: p applies ${p.applicable}`
-                : "  ·  all triaged: q to finish"}
+                ? `  ·  enter applies ${p.applicable}`
+                : "  ·  nothing checked: q to finish"}
             </Text>
           ) : null}
         </Text>

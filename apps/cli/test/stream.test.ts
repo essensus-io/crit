@@ -163,13 +163,11 @@ describe("buildStream", () => {
       "It fails when X.",
       "Rule  R1 No X",
       "CLAUDE.md",
-      "AI ●",
+      "the fix",
       "Do the thing",
       "+ added",
-      "[a] agree",
-      "[i] tell the AI",
-      "[x] apply this",
-      "[enter] less",
+      "[space] check to apply",
+      "[i] change the fix",
     ])
       expect(body).toContain(part);
   });

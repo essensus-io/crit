@@ -81,6 +81,9 @@ export class AdapterRegistry {
         .join(", ");
       throw new Error(`crit: no adapter for provider type "${profile.type}" (known: ${known})`);
     }
-    return factory.create(profile, env);
+    return factory.create(
+      profile,
+      profile.env ? { ...env, env: { ...env.env, ...profile.env } } : env,
+    );
   }
 }

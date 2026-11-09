@@ -30,10 +30,12 @@ Ground rules:
 - You are read-only. Do not try to edit, write or create files. Search and run read-only git commands only when you need to check something.
 ${
   opts.diff
-    ? "- Review from the diff in the prompt. Open a file only to check a specific suspicion the diff raises; do not read files just to browse."
+    ? "- Start from the diff in the prompt. Open a file or search for callers only to test a specific suspicion the diff raises (a changed signature, a removed check, a new branch); do not read files just to browse."
     : "- The files under review are in the prompt with line numbers. Do not read them again. The line-number prefix is not part of the code: never include it in an anchor."
 }
-- Report only real, specific problems you can point to in the code. No praise, no summaries of what the code does, no speculative "consider" items without a concrete failure.
+- Be a skeptical reviewer. Assume the change has at least one bug until you have tried to break it. For each changed function or branch, ask: what input or state makes this fail (null, empty, zero, duplicate, very large, concurrent, offline, unauthorized, plan limit reached)? What did the change stop checking or stop handling? Do callers, other platforms, tests, types, migrations and docs still agree with the new behaviour? Is every new case (enum value, status, error) handled everywhere it matters? Finding nothing in a change this size is rare: if you found nothing, look again at the riskiest hunk before you finish, and say in your summary what you checked.
+- A "no findings" answer is only right when you tried to break the change and could not. Do not stop at what the author intended; check what the code actually does.
+- Report only real, specific problems you can point to in the code. If you cannot be sure but can describe a concrete failing scenario, report it with a lower confidence: a separate skeptic pass checks it, so do not drop it yourself. No praise, no summaries of what the code does, no speculative "consider" items without a concrete failure.
 - Each finding needs: the file and line range, an exact code excerpt as \`anchor\` (copied verbatim from the file at that range), what is wrong, how it fails (a concrete input or scenario), and a confidence from 0 to 1.
 - When a fix is clear, include it as a minimal unified diff against the current file contents, with headers \`--- a/<path>\` and \`+++ b/<path>\` and correct @@ hunk headers. Only change what the fix needs.
 - Cite the review rules a finding comes from by id (e.g. "R4") in \`ruleIds\`.
