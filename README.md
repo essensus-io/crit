@@ -6,7 +6,7 @@ small MCP server, and shows them in an interactive full-screen UI where you
 check what to keep, apply the fixes, and undo them. Nothing leaves your machine
 except what your agent CLI already sends.
 
-> Status: pre-release (`0.0.0`, not published). The package name `@crit/cli` and
+> Version: `1.0.0` (internal distribution; not published to npm). The package name `@crit/cli` and
 > the `$schema` URLs in the generated JSON schemas are placeholders until a final
 > name is chosen.
 
