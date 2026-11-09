@@ -72,7 +72,7 @@ function numbered(content: string): string {
   const lines = content.split("\n");
   if (lines.at(-1) === "") lines.pop();
   const w = String(lines.length).length;
-  return lines.map((l, i) => `${String(i + 1).padStart(w)}  ${l}`).join("\n");
+  return lines.map((line, i) => `${String(i + 1).padStart(w)}  ${line}`).join("\n");
 }
 
 export function reviewPrompt(i: ReviewPromptInput): string {
@@ -91,17 +91,17 @@ export function reviewPrompt(i: ReviewPromptInput): string {
         .join("\n")}`,
     );
   }
-  const skills = i.rules.skills.filter((r) => r.layer !== "global");
+  const skills = i.rules.skills.filter((skill) => skill.layer !== "global");
   if (skills.length) {
     parts.push(
       `Skills in this repo (open the file only when relevant):\n${skills
-        .map((r) => `- ${r.id} ${r.title}: ${r.description ?? ""} (${r.path})`)
+        .map((skill) => `- ${skill.id} ${skill.title}: ${skill.description ?? ""} (${skill.path})`)
         .join("\n")}`,
     );
   }
   if (i.rules.conflicts.length) {
     parts.push(
-      `Rule conflicts (the first id wins): ${i.rules.conflicts.map((c) => `${c.winner} over ${c.ruleIds.filter((x) => x !== c.winner).join(", ")}`).join("; ")}`,
+      `Rule conflicts (the first id wins): ${i.rules.conflicts.map((ruleConflict) => `${ruleConflict.winner} over ${ruleConflict.ruleIds.filter((ruleId) => ruleId !== ruleConflict.winner).join(", ")}`).join("; ")}`,
     );
   }
   if (i.repoSummary) parts.push(`Repository overview:\n${i.repoSummary}`);
@@ -110,14 +110,14 @@ export function reviewPrompt(i: ReviewPromptInput): string {
     `Review scope: ${i.scope.label}${i.scope.baseRef ? ` (base ${i.scope.baseRef})` : ""}.`,
   );
   parts.push(
-    `Lenses for this run:\n${i.lenses.map((l) => `- ${l}: ${LENS_INSTRUCTIONS[l]}`).join("\n")}\nReport issues in these areas only.`,
+    `Lenses for this run:\n${i.lenses.map((lens) => `- ${lens}: ${LENS_INSTRUCTIONS[lens]}`).join("\n")}\nReport issues in these areas only.`,
   );
-  const files = i.scope.files.filter((f) => inShard.has(f.path));
-  const fileLines = files.map((f) => {
-    const hunks = f.hunks?.length
-      ? ` lines ${f.hunks.map((h) => (h.lines <= 1 ? `${h.start}` : `${h.start}-${h.start + h.lines - 1}`)).join(", ")}`
+  const files = i.scope.files.filter((file) => inShard.has(file.path));
+  const fileLines = files.map((file) => {
+    const hunks = file.hunks?.length
+      ? ` lines ${file.hunks.map((hunk) => (hunk.lines <= 1 ? `${hunk.start}` : `${hunk.start}-${hunk.start + hunk.lines - 1}`)).join(", ")}`
       : "";
-    return `- ${f.path} (${f.status})${hunks}`;
+    return `- ${file.path} (${file.status})${hunks}`;
   });
   parts.push(
     `Files you may report findings on (${files.length}):\n${fileLines.join("\n")}\n` +
@@ -128,15 +128,17 @@ export function reviewPrompt(i: ReviewPromptInput): string {
 
   if (isDiff) {
     const budget = i.diffBudgetChars ?? 120_000;
-    const sections = parseUnifiedDiff(i.scope.diff!).filter((f) => inShard.has(diffPath(f)));
+    const sections = parseUnifiedDiff(i.scope.diff!).filter((parsedFile) =>
+      inShard.has(diffPath(parsedFile)),
+    );
     let used = 0;
     const kept: string[] = [];
     const omitted: string[] = [];
-    for (const s of sections) {
-      if (used + s.text.length > budget) omitted.push(diffPath(s));
+    for (const parsedFile of sections) {
+      if (used + parsedFile.text.length > budget) omitted.push(diffPath(parsedFile));
       else {
-        kept.push(s.text);
-        used += s.text.length;
+        kept.push(parsedFile.text);
+        used += parsedFile.text.length;
       }
     }
     parts.push(`The diff under review:\n\n${kept.join("")}`);
@@ -146,7 +148,7 @@ export function reviewPrompt(i: ReviewPromptInput): string {
       );
   } else if (i.contents) {
     const blocks = files
-      .filter((f) => i.contents!.has(f.path))
+      .filter((file) => i.contents!.has(file.path))
       .map((f) => `### ${f.path}\n\`\`\`\n${numbered(i.contents!.get(f.path)!)}\n\`\`\``);
     if (blocks.length) parts.push(`The files under review:\n\n${blocks.join("\n\n")}`);
   }

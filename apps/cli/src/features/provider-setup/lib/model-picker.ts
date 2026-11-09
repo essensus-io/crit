@@ -15,20 +15,24 @@ export async function loadModels(
   if (!factory.listModels) return listModels(factory, { command, env: ctx.env });
   const s = ctx.prompter.spinner();
   s.start(`Loading ${factory.label} models`);
-  const r = await listModels(factory, { command, env: ctx.env });
+  const result = await listModels(factory, { command, env: ctx.env });
   s.stop(
-    r.live
-      ? `${r.models.length} ${factory.label} models`
+    result.live
+      ? `${result.models.length} ${factory.label} models`
       : `Using a built-in ${factory.label} model list (the CLI did not list its own)`,
   );
-  return r;
+  return result;
 }
 
-const toOption = (m: ModelInfo): Option<string> => ({
-  value: m.id,
-  label: m.label,
-  ...(m.id !== m.label || m.hint
-    ? { hint: [m.id !== m.label ? m.id : "", m.hint ?? ""].filter(Boolean).join(" · ") }
+const toOption = (modelInfo: ModelInfo): Option<string> => ({
+  value: modelInfo.id,
+  label: modelInfo.label,
+  ...(modelInfo.id !== modelInfo.label || modelInfo.hint
+    ? {
+        hint: [modelInfo.id !== modelInfo.label ? modelInfo.id : "", modelInfo.hint ?? ""]
+          .filter(Boolean)
+          .join(" · "),
+      }
     : {}),
 });
 
@@ -59,7 +63,7 @@ export async function askModel(
   opts: { label: string; command: string; current: string | null; models?: ModelInfo[] },
 ): Promise<{ model: string | null; info?: ModelInfo; models: ModelInfo[] }> {
   const models = opts.models ?? (await loadModels(ctx, factory, opts.command)).models;
-  const known = models.some((m) => m.id === opts.current);
+  const known = models.some((modelInfo) => modelInfo.id === opts.current);
   const options: Option<string>[] = [
     {
       value: CLI_DEFAULT,
@@ -75,7 +79,7 @@ export async function askModel(
   const chosen = await pick(ctx, `Model for ${opts.label}`, options, opts.current ?? CLI_DEFAULT);
   if (chosen === CLI_DEFAULT) return { model: null, models };
   const model = chosen === CUSTOM ? await customName(ctx, opts.current) : chosen;
-  const info = models.find((m) => m.id === model);
+  const info = models.find((modelInfo) => modelInfo.id === model);
   return { model, ...(info ? { info } : {}), models };
 }
 
@@ -93,7 +97,7 @@ export async function askEffort(
       label: "CLI default",
       ...(opts.info?.defaultEffort ? { hint: opts.info.defaultEffort } : {}),
     },
-    ...efforts.map((e) => ({ value: e, label: e })),
+    ...efforts.map((effort) => ({ value: effort, label: effort })),
   ];
   const chosen = await ctx.prompter.select({
     message: `Reasoning effort for ${opts.label}`,
@@ -109,7 +113,7 @@ export async function askFastModel(
 ): Promise<string | null> {
   const options: Option<string>[] = [
     { value: SAME, label: "Same as the main model" },
-    ...(opts.current && !opts.models.some((m) => m.id === opts.current)
+    ...(opts.current && !opts.models.some((modelInfo) => modelInfo.id === opts.current)
       ? [{ value: opts.current, label: opts.current, hint: "current" }]
       : []),
     ...opts.models.map(toOption),

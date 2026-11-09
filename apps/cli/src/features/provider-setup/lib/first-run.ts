@@ -7,10 +7,10 @@ import { profilePrompts } from "./profile-prompts.ts";
 import { testAndReport } from "./test-and-report.ts";
 
 export async function firstRun(ctx: CliContext, continuing: string): Promise<ProvidersFile> {
-  const p = ctx.prompter;
-  p.intro("crit · first run: let's add a provider");
+  const prompter = ctx.prompter;
+  prompter.intro("crit · first run: let's add a provider");
   const detected = await detectInstalled(ctx.registry, ctx.env);
-  p.note(
+  prompter.note(
     detected
       .map((d) =>
         d.path
@@ -26,7 +26,7 @@ export async function firstRun(ctx: CliContext, continuing: string): Promise<Pro
       hint: `Install one of: ${detected.map((d) => `${d.factory.label} (${d.factory.defaultCommand})`).join(", ")}, then run crit again.`,
     });
   }
-  const types = await p.multiselect({
+  const types = await prompter.multiselect({
     message: "Which providers do you want to add?",
     options: detected.map((d) => ({
       value: d.factory.type,
@@ -52,16 +52,16 @@ export async function firstRun(ctx: CliContext, continuing: string): Promise<Pro
     file = addProfile(file, { name, type, command, model, effort, fastModel });
   }
   if (file.providers.length > 1) {
-    const def = await p.select({
+    const def = await prompter.select({
       message: "Default provider",
-      options: file.providers.map((x) => ({ value: x.name, label: x.name })),
+      options: file.providers.map((provider) => ({ value: provider.name, label: provider.name })),
       initialValue: file.default!,
     });
     file = setDefault(file, def);
   }
   await testAndReport(ctx, file.providers);
   saveProviders(ctx.paths, file);
-  p.outro(
+  prompter.outro(
     `Saved ${file.providers.length} provider${file.providers.length === 1 ? "" : "s"} to ${providersPath(ctx.paths)} · continuing: ${continuing}`,
   );
   return file;

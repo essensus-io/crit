@@ -35,7 +35,7 @@ const Flow = ({ active, tick }: FlowProps) => {
   return (
     <Box width={5} height={4} alignItems="center" paddingTop={1}>
       <Text color={active ? T.orange : T.gray}>
-        {cells.map((c, i) => (i === dot ? "•" : c)).join("")}
+        {cells.map((cell, i) => (i === dot ? "•" : cell)).join("")}
       </Text>
     </Box>
   );
@@ -80,14 +80,14 @@ export const ProgressView = ({
   const running = !progress.done;
   const tick = useTick(300, running);
   const rows = [...progress.shards.values()];
-  const doneCount = rows.filter((r) =>
-    ["done", "cached", "failed", "cancelled"].includes(r.status),
+  const doneCount = rows.filter((row) =>
+    ["done", "cached", "failed", "cancelled"].includes(row.status),
   ).length;
   const phase = progress.done
     ? "done"
     : progress.verifying
       ? "verify"
-      : rows.some((r) => r.status === "running")
+      : rows.some((row) => row.status === "running")
         ? "review"
         : "plan";
   const showFlow = height >= 22;
@@ -114,11 +114,13 @@ export const ProgressView = ({
 
   const flowW = Math.floor((width - 3 * 5) / 4);
   const t = progress.tokens;
-  const log: ReactNode[] = progress.log.map((l, i) => (
-    <Text key={`${i}-${l.at}`} wrap="truncate">
-      <Text dimColor>{clock(l.at)} </Text>
-      <Text color={l.tone === "dim" ? T.gray : T[l.tone]}>{truncate(l.tag, 18).padEnd(18)} </Text>
-      <Text {...(l.tone === "dim" ? { dimColor: true } : {})}>{l.text}</Text>
+  const log: ReactNode[] = progress.log.map((logEntry, i) => (
+    <Text key={`${i}-${logEntry.at}`} wrap="truncate">
+      <Text dimColor>{clock(logEntry.at)} </Text>
+      <Text color={logEntry.tone === "dim" ? T.gray : T[logEntry.tone]}>
+        {truncate(logEntry.tag, 18).padEnd(18)}{" "}
+      </Text>
+      <Text {...(logEntry.tone === "dim" ? { dimColor: true } : {})}>{logEntry.text}</Text>
     </Text>
   ));
   const elapsed = progress.startedAt ? mmss(Date.now() - progress.startedAt) : "0m00s";

@@ -98,13 +98,13 @@ export function parseLenses(v: string | undefined): Lens[] | undefined {
 }
 
 export function parseTokens(v: string): number {
-  const m = /^(\d+(?:\.\d+)?)\s*([km]?)$/i.exec(v.trim());
-  if (!m)
+  const match = /^(\d+(?:\.\d+)?)\s*([km]?)$/i.exec(v.trim());
+  if (!match)
     throw new CliError(`crit: cannot read "${v}" as a token count (try 500k or 2M)`, {
       exitCode: EXIT.usage,
     });
   const n = Math.round(
-    Number(m[1]) * { "": 1, k: 1_000, m: 1_000_000 }[m[2]!.toLowerCase() as "" | "k" | "m"],
+    Number(match[1]) * { "": 1, k: 1_000, m: 1_000_000 }[match[2]!.toLowerCase() as "" | "k" | "m"],
   );
   if (n < 1)
     throw new CliError("crit: the token budget must be positive", { exitCode: EXIT.usage });

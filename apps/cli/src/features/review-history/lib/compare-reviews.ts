@@ -7,9 +7,9 @@ export async function compareReviews(
   b: Review,
 ): Promise<Comparison & { older: Review; newer: Review }> {
   const [older, newer] = a.startedAt <= b.startedAt ? [a, b] : [b, a];
-  const c = compareFindings(
+  const comparison = compareFindings(
     await store.findings.listByReview(older.id),
     await store.findings.listByReview(newer.id),
   );
-  return { ...c, older, newer };
+  return { ...comparison, older, newer };
 }

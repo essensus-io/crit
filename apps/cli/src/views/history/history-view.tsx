@@ -72,9 +72,9 @@ export const HistoryView = ({ initial, actions, now, width: widthProp }: Props) 
 
   if (session) return <ReviewView session={session} onExit={() => setSession(undefined)} />;
 
-  const cols = (r: HistoryRow, i: number) => (
-    <Text key={r.review.id} {...(i === cursor ? { inverse: true } : {})}>
-      {`${i === cursor ? "›" : " "} ${shortId(r.review.id).padEnd(6)} ${when(r.review.startedAt, now).padEnd(17)} ${truncate(r.review.scopeLabel, 28).padEnd(28)} ${r.review.provider.padEnd(10)} ${severitySummary(r).padEnd(17)} ${tokensLabel(r).padEnd(8)} ${outcomeOf(r)}`}
+  const cols = (historyRow: HistoryRow, i: number) => (
+    <Text key={historyRow.review.id} {...(i === cursor ? { inverse: true } : {})}>
+      {`${i === cursor ? "›" : " "} ${shortId(historyRow.review.id).padEnd(6)} ${when(historyRow.review.startedAt, now).padEnd(17)} ${truncate(historyRow.review.scopeLabel, 28).padEnd(28)} ${historyRow.review.provider.padEnd(10)} ${severitySummary(historyRow).padEnd(17)} ${tokensLabel(historyRow).padEnd(8)} ${outcomeOf(historyRow)}`}
     </Text>
   );
   return (
@@ -124,7 +124,7 @@ export const HistoryView = ({ initial, actions, now, width: widthProp }: Props) 
           onPick={() => {
             setMode("none");
             void actions.remove(row).then(() => {
-              setRows((rs) => rs.filter((r) => r.review.id !== row.review.id));
+              setRows((rs) => rs.filter((historyRow) => historyRow.review.id !== row.review.id));
               setCursor((c) => Math.max(0, c - 1));
               setMessage(`Deleted review ${shortId(row.review.id)}`);
             });
@@ -147,10 +147,10 @@ export const HistoryView = ({ initial, actions, now, width: widthProp }: Props) 
 
 export const previousOf = (row: HistoryRow, rows: HistoryRow[]): HistoryRow | undefined => {
   return rows.find(
-    (r) =>
-      r.review.startedAt < row.review.startedAt &&
-      r.review.scopeLabel === row.review.scopeLabel &&
-      r.review.branch === row.review.branch &&
-      r.review.repoId === row.review.repoId,
+    (historyRow) =>
+      historyRow.review.startedAt < row.review.startedAt &&
+      historyRow.review.scopeLabel === row.review.scopeLabel &&
+      historyRow.review.branch === row.review.branch &&
+      historyRow.review.repoId === row.review.repoId,
   );
 };

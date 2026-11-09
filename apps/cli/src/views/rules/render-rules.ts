@@ -27,14 +27,21 @@ export function renderRules(set: RuleSet, c: ReturnType<typeof colors>, all: boo
   if (set.skills.length) {
     out.push("", c.bold(`Skills and agents (${set.skills.length}, listed by name for the agent)`));
     out.push(
-      table(set.skills.map((r) => [r.id, r.title, c.dim(r.description ?? ""), c.dim(r.path)])),
+      table(
+        set.skills.map((skill) => [
+          skill.id,
+          skill.title,
+          c.dim(skill.description ?? ""),
+          c.dim(skill.path),
+        ]),
+      ),
     );
   }
   if (set.conflicts.length) {
     out.push("", c.yellow(c.bold(`Conflicts (${set.conflicts.length})`)));
-    for (const k of set.conflicts)
+    for (const ruleConflict of set.conflicts)
       out.push(
-        `  "${k.topic}": ${k.winner} wins over ${k.ruleIds.filter((x) => x !== k.winner).join(", ")} (user > project > global)`,
+        `  "${ruleConflict.topic}": ${ruleConflict.winner} wins over ${ruleConflict.ruleIds.filter((ruleId) => ruleId !== ruleConflict.winner).join(", ")} (user > project > global)`,
       );
   }
   if (set.filtered.length) {
@@ -48,7 +55,7 @@ export function renderRules(set: RuleSet, c: ReturnType<typeof colors>, all: boo
   }
   if (set.errors.length) {
     out.push("", c.red(c.bold("Errors")));
-    for (const e of set.errors) out.push(c.red(`  ${e}`));
+    for (const error of set.errors) out.push(c.red(`  ${error}`));
   }
   return `${out.join("\n")}\n`;
 }

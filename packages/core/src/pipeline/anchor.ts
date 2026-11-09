@@ -46,8 +46,10 @@ export function locateAnchor(
     }
   }
   if (candidates.length === 0) return undefined;
-  return candidates.reduce((best, c) =>
-    Math.abs(c.range.start - target) < Math.abs(best.range.start - target) ? c : best,
+  return candidates.reduce((best, anchorMatch) =>
+    Math.abs(anchorMatch.range.start - target) < Math.abs(best.range.start - target)
+      ? anchorMatch
+      : best,
   );
 }
 

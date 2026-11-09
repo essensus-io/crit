@@ -168,10 +168,11 @@ export const HomeView = (props: Props) => {
         title="compare this branch against"
         width={width}
         height={height}
-        items={props.bases.map((b, i) => ({
+        items={props.bases.map((bas, i) => ({
           key: String(i + 1),
-          label: b.ref + (b.ref === base ? "  (current)" : ""),
-          hint: b.ahead === 0 ? "already merged: nothing to review" : `${b.ahead} commits ahead`,
+          label: bas.ref + (bas.ref === base ? "  (current)" : ""),
+          hint:
+            bas.ahead === 0 ? "already merged: nothing to review" : `${bas.ahead} commits ahead`,
         }))}
         onCancel={() => setMode("none")}
         onPick={(k) => {
@@ -228,11 +229,15 @@ export const HomeView = (props: Props) => {
           width={leftW}
           height={panelH}
         >
-          {options.map((o, i) => (
-            <Text key={o.id} wrap="truncate" {...(i === sel ? { inverse: focus === "scope" } : {})}>
+          {options.map((option, i) => (
+            <Text
+              key={option.id}
+              wrap="truncate"
+              {...(i === sel ? { inverse: focus === "scope" } : {})}
+            >
               <Text color={i === sel ? T.orange : T.gray}>{i === sel ? "●" : "○"}</Text>
-              {` ${o.label}`}
-              {o.id === "paths" && paths ? <Text color={T.cyan}>{`  ${paths}`}</Text> : null}
+              {` ${option.label}`}
+              {option.id === "paths" && paths ? <Text color={T.cyan}>{`  ${paths}`}</Text> : null}
             </Text>
           ))}
           <Text> </Text>
@@ -288,19 +293,19 @@ export const HomeView = (props: Props) => {
           height={panelH}
         >
           {props.recent.length === 0 ? <Text dimColor>None yet in this repository.</Text> : null}
-          {props.recent.slice(0, Math.floor((panelH - 3) / 2)).map((r, i) => (
-            <Box key={r.id} flexDirection="column">
+          {props.recent.slice(0, Math.floor((panelH - 3) / 2)).map((recentReview, i) => (
+            <Box key={recentReview.id} flexDirection="column">
               <Text
                 wrap="truncate"
                 {...(focus === "recent" && i === recentAt ? { inverse: true } : {})}
               >
-                <Text color={T.cyan}>{r.id.slice(-4)}</Text>
-                {` ${truncate(r.label, Math.max(8, rightW - 10))}`}
+                <Text color={T.cyan}>{recentReview.id.slice(-4)}</Text>
+                {` ${truncate(recentReview.label, Math.max(8, rightW - 10))}`}
               </Text>
               <Text
                 dimColor
                 wrap="truncate"
-              >{`     ${r.when} · ${r.findings} · ${r.outcome}`}</Text>
+              >{`     ${recentReview.when} · ${recentReview.findings} · ${recentReview.outcome}`}</Text>
             </Box>
           ))}
         </Panel>
@@ -313,7 +318,7 @@ export const HomeView = (props: Props) => {
           onSubmit={(v) => {
             setPaths(v.trim());
             setMode("none");
-            setSel(options.findIndex((o) => o.id === "paths"));
+            setSel(options.findIndex((option) => option.id === "paths"));
           }}
         />
       ) : notice ? (

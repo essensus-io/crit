@@ -35,11 +35,14 @@ export function groupKey(root: string, path: string): string {
 export function fileTokens(scope: ResolvedScope): Map<string, number> {
   const diffChars = new Map<string, number>();
   if (scope.diff !== undefined)
-    for (const f of parseUnifiedDiff(scope.diff)) diffChars.set(diffPath(f), f.text.length);
+    for (const parsedFile of parseUnifiedDiff(scope.diff))
+      diffChars.set(diffPath(parsedFile), parsedFile.text.length);
   return new Map(
-    scope.files.map((f) => [
-      f.path,
-      estimateTokensOf(scope.diff !== undefined ? (diffChars.get(f.path) ?? f.size) : f.size),
+    scope.files.map((file) => [
+      file.path,
+      estimateTokensOf(
+        scope.diff !== undefined ? (diffChars.get(file.path) ?? file.size) : file.size,
+      ),
     ]),
   );
 }
@@ -47,17 +50,17 @@ export function fileTokens(scope: ResolvedScope): Map<string, number> {
 export function planShards(scope: ResolvedScope, shardTokens: number): PlannedShard[] {
   const tokens = fileTokens(scope);
   const files = scope.files
-    .filter((f) => f.status !== "deleted")
+    .filter((file) => file.status !== "deleted")
     .map((f) => f.path)
     .sort();
   if (files.length === 0) return [];
-  const total = files.reduce((n, f) => n + (tokens.get(f) ?? 0), 0);
+  const total = files.reduce((file, f) => file + (tokens.get(f) ?? 0), 0);
   if (total <= shardTokens) return [{ label: scope.label, files, estimatedTokens: total }];
 
   const groups = new Map<string, string[]>();
-  for (const f of files) {
-    const k = groupKey(scope.root, f);
-    groups.set(k, [...(groups.get(k) ?? []), f]);
+  for (const file of files) {
+    const k = groupKey(scope.root, file);
+    groups.set(k, [...(groups.get(k) ?? []), file]);
   }
 
   type Piece = PlannedShard & { split: boolean };
@@ -75,26 +78,26 @@ export function planShards(scope: ResolvedScope, shardTokens: number): PlannedSh
       size += t;
     }
     const sum = (fs: string[]) => fs.reduce((n, f) => n + (tokens.get(f) ?? 0), 0);
-    chunks.forEach((c, i) =>
+    chunks.forEach((chunk, i) =>
       pieces.push({
         label: chunks.length > 1 ? `${key} (${i + 1}/${chunks.length})` : key,
-        files: c,
-        estimatedTokens: sum(c),
+        files: chunk,
+        estimatedTokens: sum(chunk),
         split: chunks.length > 1,
       }),
     );
   }
 
   const shards: Piece[] = [];
-  for (const p of pieces) {
-    const fit = p.split
+  for (const piece of pieces) {
+    const fit = piece.split
       ? undefined
-      : shards.find((s) => !s.split && s.estimatedTokens + p.estimatedTokens <= shardTokens);
+      : shards.find((s) => !s.split && s.estimatedTokens + piece.estimatedTokens <= shardTokens);
     if (fit) {
-      fit.label = `${fit.label}, ${p.label}`;
-      fit.files.push(...p.files);
-      fit.estimatedTokens += p.estimatedTokens;
-    } else shards.push({ ...p, files: [...p.files] });
+      fit.label = `${fit.label}, ${piece.label}`;
+      fit.files.push(...piece.files);
+      fit.estimatedTokens += piece.estimatedTokens;
+    } else shards.push({ ...piece, files: [...piece.files] });
   }
   return shards.map(({ split: _s, ...rest }) => rest);
 }
@@ -107,7 +110,7 @@ export type DepthProfile = {
 
 export function depthProfile(config: { lenses: Lens[]; depth: Depth }): DepthProfile {
   if (config.depth === "quick") {
-    const core = config.lenses.filter((l) => l === "correctness" || l === "security");
+    const core = config.lenses.filter((lens) => lens === "correctness" || lens === "security");
     return {
       lenses: core.length ? core : ["correctness", "security"],
       split: false,
@@ -126,9 +129,9 @@ export function lensGroups(
 ): Lens[][] {
   if (!split || estimatedTokens < shardTokens / 2 || lenses.length <= 2) return [lenses];
   const first: Lens[] = lenses.filter(
-    (l) => l === "correctness" || l === "security" || l === "test",
+    (lens) => lens === "correctness" || lens === "security" || lens === "test",
   );
-  const second = lenses.filter((l) => !first.includes(l));
+  const second = lenses.filter((lens) => !first.includes(lens));
   return [first, second].filter((g) => g.length > 0);
 }
 
@@ -139,9 +142,9 @@ export function planRuns(
   config: { shardTokens: number; lenses: Lens[]; depth: Depth },
 ): PlannedRun[] {
   const profile = depthProfile(config);
-  return planShards(scope, config.shardTokens).flatMap((p) =>
-    lensGroups(profile.lenses, config.shardTokens, p.estimatedTokens, profile.split).map(
-      (lenses) => ({ ...p, lenses }),
+  return planShards(scope, config.shardTokens).flatMap((plannedShard) =>
+    lensGroups(profile.lenses, config.shardTokens, plannedShard.estimatedTokens, profile.split).map(
+      (lenses) => ({ ...plannedShard, lenses }),
     ),
   );
 }

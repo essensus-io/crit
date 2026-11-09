@@ -72,15 +72,17 @@ export async function verifyInWorktree(
   try {
     const local = await gitRaw(root, ["diff", "--binary", "HEAD"]);
     if (local.stdout.trim()) {
-      const r = await gitRaw(wt, ["apply", "--whitespace=nowarn", "-"], local.stdout);
-      if (r.exitCode !== 0)
+      const gitResult = await gitRaw(wt, ["apply", "--whitespace=nowarn", "-"], local.stdout);
+      if (gitResult.exitCode !== 0)
         throw new FixError(
-          `could not copy your uncommitted changes into the verify worktree: ${r.stderr.trim()}`,
+          `could not copy your uncommitted changes into the verify worktree: ${gitResult.stderr.trim()}`,
         );
     }
-    const r = await gitApplyPatch(wt, patch);
-    if (r.exitCode !== 0)
-      throw new FixError(`the fix does not apply in the verify worktree: ${r.stderr.trim()}`);
+    const gitResult = await gitApplyPatch(wt, patch);
+    if (gitResult.exitCode !== 0)
+      throw new FixError(
+        `the fix does not apply in the verify worktree: ${gitResult.stderr.trim()}`,
+      );
     return await runVerify(commands, wt);
   } finally {
     await gitRaw(root, ["worktree", "remove", "--force", wt]);
@@ -260,10 +262,10 @@ async function evaluate(
   }
   if (!parsed.ok)
     throw new FixError(`the evaluator gave no usable verdict: ${out.errors[0] ?? parsed.error}`);
-  const r = parsed.data;
-  if (r.verdict === "concerns" && !r.question)
-    r.question = "Can you say more about the case your fix is meant to handle?";
-  return r;
+  const result = parsed.data;
+  if (result.verdict === "concerns" && !result.question)
+    result.question = "Can you say more about the case your fix is meant to handle?";
+  return result;
 }
 
 export async function proposeFix(

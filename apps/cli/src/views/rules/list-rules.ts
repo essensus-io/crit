@@ -28,7 +28,7 @@ export async function listRules(
   }).catch(() => undefined);
   const set = await loadRules({
     files,
-    scopeFiles: scope?.files.map((f) => f.path) ?? [],
+    scopeFiles: scope?.files.map((file) => file.path) ?? [],
     sources: config.rules.sources,
     exclude: config.rules.exclude,
     budgetTokens: config.rules.budgetTokens,

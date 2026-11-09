@@ -85,9 +85,9 @@ export async function applyCommand(
       `${c.red("✗")} ${s.finding.file}:${s.finding.range.start}  ${s.finding.title} · ${s.reason}\n`,
     );
   if (result.verify) {
-    for (const v of result.verify.commands)
+    for (const command of result.verify.commands)
       ctx.out(
-        `  ${v.exitCode === 0 ? c.green("✓") : c.red("✗")} ${v.command} ${c.dim(duration(v.durationMs))}\n`,
+        `  ${command.exitCode === 0 ? c.green("✓") : c.red("✗")} ${command.command} ${c.dim(duration(command.durationMs))}\n`,
       );
     if (!result.verify.passed)
       ctx.out(

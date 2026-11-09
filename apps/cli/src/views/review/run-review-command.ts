@@ -73,7 +73,8 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
     ...(args.provider ? { name: args.provider } : {}),
     ...(config.provider ? { preferred: config.provider } : {}),
   });
-  for (const w of resolved.warnings) ctx.err(colors(ctx.color).yellow(`warning: ${w}\n`));
+  for (const warning of resolved.warnings)
+    ctx.err(colors(ctx.color).yellow(`warning: ${warning}\n`));
   const profile = {
     ...resolved.profile,
     ...(args.model !== undefined ? { model: args.model === "default" ? null : args.model } : {}),
@@ -85,8 +86,11 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
   let skeptic: typeof reviewer | null = reviewer;
   if (args.verify === false) skeptic = null;
   else if (providers.roles.skeptic) {
-    const s = resolveProvider(providers, { role: "skeptic" });
-    skeptic = { profile: s.profile, adapter: adapterFor(ctx, s.profile) };
+    const resolvedProvider = resolveProvider(providers, { role: "skeptic" });
+    skeptic = {
+      profile: resolvedProvider.profile,
+      adapter: adapterFor(ctx, resolvedProvider.profile),
+    };
   }
 
   const store = ctx.openStore();
@@ -216,7 +220,8 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
     if (failOn) {
       const limit = SEVERITY_ORDER.indexOf(failOn as Severity);
       const hit = result.findings.some(
-        (f) => f.verdict !== "rejected" && SEVERITY_ORDER.indexOf(f.severity) <= limit,
+        (finding) =>
+          finding.verdict !== "rejected" && SEVERITY_ORDER.indexOf(finding.severity) <= limit,
       );
       if (hit) return EXIT.findings;
     }

@@ -3,27 +3,37 @@ import type { FindingView, SessionState } from "@/features/review-session/model/
 import { type ListFilter } from "./parse-query.ts";
 import { isFiltered, triage } from "./triage.ts";
 
-export function visibleItems(state: SessionState, f: ListFilter): FindingView[] {
-  const q = f.search?.toLowerCase();
+export function visibleItems(state: SessionState, listFilter: ListFilter): FindingView[] {
+  const q = listFilter.search?.toLowerCase();
   return state.items
-    .filter((v) => (f.tab === "filtered" ? isFiltered(v) : !isFiltered(v)))
-    .filter(
-      (v) =>
-        !f.severity ||
-        SEVERITY_ORDER.indexOf(v.finding.severity) <= SEVERITY_ORDER.indexOf(f.severity),
+    .filter((findingView) =>
+      listFilter.tab === "filtered" ? isFiltered(findingView) : !isFiltered(findingView),
     )
-    .filter((v) => !f.lens || v.finding.category === f.lens)
-    .filter((v) => !f.hasFix || Boolean(v.fix))
-    .filter((v) => !f.pending || triage(v) === "pending")
-    .filter((v) => !f.file || v.finding.file.toLowerCase().includes(f.file.toLowerCase()))
     .filter(
-      (v) =>
-        !q || v.finding.title.toLowerCase().includes(q) || v.finding.file.toLowerCase().includes(q),
+      (findingView) =>
+        !listFilter.severity ||
+        SEVERITY_ORDER.indexOf(findingView.finding.severity) <=
+          SEVERITY_ORDER.indexOf(listFilter.severity),
+    )
+    .filter((findingView) => !listFilter.lens || findingView.finding.category === listFilter.lens)
+    .filter((findingView) => !listFilter.hasFix || Boolean(findingView.fix))
+    .filter((findingView) => !listFilter.pending || triage(findingView) === "pending")
+    .filter(
+      (findingView) =>
+        !listFilter.file ||
+        findingView.finding.file.toLowerCase().includes(listFilter.file.toLowerCase()),
+    )
+    .filter(
+      (findingView) =>
+        !q ||
+        findingView.finding.title.toLowerCase().includes(q) ||
+        findingView.finding.file.toLowerCase().includes(q),
     )
     .sort(
-      (a, b) =>
-        a.finding.file.localeCompare(b.finding.file) ||
-        a.finding.range.start - b.finding.range.start ||
-        SEVERITY_ORDER.indexOf(a.finding.severity) - SEVERITY_ORDER.indexOf(b.finding.severity),
+      (findingView, b) =>
+        findingView.finding.file.localeCompare(b.finding.file) ||
+        findingView.finding.range.start - b.finding.range.start ||
+        SEVERITY_ORDER.indexOf(findingView.finding.severity) -
+          SEVERITY_ORDER.indexOf(b.finding.severity),
     );
 }

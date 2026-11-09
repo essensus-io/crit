@@ -40,7 +40,7 @@ export const createFixesRepository = (db: Db): Repositories["fixes"] => {
         .where(eq(t.findings.reviewId, reviewId))
         .orderBy(asc(t.fixes.id))
         .all();
-      return rows.map((r) => fixFromRow(r.fix));
+      return rows.map((row) => fixFromRow(row.fix));
     },
     async active(findingId) {
       const row = await db

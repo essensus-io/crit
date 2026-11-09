@@ -32,21 +32,24 @@ export async function runHome(
   const pick = await homeTui(ctx, config, {
     info: { repo: basename(root), branch, base },
     bases: await candidateBases(root),
-    recent: history.map((r) => ({
-      id: r.review.id,
-      label: r.review.scopeLabel,
-      when: when(r.review.startedAt, now),
+    recent: history.map((historyRow) => ({
+      id: historyRow.review.id,
+      label: historyRow.review.scopeLabel,
+      when: when(historyRow.review.startedAt, now),
       findings: plural(
-        r.severity.critical + r.severity.major + r.severity.minor + r.severity.nit,
+        historyRow.severity.critical +
+          historyRow.severity.major +
+          historyRow.severity.minor +
+          historyRow.severity.nit,
         "finding",
       ),
       outcome:
-        r.review.status === "superseded"
+        historyRow.review.status === "superseded"
           ? "superseded"
-          : r.review.status === "partial"
+          : historyRow.review.status === "partial"
             ? "partial"
-            : r.outcome.applied
-              ? `${r.outcome.applied} applied`
+            : historyRow.outcome.applied
+              ? `${historyRow.outcome.applied} applied`
               : "open",
     })),
     initialSpec: home.spec,

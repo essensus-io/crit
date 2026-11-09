@@ -45,7 +45,7 @@ export function openDatabase(path: string = ":memory:"): Connection {
       raw.exec("BEGIN IMMEDIATE");
       try {
         const results = queries.map(
-          (q) => exec(raw, q.sql, q.params, q.method) as { rows: unknown[][] },
+          (query) => exec(raw, query.sql, query.params, query.method) as { rows: unknown[][] },
         );
         raw.exec("COMMIT");
         return results;
@@ -73,7 +73,7 @@ export function migrate(raw: DatabaseSync): string[] {
     if (applied.has(m.tag)) continue;
     raw.exec("BEGIN IMMEDIATE");
     try {
-      for (const s of m.statements) raw.exec(s);
+      for (const statement of m.statements) raw.exec(statement);
       raw
         .prepare("INSERT INTO crit_migrations (tag, applied_at) VALUES (?, ?)")
         .run(m.tag, Date.now());

@@ -78,7 +78,7 @@ export const ReviewView = ({ session, onExit, switcher, onConnect, onRerun, onBa
   useEffect(() => {
     for (const id of wanted.current) {
       if (state.drafting.includes(id)) continue;
-      const it = state.items.find((v) => v.finding.id === id);
+      const it = state.items.find((findingView) => findingView.finding.id === id);
       if (!it) continue;
       if (!it.fix) continue;
       wanted.current.delete(id);

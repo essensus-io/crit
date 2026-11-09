@@ -35,7 +35,7 @@ export async function historyCommand(
   if (args.json) {
     ctx.out(
       `${JSON.stringify(
-        rows.map((r) => ({ ...r, outcomeLabel: outcomeOf(r) })),
+        rows.map((historyRow) => ({ ...historyRow, outcomeLabel: outcomeOf(historyRow) })),
         null,
         2,
       )}\n`,

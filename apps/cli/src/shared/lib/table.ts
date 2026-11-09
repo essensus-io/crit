@@ -6,14 +6,14 @@ const pad = (s: string, w: number) => s + " ".repeat(Math.max(0, w - visibleLeng
 
 export function table(rows: string[][], indent = "  "): string {
   const widths: number[] = [];
-  for (const r of rows)
-    r.forEach((cell, i) => (widths[i] = Math.max(widths[i] ?? 0, visibleLength(cell))));
+  for (const row of rows)
+    row.forEach((cell, i) => (widths[i] = Math.max(widths[i] ?? 0, visibleLength(cell))));
   return rows
     .map(
-      (r) =>
+      (row) =>
         indent +
-        r
-          .map((cell, i) => (i === r.length - 1 ? cell : pad(cell, widths[i]!)))
+        row
+          .map((cell, i) => (i === row.length - 1 ? cell : pad(cell, widths[i]!)))
           .join("  ")
           .trimEnd(),
     )

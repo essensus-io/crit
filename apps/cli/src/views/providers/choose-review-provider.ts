@@ -10,7 +10,7 @@ export async function chooseReviewProvider(ctx: CliContext): Promise<string> {
       "Retry review with a provider (starts a new review; previous findings stay in history)",
     options: [
       ...file.providers
-        .filter((p) => p.enabled)
+        .filter((provider) => provider.enabled)
         .map((p) => ({
           value: p.name,
           label: `${p.name} (${p.type}, ${p.model ?? "CLI default"})`,
@@ -20,7 +20,9 @@ export async function chooseReviewProvider(ctx: CliContext): Promise<string> {
   });
   if (choice !== "__add__") return choice;
   await addProvider(ctx, {});
-  const added = load(ctx).providers.find((p) => !file.providers.some((old) => old.name === p.name));
+  const added = load(ctx).providers.find(
+    (provider) => !file.providers.some((old) => old.name === provider.name),
+  );
   if (!added) throw new CliError("crit: no new provider was added");
   return added.name;
 }

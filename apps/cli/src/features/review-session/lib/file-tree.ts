@@ -5,12 +5,12 @@ import { isFiltered } from "./triage.ts";
 export type TreeRow = { key: string; label: string; count: number; file?: string };
 
 export function fileTree(state: SessionState): TreeRow[] {
-  const shown = state.items.filter((v) => !isFiltered(v));
+  const shown = state.items.filter((findingView) => !isFiltered(findingView));
   const byDir = new Map<string, Map<string, number>>();
-  for (const v of shown) {
-    const d = dirname(v.finding.file);
+  for (const findingView of shown) {
+    const d = dirname(findingView.finding.file);
     const files = byDir.get(d) ?? new Map<string, number>();
-    files.set(v.finding.file, (files.get(v.finding.file) ?? 0) + 1);
+    files.set(findingView.finding.file, (files.get(findingView.finding.file) ?? 0) + 1);
     byDir.set(d, files);
   }
   const rows: TreeRow[] = [];

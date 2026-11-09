@@ -88,10 +88,10 @@ export function parseUnifiedDiff(diff: string): ParsedFile[] {
     }
     if (line.startsWith("diff --git ")) {
       begin(i);
-      const m = /^diff --git (?:"?a\/(.+?)"?) (?:"?b\/(.+?)"?)$/.exec(line);
-      if (m) {
-        cur!.oldPath = m[1]!;
-        cur!.newPath = m[2]!;
+      const match = /^diff --git (?:"?a\/(.+?)"?) (?:"?b\/(.+?)"?)$/.exec(line);
+      if (match) {
+        cur!.oldPath = match[1]!;
+        cur!.newPath = match[2]!;
       }
       continue;
     }
@@ -115,13 +115,13 @@ export function parseUnifiedDiff(diff: string): ParsedFile[] {
       cur.status = "renamed";
     } else if (line.startsWith("Binary files ") || line === "GIT binary patch") cur.binary = true;
     else {
-      const m = HUNK_RE.exec(line);
-      if (m) {
+      const match = HUNK_RE.exec(line);
+      if (match) {
         hunk = {
-          oldStart: Number(m[1]),
-          oldLines: m[2] === undefined ? 1 : Number(m[2]),
-          newStart: Number(m[3]),
-          newLines: m[4] === undefined ? 1 : Number(m[4]),
+          oldStart: Number(match[1]),
+          oldLines: match[2] === undefined ? 1 : Number(match[2]),
+          newStart: Number(match[3]),
+          newLines: match[4] === undefined ? 1 : Number(match[4]),
           header: line,
           body: [],
         };
@@ -132,24 +132,28 @@ export function parseUnifiedDiff(diff: string): ParsedFile[] {
     }
   }
   finish(lines.length);
-  for (const f of files) {
-    if (f.status === "added") f.oldPath = null;
-    if (f.status === "deleted") f.newPath = null;
+  for (const parsedFile of files) {
+    if (parsedFile.status === "added") parsedFile.oldPath = null;
+    if (parsedFile.status === "deleted") parsedFile.newPath = null;
   }
   return files;
 }
 
-export const diffPath = (f: ParsedFile): string => (f.newPath ?? f.oldPath)!;
+export const diffPath = (parsedFile: ParsedFile): string =>
+  (parsedFile.newPath ?? parsedFile.oldPath)!;
 
-export function hunksOf(f: ParsedFile): Hunk[] {
-  return f.hunks.map((h) => ({ start: h.newStart, lines: h.newLines }));
+export function hunksOf(parsedFile: ParsedFile): Hunk[] {
+  return parsedFile.hunks.map((parsedHunk) => ({
+    start: parsedHunk.newStart,
+    lines: parsedHunk.newLines,
+  }));
 }
 
-export function addedLines(f: ParsedFile): Set<number> {
+export function addedLines(parsedFile: ParsedFile): Set<number> {
   const out = new Set<number>();
-  for (const h of f.hunks) {
-    let n = h.newStart;
-    for (const l of h.body) {
+  for (const parsedHunk of parsedFile.hunks) {
+    let n = parsedHunk.newStart;
+    for (const l of parsedHunk.body) {
       if (l.startsWith("+")) out.add(n++);
       else if (l.startsWith(" ") || l === "") n++;
     }

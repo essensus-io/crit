@@ -28,7 +28,10 @@ export async function editProvider(
     ...(roles ? { roles } : {}),
     ...(args.test !== undefined ? { test: args.test } : {}),
   });
-  if (next.default === name && !next.providers.find((p) => p.name === name)!.enabled) {
+  if (
+    next.default === name &&
+    !next.providers.find((provider) => provider.name === name)!.enabled
+  ) {
     throw new CliError(
       `crit: ${name} is the default provider; choose another default before disabling it`,
     );

@@ -72,7 +72,7 @@ export const buildClaudeInvocation = (
         : ["Read", "Grep", "Glob", "Bash"];
   args.push("--tools", tools.join(","));
   const allowed = [
-    ...tools.filter((t) => t !== "Bash"),
+    ...tools.filter((tool) => tool !== "Bash"),
     ...(access === "shell" ? bashRules : []),
     ...(task.mcp ? ["mcp__crit"] : []),
   ];

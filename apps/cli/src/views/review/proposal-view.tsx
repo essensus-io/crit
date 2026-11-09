@@ -74,9 +74,9 @@ export const ProposalView = (props: Props) => {
         {verify ? (
           <Text>
             {"   verify: "}
-            {verify.commands.map((c) => (
-              <Text key={c.command} color={c.exitCode === 0 ? T.mint : T.red}>
-                {`${c.command.split(" ").slice(-1)[0]} ${c.exitCode === 0 ? "✓" : "✗"} `}
+            {verify.commands.map((command) => (
+              <Text key={command.command} color={command.exitCode === 0 ? T.mint : T.red}>
+                {`${command.command.split(" ").slice(-1)[0]} ${command.exitCode === 0 ? "✓" : "✗"} `}
               </Text>
             ))}
           </Text>

@@ -27,13 +27,13 @@ const toArray = (v: string | string[] | undefined): string[] => {
   return arr.map((s) => s.trim()).filter(Boolean);
 };
 
-function headingText(h: Heading): string {
+function headingText(heading: Heading): string {
   const parts: string[] = [];
   const walk = (n: { value?: string; children?: unknown[] }) => {
     if (typeof n.value === "string") parts.push(n.value);
     for (const c of n.children ?? []) walk(c as typeof n);
   };
-  walk(h as never);
+  walk(heading as never);
   return parts.join("").trim();
 }
 
@@ -41,14 +41,16 @@ type Section = { title: string | undefined; body: string };
 
 export function splitSections(markdown: string): Section[] {
   const tree: Root = fromMarkdown(markdown);
-  const headings = tree.children.filter((n): n is Heading => n.type === "heading");
+  const headings = tree.children.filter(
+    (rootContent): rootContent is Heading => rootContent.type === "heading",
+  );
   const counts = new Map<number, number>();
-  for (const h of headings) counts.set(h.depth, (counts.get(h.depth) ?? 0) + 1);
+  for (const heading of headings) counts.set(heading.depth, (counts.get(heading.depth) ?? 0) + 1);
   const depths = [...counts.keys()].sort((a, b) => a - b);
   const depth = depths.find((d) => (counts.get(d) ?? 0) > 1) ?? depths[0];
   if (depth === undefined) return [{ title: undefined, body: markdown.trim() }];
 
-  const splits = headings.filter((h) => h.depth === depth);
+  const splits = headings.filter((heading) => heading.depth === depth);
   const sections: Section[] = [];
   const firstOffset = splits[0]!.position!.start.offset!;
   const preamble = markdown.slice(0, firstOffset).trim();
@@ -59,11 +61,11 @@ export function splitSections(markdown: string): Section[] {
     const end = splits[i + 1]?.position!.start.offset ?? markdown.length;
     sections.push({ title: headingText(h), body: markdown.slice(start, end).trim() });
   }
-  return sections.filter((s) => s.body.length > 0);
+  return sections.filter((section) => section.body.length > 0);
 }
 
 function base(file: RuleFile, title: string, body: string, section?: string): ParsedRule {
-  const r: ParsedRule = {
+  const parsedRule: ParsedRule = {
     key: section ? `${file.path}#${section}` : file.path,
     title,
     body,
@@ -72,8 +74,8 @@ function base(file: RuleFile, title: string, body: string, section?: string): Pa
     path: file.path,
     hash: hashText(`${title}\n${body}`),
   };
-  if (section) r.section = section;
-  return r;
+  if (section) parsedRule.section = section;
+  return parsedRule;
 }
 
 function scopeDirOf(file: RuleFile): string {
@@ -89,11 +91,11 @@ function parseMarkdownDoc(file: RuleFile): ParsedRule[] {
   const content = file.content.trim();
   if (!content) return [];
   const sections = splitSections(content);
-  return sections.map((s) => {
-    const title = s.title ?? (sections.length > 1 ? `${name} (intro)` : name);
-    const r = base(file, title, s.body, s.title);
-    r.scopeDir = scopeDir;
-    return r;
+  return sections.map((section) => {
+    const title = section.title ?? (sections.length > 1 ? `${name} (intro)` : name);
+    const parsedRule = base(file, title, section.body, section.title);
+    parsedRule.scopeDir = scopeDir;
+    return parsedRule;
   });
 }
 
@@ -101,38 +103,40 @@ function parseCursorRule(file: RuleFile): ParsedRule[] {
   const { data, content } = matter(file.content);
   const description = typeof data.description === "string" ? data.description.trim() : "";
   const title = description || basename(file.path, ".mdc");
-  const r = base(file, title, content.trim());
-  r.globs = toArray(data.globs as string | string[] | undefined);
-  r.alwaysApply = data.alwaysApply === true;
-  if (description) r.description = description;
-  return content.trim() ? [r] : [];
+  const parsedRule = base(file, title, content.trim());
+  parsedRule.globs = toArray(data.globs as string | string[] | undefined);
+  parsedRule.alwaysApply = data.alwaysApply === true;
+  if (description) parsedRule.description = description;
+  return content.trim() ? [parsedRule] : [];
 }
 
 function parseSkill(file: RuleFile): ParsedRule[] {
   const { data, content } = matter(file.content);
   const fallback = basename(file.kind === "skill" ? dirname(file.path) : file.path, ".md");
   const name = typeof data.name === "string" && data.name.trim() ? data.name.trim() : fallback;
-  const r = base(file, name, content.trim());
-  if (typeof data.description === "string") r.description = data.description.trim();
-  return [r];
+  const parsedRule = base(file, name, content.trim());
+  if (typeof data.description === "string") parsedRule.description = data.description.trim();
+  return [parsedRule];
 }
 
 function parseCritRule(file: RuleFile): ParsedRule[] {
   const { data, content } = matter(file.content);
-  const fm = CritRuleFrontmatter.safeParse(data);
-  if (!fm.success) {
-    const issues = fm.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+  const zodSafeParseResult = CritRuleFrontmatter.safeParse(data);
+  if (!zodSafeParseResult.success) {
+    const issues = zodSafeParseResult.error.issues
+      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .join("; ");
     throw new RuleParseError(file.path, `invalid frontmatter (${issues})`);
   }
-  const f = fm.data;
+  const f = zodSafeParseResult.data;
   const title = f.title ?? f.id ?? basename(file.path, ".md");
-  const r = base(file, title, content.trim());
-  if (f.id) r.key = `${file.path}#${f.id}`;
-  r.globs = toArray(f.globs);
-  if (f.lens) r.lens = f.lens;
-  if (f.severity) r.severity = f.severity;
-  if (f.alwaysApply) r.alwaysApply = true;
-  return [r];
+  const parsedRule = base(file, title, content.trim());
+  if (f.id) parsedRule.key = `${file.path}#${f.id}`;
+  parsedRule.globs = toArray(f.globs);
+  if (f.lens) parsedRule.lens = f.lens;
+  if (f.severity) parsedRule.severity = f.severity;
+  if (f.alwaysApply) parsedRule.alwaysApply = true;
+  return [parsedRule];
 }
 
 export class RuleParseError extends Error {

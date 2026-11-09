@@ -8,7 +8,7 @@ import { wrapText } from "@/shared/lib/text.ts";
 export type Seg = { t: string; color?: string; dim?: boolean; bold?: boolean; inverse?: boolean };
 export type Line = Seg[];
 
-export const lineLen = (l: Line) => l.reduce((n, s) => n + s.t.length, 0);
+export const lineLen = (line: Line) => line.reduce((n, seg) => n + seg.t.length, 0);
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, Math.max(0, n - 1))}…` : s);
 
 export const STATE_GLYPH = {
@@ -35,9 +35,9 @@ function wrapped(text: string, w: number, style: Omit<Seg, "t"> = {}, indent = "
 export function patchLines(patch: string, w: number): Line[] {
   const rows: { n: number; sign: string; text: string; path: string | undefined }[] = [];
   for (const file of parseUnifiedDiff(patch)) {
-    for (const h of file.hunks) {
-      let n = h.newStart;
-      for (const l of h.body) {
+    for (const parsedHunk of file.hunks) {
+      let n = parsedHunk.newStart;
+      for (const l of parsedHunk.body) {
         const sign = l[0] ?? " ";
         if (sign === "\\") continue;
         rows.push({
@@ -50,24 +50,24 @@ export function patchLines(patch: string, w: number): Line[] {
       }
     }
   }
-  const nw = Math.max(3, ...rows.map((r) => String(r.n).length));
-  return rows.map((r) => {
-    const mark = r.sign === "+" || r.sign === "-" ? r.sign : " ";
-    const gutter = `${String(r.n).padStart(nw)} ${mark} `;
+  const nw = Math.max(3, ...rows.map((row) => String(row.n).length));
+  return rows.map((row) => {
+    const mark = row.sign === "+" || row.sign === "-" ? row.sign : " ";
+    const gutter = `${String(row.n).padStart(nw)} ${mark} `;
     const room = Math.max(8, w - gutter.length);
     const head: Seg =
-      r.sign === "+"
+      row.sign === "+"
         ? { t: gutter, color: T.mint }
-        : r.sign === "-"
+        : row.sign === "-"
           ? { t: gutter, color: T.red }
           : { t: gutter, dim: true };
     const body: Seg[] =
-      r.sign === "-"
-        ? [{ t: clip(r.text, room), color: T.red }]
-        : clipToks(highlightLine(r.path, r.text), room).map((k) => ({
-            t: k.t,
-            ...(k.color ? { color: k.color } : {}),
-            ...(r.sign === " " ? { dim: true } : {}),
+      row.sign === "-"
+        ? [{ t: clip(row.text, room), color: T.red }]
+        : clipToks(highlightLine(row.path, row.text), room).map((tok) => ({
+            t: tok.t,
+            ...(tok.color ? { color: tok.color } : {}),
+            ...(row.sign === " " ? { dim: true } : {}),
           }));
     return [head, ...body];
   });
@@ -82,19 +82,19 @@ function titleLine(item: FindingView, w: number): Line {
   ];
 }
 
-export function cardBody(item: FindingView, state: SessionState, o: CardOptions): Line[] {
+export function cardBody(item: FindingView, state: SessionState, cardOptions: CardOptions): Line[] {
   const f = item.finding;
-  const w = Math.max(16, o.width - 4);
+  const w = Math.max(16, cardOptions.width - 4);
   const out: Line[] = [];
   const fixSummary = item.fix?.summary;
 
-  if (!o.expanded) {
+  if (!cardOptions.expanded) {
     out.push(titleLine(item, w));
     const why = (f.failureScenario ?? f.explanation).replace(/\s+/g, " ").trim();
     out.push([{ t: "why ", dim: true }, { t: clip(why, w - 4) }]);
     out.push(
-      o.drafting
-        ? [{ t: `${o.drafting} writing a fix…`, color: T.orange }]
+      cardOptions.drafting
+        ? [{ t: `${cardOptions.drafting} writing a fix…`, color: T.orange }]
         : fixSummary
           ? [
               { t: item.fix?.author === "user" ? "your fix " : "fix ", dim: true },
@@ -110,11 +110,14 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
       out.push(...wrapped(f.failureScenario, w));
     }
     for (const id of f.ruleIds) {
-      const r = state.rules.get(id);
-      out.push([{ t: "Rule  ", dim: true }, { t: clip(`${id} ${r?.title ?? ""}`, w - 6) }]);
-      if (r?.path)
+      const result = state.rules.get(id);
+      out.push([{ t: "Rule  ", dim: true }, { t: clip(`${id} ${result?.title ?? ""}`, w - 6) }]);
+      if (result?.path)
         out.push([
-          { t: clip(`      ${r.path}${r.section ? ` §${r.section}` : ""}`, w), dim: true },
+          {
+            t: clip(`      ${result.path}${result.section ? ` §${result.section}` : ""}`, w),
+            dim: true,
+          },
         ]);
     }
     if (f.verdictReason)
@@ -122,7 +125,7 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
     out.push([{ t: `── fix ${"─".repeat(Math.max(0, w - 7))}`, color: T.lav }]);
     const both = Boolean(item.aiFix && item.userFix);
     const shown = both
-      ? o.fixTab === "user"
+      ? cardOptions.fixTab === "user"
         ? item.userFix
         : item.aiFix
       : (item.aiFix ?? item.userFix);
@@ -131,12 +134,12 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
         ? [
             {
               t: ` AI ${item.fix?.id === item.aiFix?.id ? "●" : "○"} `,
-              inverse: o.fixTab === "ai",
+              inverse: cardOptions.fixTab === "ai",
             },
             { t: " " },
             {
               t: ` yours ${item.fix?.id === item.userFix?.id ? "●" : "○"} `,
-              inverse: o.fixTab === "user",
+              inverse: cardOptions.fixTab === "user",
             },
             { t: "  tab switches", dim: true },
           ]
@@ -161,10 +164,10 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
     } else
       out.push([
         {
-          t: o.drafting
-            ? `${o.drafting} writing a fix…`
+          t: cardOptions.drafting
+            ? `${cardOptions.drafting} writing a fix…`
             : "No fix yet. Press i and tell the AI what it should be.",
-          ...(o.drafting ? { color: T.orange } : { dim: true }),
+          ...(cardOptions.drafting ? { color: T.orange } : { dim: true }),
         },
       ]);
     if (item.messages.length) {
@@ -174,15 +177,15 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
           color: T.lav,
         },
       ]);
-      for (const m of item.messages) {
-        const body = m.body.replace(/^\[(evaluation|override)\] /, "");
+      for (const message of item.messages) {
+        const body = message.body.replace(/^\[(evaluation|override)\] /, "");
         wrapText(body, w - 4).forEach((l, i) =>
           out.push([
             i === 0
               ? {
-                  t: m.role === "ai" ? "AI  " : "you ",
+                  t: message.role === "ai" ? "AI  " : "you ",
                   bold: true,
-                  color: m.role === "ai" ? T.lav : T.cyan,
+                  color: message.role === "ai" ? T.lav : T.cyan,
                 }
               : { t: "    " },
             { t: l },
@@ -192,7 +195,7 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
     }
   }
 
-  if (o.focused) {
+  if (cardOptions.focused) {
     const state2 = triage(item);
     const keys: [string, string][] =
       state2 === "dismissed"
@@ -213,18 +216,18 @@ export function cardBody(item: FindingView, state: SessionState, o: CardOptions)
       { t: `[${k}]`, bold: true, color: T.cyan },
       { t: ` ${label}`, dim: true },
     ]);
-    if (o.expanded) out.splice(1, 0, hint);
+    if (cardOptions.expanded) out.splice(1, 0, hint);
     else out.push(hint);
   }
   return out;
 }
 
-export function boxCard(item: FindingView, state: SessionState, o: CardOptions): Line[] {
+export function boxCard(item: FindingView, state: SessionState, cardOptions: CardOptions): Line[] {
   const f = item.finding;
   const tri = triage(item);
   const g = STATE_GLYPH[tri];
-  const border = o.focused ? T.orange : tri === "dismissed" ? T.gray : T.lav;
-  const w = o.width;
+  const border = cardOptions.focused ? T.orange : tri === "dismissed" ? T.gray : T.lav;
+  const w = cardOptions.width;
   const tag =
     f.verdict === "plausible" ? " · unsure" : item.fix?.author === "user" ? " · your fix" : "";
   const head: Line = [
@@ -237,9 +240,9 @@ export function boxCard(item: FindingView, state: SessionState, o: CardOptions):
   const used = lineLen(head);
   head.push({ t: "─".repeat(Math.max(0, w - used - 1)), color: border }, { t: "╮", color: border });
   const rows: Line[] = [head];
-  for (const l of cardBody(item, state, o)) {
-    const pad = Math.max(0, w - 4 - lineLen(l));
-    rows.push([{ t: "│ ", color: border }, ...l, { t: `${" ".repeat(pad)} │`, color: border }]);
+  for (const line of cardBody(item, state, cardOptions)) {
+    const pad = Math.max(0, w - 4 - lineLen(line));
+    rows.push([{ t: "│ ", color: border }, ...line, { t: `${" ".repeat(pad)} │`, color: border }]);
   }
   rows.push([{ t: `╰${"─".repeat(Math.max(0, w - 2))}╯`, color: border }]);
   void SEV_LABEL;

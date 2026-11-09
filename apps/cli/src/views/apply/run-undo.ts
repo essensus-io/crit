@@ -11,13 +11,15 @@ export async function undoCommand(ctx: CliContext, args: { force?: boolean }): P
   const store = ctx.openStore();
   const repo = await store.repos.getByRoot(root);
   if (!repo) throw new CliError("crit: nothing to undo in this repository");
-  const ids = (await listHistory(store.db, { repoId: repo.id, limit: 50 })).map((r) => r.review.id);
+  const ids = (await listHistory(store.db, { repoId: repo.id, limit: 50 })).map(
+    (historyRow) => historyRow.review.id,
+  );
   try {
-    const r = await undoApply({ store, reviewIds: ids, root, force: Boolean(args.force) });
-    if (r.branchDeleted) ctx.out(`Deleted branch ${r.branchDeleted}\n`);
+    const undoResult = await undoApply({ store, reviewIds: ids, root, force: Boolean(args.force) });
+    if (undoResult.branchDeleted) ctx.out(`Deleted branch ${undoResult.branchDeleted}\n`);
     else
       ctx.out(
-        `Restored ${plural(r.restored.length, "file")}${r.removed.length ? `, removed ${plural(r.removed.length, "new file")}` : ""} (review ${shortId(r.reviewId)})\n`,
+        `Restored ${plural(undoResult.restored.length, "file")}${undoResult.removed.length ? `, removed ${plural(undoResult.removed.length, "new file")}` : ""} (review ${shortId(undoResult.reviewId)})\n`,
       );
     return EXIT.ok;
   } catch (err) {

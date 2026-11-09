@@ -62,7 +62,7 @@ export async function startSessionHost(opts: {
         socket.end();
         return;
       }
-      const reply = (r: Response) => socket.write(`${JSON.stringify(r)}\n`);
+      const reply = (response: Response) => socket.write(`${JSON.stringify(response)}\n`);
       if (req.token !== token) return reply({ id: req.id, error: "invalid session token" });
       if (!METHODS.has(req.method))
         return reply({ id: req.id, error: `unknown method ${req.method}` });
@@ -87,7 +87,7 @@ export async function startSessionHost(opts: {
     sessionId,
     socketPath,
     close: async () => {
-      for (const s of sockets) s.destroy();
+      for (const socket of sockets) socket.destroy();
       await new Promise<void>((r) => server.close(() => r()));
       rmSync(sessionFilePath(opts.dir, sessionId), { force: true });
       if (process.platform !== "win32") rmSync(socketPath, { force: true });

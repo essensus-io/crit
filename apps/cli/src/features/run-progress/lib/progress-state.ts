@@ -51,161 +51,185 @@ export const emptyProgress = (): ProgressState => ({
   warnings: [],
 });
 
-export function reduceProgress(p: ProgressState, e: ReviewEvent, now = Date.now()): ProgressState {
-  const shards = new Map(p.shards);
+export function reduceProgress(
+  progressState: ProgressState,
+  reviewEvent: ReviewEvent,
+  now = Date.now(),
+): ProgressState {
+  const shards = new Map(progressState.shards);
   const log = (tag: string, text: string, tone: LogEntry["tone"] = "dim"): LogEntry[] =>
-    [...p.log, { at: now, tag, text, tone }].slice(-MAX_LOG);
-  const name = (id: string) => p.shards.get(id)?.shard.label ?? id;
-  switch (e.type) {
+    [...progressState.log, { at: now, tag, text, tone }].slice(-MAX_LOG);
+  const name = (id: string) => progressState.shards.get(id)?.shard.label ?? id;
+  switch (reviewEvent.type) {
     case "review-started":
       return {
-        ...p,
-        startedAt: p.startedAt ?? now,
-        header: `${e.scope.label} · ${e.provider}${e.model ? ` (${e.model})` : ""}`,
-        provider: e.provider,
-        model: e.model,
+        ...progressState,
+        startedAt: progressState.startedAt ?? now,
+        header: `${reviewEvent.scope.label} · ${reviewEvent.provider}${reviewEvent.model ? ` (${reviewEvent.model})` : ""}`,
+        provider: reviewEvent.provider,
+        model: reviewEvent.model,
         scope: {
-          label: e.scope.label,
-          files: e.scope.files.length,
-          skipped: e.scope.skipped.length,
+          label: reviewEvent.scope.label,
+          files: reviewEvent.scope.files.length,
+          skipped: reviewEvent.scope.skipped.length,
         },
         log: log(
           "scope",
-          `${e.scope.label}: ${e.scope.files.length} files, ${e.scope.skipped.length} skipped`,
+          `${reviewEvent.scope.label}: ${reviewEvent.scope.files.length} files, ${reviewEvent.scope.skipped.length} skipped`,
           "lav",
         ),
       };
     case "rules":
       return {
-        ...p,
+        ...progressState,
         rules: {
-          attached: e.attached.map((r) => (r.section ? `${r.path} §${r.section}` : r.path)),
-          listed: e.listed.length,
-          conflicts: e.conflicts.length,
+          attached: reviewEvent.attached.map((r) =>
+            r.section ? `${r.path} §${r.section}` : r.path,
+          ),
+          listed: reviewEvent.listed.length,
+          conflicts: reviewEvent.conflicts.length,
         },
         log: log(
           "rules",
-          `${e.attached.length} attached, ${e.listed.length} listed only${e.conflicts.length ? `, ${e.conflicts.length} conflict(s)` : ""}`,
+          `${reviewEvent.attached.length} attached, ${reviewEvent.listed.length} listed only${reviewEvent.conflicts.length ? `, ${reviewEvent.conflicts.length} conflict(s)` : ""}`,
           "lav",
         ),
       };
     case "cache":
       return {
-        ...p,
-        cache: { files: e.files, findings: e.findings },
-        log: log("cache", `${e.files} files unchanged, ${e.findings} findings reused`, "mint"),
+        ...progressState,
+        cache: { files: reviewEvent.files, findings: reviewEvent.findings },
+        log: log(
+          "cache",
+          `${reviewEvent.files} files unchanged, ${reviewEvent.findings} findings reused`,
+          "mint",
+        ),
       };
     case "plan":
-      for (const s of e.shards) shards.set(s.id, { shard: s, status: "queued", findings: 0 });
+      for (const shard of reviewEvent.shards)
+        shards.set(shard.id, { shard: shard, status: "queued", findings: 0 });
       return {
-        ...p,
+        ...progressState,
         shards,
-        header: `${p.header ?? ""} · ${e.shards.length} shard${e.shards.length === 1 ? "" : "s"}`,
+        header: `${progressState.header ?? ""} · ${reviewEvent.shards.length} shard${reviewEvent.shards.length === 1 ? "" : "s"}`,
         log: log(
           "plan",
-          `${e.shards.length} run${e.shards.length === 1 ? "" : "s"}, est. ${Math.round(e.estimateMs / 60_000) || "<1"} min`,
+          `${reviewEvent.shards.length} run${reviewEvent.shards.length === 1 ? "" : "s"}, est. ${Math.round(reviewEvent.estimateMs / 60_000) || "<1"} min`,
           "lav",
         ),
       };
     case "shard-started": {
-      const s = shards.get(e.shardId);
-      if (s) shards.set(e.shardId, { ...s, status: "running" });
-      return { ...p, shards, log: log(name(e.shardId), "started", "orange") };
+      const s = shards.get(reviewEvent.shardId);
+      if (s) shards.set(reviewEvent.shardId, { ...s, status: "running" });
+      return { ...progressState, shards, log: log(name(reviewEvent.shardId), "started", "orange") };
     }
     case "shard-progress": {
-      const s = shards.get(e.shardId);
-      if (s) shards.set(e.shardId, { ...s, text: e.text });
-      const last = p.log.at(-1);
-      return last?.tag === name(e.shardId) && last.text === e.text
-        ? { ...p, shards }
-        : { ...p, shards, log: log(name(e.shardId), e.text) };
+      const s = shards.get(reviewEvent.shardId);
+      if (s) shards.set(reviewEvent.shardId, { ...s, text: reviewEvent.text });
+      const last = progressState.log.at(-1);
+      return last?.tag === name(reviewEvent.shardId) && last.text === reviewEvent.text
+        ? { ...progressState, shards }
+        : { ...progressState, shards, log: log(name(reviewEvent.shardId), reviewEvent.text) };
     }
     case "finding": {
-      const f = e.finding;
+      const f = reviewEvent.finding;
       const s = f.shardId ? shards.get(f.shardId) : undefined;
       if (s && f.shardId) shards.set(f.shardId, { ...s, findings: s.findings + 1 });
       return {
-        ...p,
+        ...progressState,
         shards,
-        findings: p.findings + 1,
+        findings: progressState.findings + 1,
         log: log("FIND", `${SEV_LABEL[f.severity]} ${f.file}:${f.range.start}  ${f.title}`, "dim"),
       };
     }
     case "shard-done": {
-      const s = shards.get(e.shard.id);
+      const s = shards.get(reviewEvent.shard.id);
       if (s)
-        shards.set(e.shard.id, {
+        shards.set(reviewEvent.shard.id, {
           ...s,
-          status: e.shard.status,
-          ...(e.shard.durationMs ? { durationMs: e.shard.durationMs } : {}),
-          ...(e.shard.error ? { text: e.shard.error } : {}),
+          status: reviewEvent.shard.status,
+          ...(reviewEvent.shard.durationMs ? { durationMs: reviewEvent.shard.durationMs } : {}),
+          ...(reviewEvent.shard.error ? { text: reviewEvent.shard.error } : {}),
         });
       return {
-        ...p,
+        ...progressState,
         shards,
         log: log(
-          e.shard.label,
-          e.shard.status === "failed"
-            ? `failed: ${e.shard.error ?? ""}`
-            : e.shard.status === "cancelled"
+          reviewEvent.shard.label,
+          reviewEvent.shard.status === "failed"
+            ? `failed: ${reviewEvent.shard.error ?? ""}`
+            : reviewEvent.shard.status === "cancelled"
               ? "stopped"
               : `done, ${s?.findings ?? 0} findings`,
-          e.shard.status === "failed" ? "red" : "mint",
+          reviewEvent.shard.status === "failed" ? "red" : "mint",
         ),
       };
     }
     case "usage":
-      return { ...p, tokens: { spent: e.spent, budget: e.budget } };
+      return { ...progressState, tokens: { spent: reviewEvent.spent, budget: reviewEvent.budget } };
     case "verify-started":
       return {
-        ...p,
-        verifying: e.count,
-        log: log("skeptic", `checking ${e.count} findings`, "lav"),
+        ...progressState,
+        verifying: reviewEvent.count,
+        log: log("skeptic", `checking ${reviewEvent.count} findings`, "lav"),
       };
     case "verified":
-      return { ...p, verified: p.verified + 1 };
+      return { ...progressState, verified: progressState.verified + 1 };
     case "warning":
-      return { ...p, warnings: [...p.warnings, e.message], log: log("warn", e.message, "yellow") };
+      return {
+        ...progressState,
+        warnings: [...progressState.warnings, reviewEvent.message],
+        log: log("warn", reviewEvent.message, "yellow"),
+      };
     case "budget-exceeded":
       return {
-        ...p,
-        budget: { required: e.required, limit: e.limit },
-        log: log("budget", `${e.required} runs exceed the ${e.limit}-run limit`, "red"),
+        ...progressState,
+        budget: { required: reviewEvent.required, limit: reviewEvent.limit },
+        log: log(
+          "budget",
+          `${reviewEvent.required} runs exceed the ${reviewEvent.limit}-run limit`,
+          "red",
+        ),
       };
     case "budget-stop":
       return {
-        ...p,
+        ...progressState,
         log: log(
           "budget",
-          `token budget reached (${formatTokens(e.spent)} of ${formatTokens(e.limit)})`,
+          `token budget reached (${formatTokens(reviewEvent.spent)} of ${formatTokens(reviewEvent.limit)})`,
           "red",
         ),
       };
     case "rate-limited":
       return {
-        ...p,
+        ...progressState,
         rateLimited: true,
         log: log(
           "limit",
-          `rate limited; waiting ${Math.round((e.retryAfterMs ?? 0) / 1000)}s`,
+          `rate limited; waiting ${Math.round((reviewEvent.retryAfterMs ?? 0) / 1000)}s`,
           "yellow",
         ),
       };
     case "review-done":
       return {
-        ...p,
+        ...progressState,
         done: true,
-        ...(e.partial ? { partial: e.partial } : {}),
+        ...(reviewEvent.partial ? { partial: reviewEvent.partial } : {}),
         log: log(
           "done",
-          e.partial ? "stopped early" : `${e.findings.length} findings`,
-          e.partial ? "yellow" : "mint",
+          reviewEvent.partial ? "stopped early" : `${reviewEvent.findings.length} findings`,
+          reviewEvent.partial ? "yellow" : "mint",
         ),
       };
     case "review-failed":
-      return { ...p, done: true, failed: e.error, log: log("failed", e.error, "red") };
+      return {
+        ...progressState,
+        done: true,
+        failed: reviewEvent.error,
+        log: log("failed", reviewEvent.error, "red"),
+      };
     default:
-      return p;
+      return progressState;
   }
 }
 

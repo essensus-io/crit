@@ -28,12 +28,12 @@ export const Menu = ({ title, items, width, height, note, onPick, onCancel }: Pr
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
       <Panel title={title} tone="lav" width={w} height={items.length + 3}>
-        {items.map((it, i) => (
-          <Text key={it.key} wrap="truncate" {...(i === index ? { inverse: true } : {})}>
+        {items.map((menuItem, i) => (
+          <Text key={menuItem.key} wrap="truncate" {...(i === index ? { inverse: true } : {})}>
             {i === index ? "› " : "  "}
-            <Text bold color={T.cyan}>{`${it.key}`}</Text>
-            {`  ${it.label}`}
-            {it.hint ? <Text dimColor>{`  ${it.hint}`}</Text> : null}
+            <Text bold color={T.cyan}>{`${menuItem.key}`}</Text>
+            {`  ${menuItem.label}`}
+            {menuItem.hint ? <Text dimColor>{`  ${menuItem.hint}`}</Text> : null}
           </Text>
         ))}
       </Panel>

@@ -44,10 +44,10 @@ export async function importReview(store: SqliteStore, input: unknown): Promise<
   }
   ops.push(db.delete(t.reviews).where(eq(t.reviews.id, review.id)));
   ops.push(db.insert(t.reviews).values(reviewToRow(review)));
-  for (const s of doc.shards) ops.push(db.insert(t.shards).values(shardToRow(s)));
-  for (const f of doc.findings) ops.push(db.insert(t.findings).values(findingToRow(f)));
-  for (const f of doc.fixes) ops.push(db.insert(t.fixes).values(fixToRow(f)));
-  for (const m of doc.messages) ops.push(db.insert(t.messages).values(m));
+  for (const shard of doc.shards) ops.push(db.insert(t.shards).values(shardToRow(shard)));
+  for (const finding of doc.findings) ops.push(db.insert(t.findings).values(findingToRow(finding)));
+  for (const fix of doc.fixes) ops.push(db.insert(t.fixes).values(fixToRow(fix)));
+  for (const message of doc.messages) ops.push(db.insert(t.messages).values(message));
   await db.batch(ops as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
   return { ...doc, review, repo: { ...doc.repo, id: repoId } };
 }

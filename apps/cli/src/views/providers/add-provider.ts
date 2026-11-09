@@ -34,18 +34,21 @@ export async function addProvider(
     if (!ctx.interactive)
       throw new CliError("crit: pass a provider type", {
         exitCode: EXIT.usage,
-        hint: `Types: ${types.map((t) => t.type).join(", ")}`,
+        hint: `Types: ${types.map((adapterFactory) => adapterFactory.type).join(", ")}`,
       });
     type = await ctx.prompter.select({
       message: "Provider type",
-      options: types.map((t) => ({ value: t.type, label: `${t.label} (${t.defaultCommand})` })),
+      options: types.map((adapterFactory) => ({
+        value: adapterFactory.type,
+        label: `${adapterFactory.label} (${adapterFactory.defaultCommand})`,
+      })),
     });
   }
   const factory = ctx.registry.get(type);
   if (!factory)
     throw new CliError(`crit: unknown provider type ${type}`, {
       exitCode: EXIT.usage,
-      hint: `Types: ${types.map((t) => t.type).join(", ")}`,
+      hint: `Types: ${types.map((adapterFactory) => adapterFactory.type).join(", ")}`,
     });
 
   let name = args.name;
@@ -62,7 +65,7 @@ export async function addProvider(
     if (effort === undefined) effort = answers.effort;
     if (fastModel === undefined) fastModel = answers.fastModel;
   }
-  name ??= file.providers.some((p) => p.name === factory.defaultName)
+  name ??= file.providers.some((provider) => provider.name === factory.defaultName)
     ? `${factory.defaultName}-2`
     : factory.defaultName;
   file = addProfile(
@@ -77,11 +80,11 @@ export async function addProvider(
     },
     { makeDefault: Boolean(args.default) },
   );
-  const profile = file.providers.find((p) => p.name === name)!;
+  const profile = file.providers.find((provider) => provider.name === name)!;
   if (args.test ?? ctx.interactive) {
-    const r = await testProvider(ctx, profile);
-    if (r.ok) ctx.err(`✓ ${name} replied in ${duration(r.ms)}\n`);
-    else ctx.err(colors(ctx.color).yellow(`✗ ${name} ${r.error}\n`));
+    const testResult = await testProvider(ctx, profile);
+    if (testResult.ok) ctx.err(`✓ ${name} replied in ${duration(testResult.ms)}\n`);
+    else ctx.err(colors(ctx.color).yellow(`✗ ${name} ${testResult.error}\n`));
   }
   saveProviders(ctx.paths, file);
   ctx.out(`Added ${name}${file.default === name ? " (default)" : ""}\n`);

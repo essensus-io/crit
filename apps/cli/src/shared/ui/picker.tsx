@@ -29,12 +29,14 @@ export const Picker = <V,>({
   const [index, setIndex] = useState(() =>
     Math.max(
       0,
-      options.findIndex((o) => o.value === initial),
+      options.findIndex((pickOption) => pickOption.value === initial),
     ),
   );
   const q = query.toLowerCase();
   const list = q
-    ? options.filter((o) => `${o.label} ${o.hint ?? ""}`.toLowerCase().includes(q))
+    ? options.filter((pickOption) =>
+        `${pickOption.label} ${pickOption.hint ?? ""}`.toLowerCase().includes(q),
+      )
     : options;
   const cur = Math.min(index, Math.max(0, list.length - 1));
   const rows = Math.max(3, height - 7);
@@ -73,13 +75,13 @@ export const Picker = <V,>({
         </Text>
         <Text> </Text>
         {list.length === 0 ? <Text dimColor>No matches.</Text> : null}
-        {list.slice(start, start + rows).map((o, i) => {
+        {list.slice(start, start + rows).map((pickOption, i) => {
           const idx = start + i;
           return (
             <Text key={`${idx}`} wrap="truncate" {...(idx === cur ? { inverse: true } : {})}>
               {idx === cur ? "› " : "  "}
-              {o.label}
-              {o.hint ? <Text dimColor> {o.hint}</Text> : null}
+              {pickOption.label}
+              {pickOption.hint ? <Text dimColor> {pickOption.hint}</Text> : null}
             </Text>
           );
         })}

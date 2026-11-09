@@ -16,12 +16,13 @@ export const emptyProvidersFile = (): ProvidersFile => ({
   roles: {},
 });
 
-const find = (file: ProvidersFile, name: string) => file.providers.find((p) => p.name === name);
+const find = (file: ProvidersFile, name: string) =>
+  file.providers.find((provider) => provider.name === name);
 
 function need(file: ProvidersFile, name: string): ProviderProfile {
   const p = find(file, name);
   if (!p) {
-    const names = file.providers.map((x) => x.name).join(", ") || "none";
+    const names = file.providers.map((provider) => provider.name).join(", ") || "none";
     throw new ProfileError(`crit: no provider named "${name}" (have: ${names})`);
   }
   return p;
@@ -54,7 +55,7 @@ export function updateProfile(
   const roles = Object.fromEntries(Object.entries(file.roles).map(([r, n]) => [r, rename(n)]));
   return {
     ...file,
-    providers: file.providers.map((p) => (p.name === name ? next : p)),
+    providers: file.providers.map((provider) => (provider.name === name ? next : provider)),
     default: rename(file.default) ?? null,
     roles,
   };
@@ -66,14 +67,15 @@ export function removeProfile(
   newDefault?: string,
 ): ProvidersFile {
   need(file, name);
-  const providers = file.providers.filter((p) => p.name !== name);
+  const providers = file.providers.filter((provider) => provider.name !== name);
   let def = file.default;
   if (file.default === name) {
     if (providers.length === 0) def = null;
     else if (!newDefault)
       throw new ProfileError(`crit: ${name} is the default provider; choose a new default`);
     else {
-      if (!providers.some((p) => p.name === newDefault)) need({ ...file, providers }, newDefault);
+      if (!providers.some((provider) => provider.name === newDefault))
+        need({ ...file, providers }, newDefault);
       def = newDefault;
     }
   }
@@ -143,7 +145,7 @@ export function resolveProvider(
   }
   const def = file.default ? usable(find(file, file.default), "default") : undefined;
   if (def) return { profile: def, warnings };
-  const any = file.providers.find((p) => p.enabled);
+  const any = file.providers.find((provider) => provider.enabled);
   if (any) {
     warnings.push(`no usable default provider; using ${any.name}`);
     return { profile: any, warnings };

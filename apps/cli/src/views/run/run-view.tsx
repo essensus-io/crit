@@ -15,7 +15,7 @@ import { type Switcher } from "@/features/model-switching/lib/create-switcher.ts
 import { useSwitching } from "@/features/model-switching/hooks/use-switching.tsx";
 import { ReviewView } from "@/views/review/review-view.tsx";
 type Props = {
-  subscribe: (fn: (e: ReviewEvent) => void) => () => void;
+  subscribe: (fn: (reviewEvent: ReviewEvent) => void) => () => void;
   makeSession: (reviewId: string) => Promise<ReviewSession>;
   onStop: () => void;
   onRecover?: (action: RunRecovery) => void;
@@ -36,10 +36,14 @@ export const RunView = (props: Props) => {
 
   useEffect(
     () =>
-      props.subscribe((e) => {
-        setProgress((p) => reduceProgress(p, e));
-        if (e.type === "review-started") setReviewId(e.reviewId);
-        if (e.type === "finding" || e.type === "verified" || e.type === "review-done")
+      props.subscribe((reviewEvent) => {
+        setProgress((progressState) => reduceProgress(progressState, reviewEvent));
+        if (reviewEvent.type === "review-started") setReviewId(reviewEvent.reviewId);
+        if (
+          reviewEvent.type === "finding" ||
+          reviewEvent.type === "verified" ||
+          reviewEvent.type === "review-done"
+        )
           void session?.load();
       }),
     [props, session],

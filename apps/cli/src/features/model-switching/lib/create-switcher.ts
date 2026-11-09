@@ -41,7 +41,7 @@ export function createSwitcher(
   onChange: (choice: Choice) => void = () => undefined,
 ): Switcher {
   let file = initialFile;
-  const profile = (name: string) => file.providers.find((p) => p.name === name);
+  const profile = (name: string) => file.providers.find((provider) => provider.name === name);
   const start = profile(initial.provider);
   let choice: Choice = {
     provider: initial.provider,
@@ -52,7 +52,7 @@ export function createSwitcher(
   const listeners = new Set<(c: Choice) => void>([onChange]);
   const set = (patch: Partial<Choice>): Choice => {
     choice = { ...choice, ...patch };
-    for (const l of listeners) l(choice);
+    for (const listener of listeners) listener(choice);
     return choice;
   };
   const cache = new Map<string, Awaited<ReturnType<typeof listModels>>>();
@@ -62,9 +62,9 @@ export function createSwitcher(
     if (!p || !factory) return { models: [], live: false };
     const hit = cache.get(name);
     if (hit) return hit;
-    const r = await listModels(factory, { command: p.command, env: ctx.env });
-    cache.set(name, r);
-    return r;
+    const result = await listModels(factory, { command: p.command, env: ctx.env });
+    cache.set(name, result);
+    return result;
   };
   return {
     current: () => choice,
@@ -72,7 +72,7 @@ export function createSwitcher(
       listeners.add(fn);
       return () => void listeners.delete(fn);
     },
-    providers: () => file.providers.filter((p) => p.enabled),
+    providers: () => file.providers.filter((provider) => provider.enabled),
     setProvider(name) {
       const p = profile(name);
       return set({ provider: name, model: p?.model ?? null, effort: p?.effort ?? null });
@@ -84,7 +84,8 @@ export function createSwitcher(
       if (!factory) return [];
       const { models } = await modelsFor(choice.provider);
       const info =
-        models.find((m) => m.id === choice.model) ?? models.find((m) => m.efforts?.length);
+        models.find((modelInfo) => modelInfo.id === choice.model) ??
+        models.find((modelInfo) => modelInfo.efforts?.length);
       return info?.efforts?.length ? info.efforts : factory.efforts;
     },
     setModel: (model) => set({ model }),
@@ -99,10 +100,12 @@ export function createSwitcher(
       return choice.provider;
     },
     types: () =>
-      ctx.registry.list().map((f) => ({
-        type: f.type,
-        label: f.label,
-        ...(ACCOUNT_VAR[f.type] ? { accountVar: ACCOUNT_VAR[f.type] } : {}),
+      ctx.registry.list().map((adapterFactory) => ({
+        type: adapterFactory.type,
+        label: adapterFactory.label,
+        ...(ACCOUNT_VAR[adapterFactory.type]
+          ? { accountVar: ACCOUNT_VAR[adapterFactory.type] }
+          : {}),
       })),
     suggestName(type) {
       const base = ctx.registry.get(type)?.defaultName ?? type;
@@ -129,12 +132,12 @@ export function createSwitcher(
     },
     remove(name) {
       const fresh = loadProviders(ctx.paths) ?? file;
-      const rest = fresh.providers.filter((p) => p.name !== name);
+      const rest = fresh.providers.filter((provider) => provider.name !== name);
       if (rest.length === 0) throw new Error("crit: keep at least one provider");
       file = removeProfile(fresh, name, rest.find((p) => p.enabled)?.name ?? rest[0]!.name);
       saveProviders(ctx.paths, file);
       if (choice.provider === name) {
-        const next = file.providers.find((p) => p.enabled) ?? file.providers[0]!;
+        const next = file.providers.find((provider) => provider.enabled) ?? file.providers[0]!;
         set({ provider: next.name, model: next.model ?? null, effort: next.effort ?? null });
       }
     },

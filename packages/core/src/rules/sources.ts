@@ -51,7 +51,7 @@ export async function discoverProjectRules(
   const seen = new Set<string>();
   for (const p of [...new Set(files)].sort()) {
     if (IGNORED_DIRS.test(p)) continue;
-    const pattern = PROJECT_PATTERNS.find((pt) => pt.match(p));
+    const pattern = PROJECT_PATTERNS.find((projectPattern) => projectPattern.match(p));
     const kind: RuleSourceKind | undefined =
       pattern?.kind ?? (isExtra(p) && p.endsWith(".md") ? "crit-rule" : undefined);
     if (!kind || seen.has(p)) continue;

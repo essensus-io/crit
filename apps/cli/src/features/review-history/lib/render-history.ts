@@ -22,18 +22,18 @@ export function renderHistory(
     c.dim("TOKENS"),
     c.dim("OUTCOME"),
   ];
-  const body = rows.map((r, i) => {
-    const scope = r.review.scopeLabel;
+  const body = rows.map((historyRow, i) => {
+    const scope = historyRow.review.scopeLabel;
     return [
       i === opts.cursor ? "›" : " ",
-      shortId(r.review.id),
-      when(r.review.startedAt, opts.now),
-      ...(opts.allRepos ? [r.repoName] : []),
+      shortId(historyRow.review.id),
+      when(historyRow.review.startedAt, opts.now),
+      ...(opts.allRepos ? [historyRow.repoName] : []),
       truncate(scope, 30),
-      r.review.provider,
-      severitySummary(r),
-      tokensLabel(r),
-      outcomeOf(r),
+      historyRow.review.provider,
+      severitySummary(historyRow),
+      tokensLabel(historyRow),
+      outcomeOf(historyRow),
     ];
   });
   return `${table([head, ...body])}\n\n  ${c.dim("C critical · M major · m minor · n nit")}\n`;

@@ -35,7 +35,7 @@ export function createFixtureRepo(initial?: Record<string, string>): FixtureRepo
     }
   };
   const remove = (...paths: string[]) => {
-    for (const p of paths) rmSync(join(root, p), { force: true, recursive: true });
+    for (const path of paths) rmSync(join(root, path), { force: true, recursive: true });
   };
   const commit = (message: string, files?: Record<string, string>) => {
     if (files) write(files);

@@ -8,11 +8,11 @@ type Props = {
 export const StatusBar = ({ items, width }: Props) => {
   let used = 0;
   const shown: typeof items = [];
-  for (const it of items) {
-    const len = it.k.length + it.v.length + 5;
+  for (const item of items) {
+    const len = item.k.length + item.v.length + 5;
     if (used + len > width) break;
     used += len;
-    shown.push(it);
+    shown.push(item);
   }
   return (
     <Text wrap="truncate">

@@ -36,12 +36,12 @@ export async function commandVersion(
   timeoutMs = 10_000,
 ): Promise<string | undefined> {
   try {
-    const r = await x(command, ["--version"], {
+    const output = await x(command, ["--version"], {
       nodeOptions: { env, stdio: ["ignore", "pipe", "pipe"] },
       timeout: timeoutMs,
       throwOnError: false,
     });
-    const out = `${r.stdout}\n${r.stderr}`;
+    const out = `${output.stdout}\n${output.stderr}`;
     return /\d+\.\d+(?:\.\d+)?(?:[-+][\w.]+)?/.exec(out)?.[0];
   } catch {
     return undefined;
@@ -70,8 +70,8 @@ export async function* streamProcess(opts: {
   });
   const queue: LineEvent[] = [];
   let wake: (() => void) | undefined;
-  const push = (e: LineEvent) => {
-    queue.push(e);
+  const push = (lineEvent: LineEvent) => {
+    queue.push(lineEvent);
     wake?.();
   };
   let timedOut = false;
@@ -125,9 +125,9 @@ export async function* streamProcess(opts: {
       if (queue.length === 0) await new Promise<void>((r) => (wake = r));
       wake = undefined;
       while (queue.length) {
-        const e = queue.shift()!;
-        yield e;
-        if (e.kind === "exit") {
+        const lineEvent = queue.shift()!;
+        yield lineEvent;
+        if (lineEvent.kind === "exit") {
           if (spawnError) throw spawnError;
           return;
         }

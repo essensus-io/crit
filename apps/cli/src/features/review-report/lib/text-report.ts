@@ -11,7 +11,7 @@ export function textReport(
   const { review } = doc;
   const fixes = activeFixes(doc);
   const shown = sortFindings(doc.findings.filter(visible));
-  const filtered = doc.findings.filter((f) => f.verdict === "rejected").length;
+  const filtered = doc.findings.filter((finding) => finding.verdict === "rejected").length;
   const selected = shown.filter((f) => f.selected).length;
   const out: string[] = [];
   out.push(

@@ -147,7 +147,7 @@ export function highlightFile(file: string, lines: string[]): Tok[][] | undefine
   if (!language || lines.length > MAX_LINES) return undefined;
   try {
     const out = toLines(
-      hljs.highlight(lines.map((l) => l.replace(/\t/g, "  ")).join("\n"), {
+      hljs.highlight(lines.map((line) => line.replace(/\t/g, "  ")).join("\n"), {
         language,
         ignoreIllegals: true,
       }).value,
@@ -176,7 +176,7 @@ export function highlightLine(file: string | undefined, line: string): Tok[] {
 export function clipToks(toks: Tok[], n: number): Tok[] {
   const out: Tok[] = [];
   let left = n;
-  const total = toks.reduce((a, t) => a + t.t.length, 0);
+  const total = toks.reduce((tok, t) => tok + t.t.length, 0);
   const limit = total > n ? n - 1 : n;
   left = limit;
   for (const tok of toks) {

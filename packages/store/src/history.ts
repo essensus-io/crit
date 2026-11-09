@@ -53,7 +53,7 @@ export async function listHistory(db: Db, filter: HistoryFilter = {}): Promise<H
     .all();
   if (rows.length === 0) return [];
 
-  const ids = rows.map((r) => r.review.id);
+  const ids = rows.map((row) => row.review.id);
   const counts = await db
     .select({
       reviewId: t.findings.reviewId,
@@ -68,11 +68,11 @@ export async function listHistory(db: Db, filter: HistoryFilter = {}): Promise<H
     .all();
 
   const byReview = new Map<string, HistoryRow>(
-    rows.map((r) => [
-      r.review.id,
+    rows.map((row) => [
+      row.review.id,
       {
-        review: reviewFromRow(r.review),
-        repoName: r.repoName,
+        review: reviewFromRow(row.review),
+        repoName: row.repoName,
         severity: emptySeverity(),
         outcome: { applied: 0, dismissed: 0, open: 0, filtered: 0 },
         tokens: { ...emptyUsage(), effective: 0 },
@@ -100,24 +100,25 @@ export async function listHistory(db: Db, filter: HistoryFilter = {}): Promise<H
     Object.assign(row.tokens, addUsage(row.tokens, u));
     row.tokens.effective = effectiveTokens(row.tokens);
   };
-  for (const s of shardTokens)
-    add(s.reviewId, {
-      inputTokens: Number(s.input),
-      cachedInputTokens: Number(s.cached),
-      outputTokens: Number(s.output),
+  for (const shardToken of shardTokens)
+    add(shardToken.reviewId, {
+      inputTokens: Number(shardToken.input),
+      cachedInputTokens: Number(shardToken.cached),
+      outputTokens: Number(shardToken.output),
     });
-  for (const e of usageEvents) add(e.reviewId, JSON.parse(e.payload) as Partial<TokenUsage>);
-  for (const c of counts) {
-    const row = byReview.get(c.reviewId)!;
-    const n = Number(c.n);
-    if (c.verdict === "rejected") {
+  for (const usageEvent of usageEvents)
+    add(usageEvent.reviewId, JSON.parse(usageEvent.payload) as Partial<TokenUsage>);
+  for (const count of counts) {
+    const row = byReview.get(count.reviewId)!;
+    const n = Number(count.n);
+    if (count.verdict === "rejected") {
       row.outcome.filtered += n;
       continue;
     }
-    row.severity[c.severity as Severity] += n;
-    if (c.status === "applied" || c.status === "fixed") row.outcome.applied += n;
-    else if (c.status === "dismissed") row.outcome.dismissed += n;
-    else if (c.status === "open") row.outcome.open += n;
+    row.severity[count.severity as Severity] += n;
+    if (count.status === "applied" || count.status === "fixed") row.outcome.applied += n;
+    else if (count.status === "dismissed") row.outcome.dismissed += n;
+    else if (count.status === "open") row.outcome.open += n;
   }
   return [...byReview.values()];
 }

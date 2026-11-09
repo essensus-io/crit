@@ -159,7 +159,8 @@ export const reviewPrompt = ({
     );
   if (mode === "apply") {
     const n = state.items.filter(
-      (v) => v.finding.selected && v.finding.status === "open" && v.fix,
+      (findingView) =>
+        findingView.finding.selected && findingView.finding.status === "open" && findingView.fix,
     ).length;
     prompt = (
       <Choice

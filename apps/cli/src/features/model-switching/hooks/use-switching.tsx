@@ -46,9 +46,11 @@ export const useSwitching = (opts: {
 
   const changed = (verb: string) => {
     opts.onChange?.();
-    const c = switcher!.current();
+    const choice = switcher!.current();
     const save = (opts.hotkeys ?? true) ? "S saves" : "o then s saves";
-    onNotice(`${verb}: ${describeChoice(c)}. ${save} it as the default for ${c.provider}.`);
+    onNotice(
+      `${verb}: ${describeChoice(choice)}. ${save} it as the default for ${choice.provider}.`,
+    );
   };
 
   const finishAdd = (type: string, name: string, account?: string) => {
@@ -66,7 +68,7 @@ export const useSwitching = (opts: {
   const trigger = (typed: string) => {
     if (!switcher) return;
     const input = typed.toLowerCase();
-    const c = switcher.current();
+    const choice = switcher.current();
     if (input === "m") {
       void switcher.models().then(({ models, live }) => {
         if (models.length === 0) return setStage({ kind: "custom-model" });
@@ -75,10 +77,12 @@ export const useSwitching = (opts: {
           live,
           options: [
             { value: DEFAULT, label: "CLI default", hint: "the agent CLI's own choice" },
-            ...models.map((m) => ({
-              value: m.id,
-              label: m.label,
-              hint: [m.id !== m.label ? m.id : "", m.hint ?? ""].filter(Boolean).join(" · "),
+            ...models.map((modelInfo) => ({
+              value: modelInfo.id,
+              label: modelInfo.label,
+              hint: [modelInfo.id !== modelInfo.label ? modelInfo.id : "", modelInfo.hint ?? ""]
+                .filter(Boolean)
+                .join(" · "),
             })),
             { value: CUSTOM, label: "Other…", hint: "type a model name" },
           ],
@@ -109,12 +113,14 @@ export const useSwitching = (opts: {
     } else if (input === "e") {
       void switcher.efforts().then((efforts) => {
         if (efforts.length === 0)
-          return onNotice(`${c.provider} has no separate effort setting: pick a model instead.`);
+          return onNotice(
+            `${choice.provider} has no separate effort setting: pick a model instead.`,
+          );
         setStage({
           kind: "effort",
           options: [
             { value: DEFAULT, label: "CLI default" },
-            ...efforts.map((e) => ({ value: e, label: e })),
+            ...efforts.map((effort) => ({ value: effort, label: effort })),
           ],
         });
       });
@@ -128,7 +134,7 @@ export const useSwitching = (opts: {
         })),
       });
     } else if (input === "s") {
-      onNotice(`Saved ${describeChoice(c)} as the default for ${switcher.save()}.`);
+      onNotice(`Saved ${describeChoice(choice)} as the default for ${switcher.save()}.`);
     }
   };
   useInput(trigger, {
@@ -137,7 +143,7 @@ export const useSwitching = (opts: {
 
   if (!stage || !switcher) return { overlay: null, modal: false, open: trigger };
   const close = () => setStage(undefined);
-  const c = switcher.current();
+  const choice = switcher.current();
   const common = { width: screen.width, height: screen.height, onCancel: close };
   let overlay: ReactNode;
   switch (stage.kind) {
@@ -145,13 +151,13 @@ export const useSwitching = (opts: {
       overlay = (
         <Picker
           {...common}
-          title={`model · ${c.provider}`}
+          title={`model · ${choice.provider}`}
           options={stage.options}
-          initial={c.model ?? DEFAULT}
+          initial={choice.model ?? DEFAULT}
           note={
             stage.live
               ? "live list"
-              : switcher.providers().find((p) => p.name === c.provider)?.type === "claude-code"
+              : switcher.providers().find((p) => p.name === choice.provider)?.type === "claude-code"
                 ? "built-in list · with ANTHROPIC_API_KEY set, crit fetches the live one"
                 : "built-in list"
           }
@@ -167,10 +173,14 @@ export const useSwitching = (opts: {
     case "custom-model":
       overlay = (
         <Box flexDirection="column" width={screen.width} height={screen.height}>
-          <Panel title={`model · ${c.provider}`} tone="lav" width={Math.min(screen.width - 2, 70)}>
+          <Panel
+            title={`model · ${choice.provider}`}
+            tone="lav"
+            width={Math.min(screen.width - 2, 70)}
+          >
             <TextInput
               label="Model name ›"
-              initial={c.model ?? ""}
+              initial={choice.model ?? ""}
               onCancel={close}
               onSubmit={(v) => {
                 close();
@@ -190,7 +200,7 @@ export const useSwitching = (opts: {
           {...common}
           title="provider"
           options={stage.options}
-          initial={c.provider}
+          initial={choice.provider}
           onPick={(v) => {
             close();
             if (v === CONNECT) return opts.onConnect?.();
@@ -305,9 +315,9 @@ export const useSwitching = (opts: {
       overlay = (
         <Picker
           {...common}
-          title={`reasoning effort · ${c.model ?? c.provider}`}
+          title={`reasoning effort · ${choice.model ?? choice.provider}`}
           options={stage.options}
-          initial={c.effort ?? DEFAULT}
+          initial={choice.effort ?? DEFAULT}
           onPick={(v) => {
             close();
             switcher.setEffort(v === DEFAULT ? null : v);
@@ -322,7 +332,7 @@ export const useSwitching = (opts: {
           {...common}
           title="review depth"
           options={stage.options}
-          initial={c.depth}
+          initial={choice.depth}
           onPick={(v) => {
             close();
             switcher.setDepth(v);

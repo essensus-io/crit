@@ -18,8 +18,8 @@ export function critPaths(env: NodeJS.ProcessEnv = process.env): CritPaths {
         cache: join(env.CRIT_HOME, "cache"),
       }
     : (() => {
-        const p = envPaths("crit", { suffix: "" });
-        return { config: p.config, data: p.data, cache: p.cache };
+        const paths = envPaths("crit", { suffix: "" });
+        return { config: paths.config, data: paths.data, cache: paths.cache };
       })();
   return {
     config: env.CRIT_CONFIG_DIR ?? base.config,

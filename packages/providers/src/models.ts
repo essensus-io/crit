@@ -47,10 +47,10 @@ export function parseCodexModels(json: string): ModelInfo[] {
 export function parseCursorModels(text: string): ModelInfo[] {
   const out: ModelInfo[] = [];
   for (const line of text.replace(ZERO_WIDTH, "").split("\n")) {
-    const m = /^([A-Za-z0-9][\w.\-[\]=,]*) - (.+?)\s*$/.exec(line.trim());
-    if (!m) continue;
-    const hint = /\(([^)]*default[^)]*)\)/i.exec(m[2]!)?.[1];
-    out.push({ id: m[1]!, label: m[2]!.trim(), ...(hint ? { hint } : {}) });
+    const match = /^([A-Za-z0-9][\w.\-[\]=,]*) - (.+?)\s*$/.exec(line.trim());
+    if (!match) continue;
+    const hint = /\(([^)]*default[^)]*)\)/i.exec(match[2]!)?.[1];
+    out.push({ id: match[1]!, label: match[2]!.trim(), ...(hint ? { hint } : {}) });
   }
   return out;
 }
@@ -62,12 +62,12 @@ async function capture(
   timeoutMs: number,
 ): Promise<string | undefined> {
   try {
-    const r = await x(command, args, {
+    const output = await x(command, args, {
       nodeOptions: { env, stdio: ["ignore", "pipe", "pipe"] },
       timeout: timeoutMs,
       throwOnError: false,
     });
-    return r.exitCode === 0 ? r.stdout : undefined;
+    return output.exitCode === 0 ? output.stdout : undefined;
   } catch {
     return undefined;
   }

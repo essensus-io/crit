@@ -30,11 +30,11 @@ export function dryRunJson(prep: Prepared, info: DryRunInfo) {
       byReason: Object.fromEntries(reasons),
       list: prep.scope.skipped,
     },
-    runs: prep.runs.map((r) => ({
-      label: r.label,
-      lenses: r.lenses,
-      files: r.files.length,
-      estimatedTokens: r.estimatedTokens,
+    runs: prep.runs.map((plannedRun) => ({
+      label: plannedRun.label,
+      lenses: plannedRun.lenses,
+      files: plannedRun.files.length,
+      estimatedTokens: plannedRun.estimatedTokens,
     })),
     estimate: {
       effectiveTokens: prep.estimatedTokens,
@@ -69,8 +69,10 @@ export function renderDryRun(
   for (const [i, [reason, n]] of reasons.entries())
     out.push(`  ${c.dim((i === 0 ? "Skipped" : "").padEnd(9))}${String(n).padStart(4)}  ${reason}`);
   const examples = prep.scope.skipped.slice(0, opts.maxExamples ?? 5);
-  for (const e of examples)
-    out.push(`  ${" ".repeat(9)}${c.dim(`e.g. ${truncate(e.path, 70)} (${e.reason})`)}`);
+  for (const example of examples)
+    out.push(
+      `  ${" ".repeat(9)}${c.dim(`e.g. ${truncate(example.path, 70)} (${example.reason})`)}`,
+    );
   out.push("");
   if (prep.runs.length === 0) {
     out.push(
@@ -83,12 +85,12 @@ export function renderDryRun(
       `  ${" ".repeat(9)}${c.yellow(`${j.files.total} changed files is a lot for one branch: is ${prep.scope.baseRef} the right base? Try --base <branch>.`)}`,
       "",
     );
-  const rows = prep.runs.map((r) => [
+  const rows = prep.runs.map((plannedRun) => [
     "  ",
-    truncate(r.label, 34),
-    c.dim(r.lenses.join(", ")),
-    `${plural(r.files.length, "file")}`,
-    `~${formatTokens(r.estimatedTokens)}`,
+    truncate(plannedRun.label, 34),
+    c.dim(plannedRun.lenses.join(", ")),
+    `${plural(plannedRun.files.length, "file")}`,
+    `~${formatTokens(plannedRun.estimatedTokens)}`,
   ]);
   out.push(`  ${c.dim(`Runs (${prep.runs.length})`)}`, table(rows, "  "));
   out.push("");

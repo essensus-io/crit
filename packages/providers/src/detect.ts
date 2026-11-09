@@ -26,17 +26,17 @@ export async function detectCli(
   const path = which(command, env);
   if (!path) return { installed: false, loggedIn: false, hint: `${command} not found on PATH` };
   const version = await commandVersion(path, env);
-  const r: DetectResult = { installed: true, path, loggedIn: true };
+  const detectResult: DetectResult = { installed: true, path, loggedIn: true };
   if (version) {
-    r.version = version;
+    detectResult.version = version;
     if (
       compareVersions(version, tested.min) < 0 ||
       (tested.max && compareVersions(version, tested.max) > 0)
     ) {
-      r.untestedVersion = true;
+      detectResult.untestedVersion = true;
     }
   }
-  return r;
+  return detectResult;
 }
 
 export function compareVersions(a: string, b: string): number {

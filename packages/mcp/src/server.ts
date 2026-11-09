@@ -123,7 +123,12 @@ export function createCritMcpServer(
           const rules = await handler.getRules(parsed.data.ids);
           if (rules.length === 0) return text("No matching rules.");
           return text(
-            rules.map((r) => `## ${r.id} ${r.title} (${r.path})\n\n${r.body}`).join("\n\n"),
+            rules
+              .map(
+                (ruleView) =>
+                  `## ${ruleView.id} ${ruleView.title} (${ruleView.path})\n\n${ruleView.body}`,
+              )
+              .join("\n\n"),
           );
         }
         case "report_finding": {

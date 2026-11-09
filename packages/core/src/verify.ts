@@ -43,12 +43,17 @@ export async function runVerify(
 ): Promise<VerifyResult> {
   const results: VerifyResult["commands"] = [];
   for (const command of commands) {
-    const r = await runShell(command, cwd, timeoutMs);
-    results.push({ command, exitCode: r.exitCode, durationMs: r.durationMs, output: r.output });
-    if (r.exitCode !== 0) break;
+    const result = await runShell(command, cwd, timeoutMs);
+    results.push({
+      command,
+      exitCode: result.exitCode,
+      durationMs: result.durationMs,
+      output: result.output,
+    });
+    if (result.exitCode !== 0) break;
   }
   return {
-    passed: results.length === commands.length && results.every((r) => r.exitCode === 0),
+    passed: results.length === commands.length && results.every((result) => result.exitCode === 0),
     commands: results,
   };
 }

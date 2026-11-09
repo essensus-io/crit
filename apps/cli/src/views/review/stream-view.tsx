@@ -19,15 +19,15 @@ type RowProps = { line: Line };
 const Row = ({ line }: RowProps) => {
   return (
     <Text>
-      {line.map((s, i) => (
+      {line.map((seg, i) => (
         <Text
           key={i}
-          {...(s.color ? { color: s.color } : {})}
-          {...(s.dim ? { dimColor: true } : {})}
-          {...(s.bold ? { bold: true } : {})}
-          {...(s.inverse ? { inverse: true } : {})}
+          {...(seg.color ? { color: seg.color } : {})}
+          {...(seg.dim ? { dimColor: true } : {})}
+          {...(seg.bold ? { bold: true } : {})}
+          {...(seg.inverse ? { inverse: true } : {})}
         >
-          {s.t}
+          {seg.t}
         </Text>
       ))}
     </Text>
@@ -78,7 +78,8 @@ export const StreamView = (props: StreamViewProps) => {
   const review = state.review;
   const current = items[Math.min(props.cursor, Math.max(0, items.length - 1))];
   const all = state.items.filter(
-    (v) => !(v.finding.verdict === "rejected" || v.finding.status === "closed"),
+    (findingView) =>
+      !(findingView.finding.verdict === "rejected" || findingView.finding.status === "closed"),
   );
   const p = progressOf(all);
   const filtered = state.items.length - all.length;
@@ -91,7 +92,9 @@ export const StreamView = (props: StreamViewProps) => {
   const tree = fileTree(state);
   const fileCursor = Math.max(
     0,
-    tree.findIndex((r) => r.file !== undefined && r.file === current?.finding.file),
+    tree.findIndex(
+      (treeRow) => treeRow.file !== undefined && treeRow.file === current?.finding.file,
+    ),
   );
 
   const drafting = useMemo(() => new Set(state.drafting), [state.drafting]);
@@ -113,7 +116,7 @@ export const StreamView = (props: StreamViewProps) => {
     [items, state, current?.finding.id, props.expanded, props.fixTab, innerW, drafting, spin],
   );
   const span = current ? stream.card.get(current.finding.id) : undefined;
-  const lines = stream.rows.map((r, i) => <Row key={i} line={r.line} />);
+  const lines = stream.rows.map((streamRow, i) => <Row key={i} line={streamRow.line} />);
   const fstart = Math.max(0, Math.min(fileCursor - Math.floor(rows / 2), tree.length - (rows - 1)));
 
   const keys: [string, string][] = !current
@@ -165,18 +168,18 @@ export const StreamView = (props: StreamViewProps) => {
           width={leftW}
           height={panelH}
         >
-          {tree.slice(fstart, fstart + rows - 1).map((r, k) => {
+          {tree.slice(fstart, fstart + rows - 1).map((treeRow, k) => {
             const i = fstart + k;
-            const here = r.file !== undefined && r.file === current?.finding.file;
+            const here = treeRow.file !== undefined && treeRow.file === current?.finding.file;
             return (
               <Text
-                key={r.key}
+                key={treeRow.key}
                 wrap="truncate"
                 {...(props.focus === "files" && i === fileCursor ? { inverse: true } : {})}
                 {...(here ? { color: T.cyan } : {})}
               >
-                {truncate(r.label, leftW - 9).padEnd(leftW - 8)}
-                {String(r.count).padStart(3)}
+                {truncate(treeRow.label, leftW - 9).padEnd(leftW - 8)}
+                {String(treeRow.count).padStart(3)}
               </Text>
             );
           })}

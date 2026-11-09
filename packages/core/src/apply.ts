@@ -27,11 +27,11 @@ export type Overlap = { file: string; a: string; b: string };
 
 function touched(patch: string): Map<string, [number, number][]> {
   const out = new Map<string, [number, number][]>();
-  for (const f of parseUnifiedDiff(normalizePatch(patch))) {
-    const path = f.oldPath ?? diffPath(f);
-    const ranges = f.hunks.map((h): [number, number] => [
-      h.oldStart,
-      h.oldStart + Math.max(h.oldLines, 1) - 1,
+  for (const parsedFile of parseUnifiedDiff(normalizePatch(patch))) {
+    const path = parsedFile.oldPath ?? diffPath(parsedFile);
+    const ranges = parsedFile.hunks.map((parsedHunk): [number, number] => [
+      parsedHunk.oldStart,
+      parsedHunk.oldStart + Math.max(parsedHunk.oldLines, 1) - 1,
     ]);
     out.set(path, [...(out.get(path) ?? []), ...ranges]);
   }
@@ -103,26 +103,29 @@ async function applyAll(
   const applied: Planned[] = [];
   for (const item of items) {
     let patch = item.fix.patch;
-    let r = await applyPatch(root, patch, { check: true });
-    if (r.exitCode !== 0 && rebase) {
+    let gitResult = await applyPatch(root, patch, { check: true });
+    if (gitResult.exitCode !== 0 && rebase) {
       const files = [...touched(patch).keys()];
       const current = Object.fromEntries(
-        files.map((p) => [p, existsSync(join(root, p)) ? readFileSync(join(root, p), "utf8") : ""]),
+        files.map((file) => [
+          file,
+          existsSync(join(root, file)) ? readFileSync(join(root, file), "utf8") : "",
+        ]),
       );
-      const next = await rebase(item, current, r.stderr.trim());
+      const next = await rebase(item, current, gitResult.stderr.trim());
       if (next) {
         const again = await applyPatch(root, next, { check: true });
         if (again.exitCode === 0) {
           patch = normalizePatch(next);
-          r = again;
+          gitResult = again;
           result.rebased.push(item.finding.id);
         }
       }
     }
-    if (r.exitCode !== 0) {
+    if (gitResult.exitCode !== 0) {
       result.skipped.push({
         finding: item.finding,
-        reason: `does not apply: ${r.stderr.trim().split("\n")[0]}`,
+        reason: `does not apply: ${gitResult.stderr.trim().split("\n")[0]}`,
       });
       continue;
     }
@@ -161,8 +164,9 @@ export async function applyFixes(opts: {
   };
   if (items.length === 0) return result;
   items.sort(
-    (a, b) =>
-      a.finding.file.localeCompare(b.finding.file) || b.finding.range.start - a.finding.range.start,
+    (planned, b) =>
+      planned.finding.file.localeCompare(b.finding.file) ||
+      b.finding.range.start - planned.finding.range.start,
   );
 
   if (target.kind === "branch") {
@@ -192,7 +196,7 @@ export async function applyFixes(opts: {
           "commit",
           "-q",
           "-m",
-          `crit: apply ${applied.length} ${applied.length === 1 ? "fix" : "fixes"} from review ${shortId(opts.reviewId)}\n\n${applied.map((a) => `- ${a.finding.title}`).join("\n")}`,
+          `crit: apply ${applied.length} ${applied.length === 1 ? "fix" : "fixes"} from review ${shortId(opts.reviewId)}\n\n${applied.map((planned) => `- ${planned.finding.title}`).join("\n")}`,
         ]);
       }
       if (opts.verifyCommands?.length && applied.length)
@@ -215,20 +219,20 @@ export async function applyFixes(opts: {
     ];
     const backupDir = join(opts.backupRoot, `${shortId(opts.reviewId)}-${now()}`);
     mkdirSync(join(backupDir, "files"), { recursive: true });
-    const before = files.map((p) => {
-      const abs = join(opts.root, p);
+    const before = files.map((file) => {
+      const abs = join(opts.root, file);
       const existed = existsSync(abs);
       if (existed) {
-        const dest = join(backupDir, "files", p);
+        const dest = join(backupDir, "files", file);
         mkdirSync(dirname(dest), { recursive: true });
         writeFileSync(dest, readFileSync(abs));
       }
-      return { path: p, existed };
+      return { path: file, existed };
     });
     result.applied = await applyAll(opts.root, items, opts.rebase, result);
     writeFileSync(
       join(backupDir, "applied.patch"),
-      result.applied.map((a) => a.fix.patch).join(""),
+      result.applied.map((planned) => planned.fix.patch).join(""),
     );
     const manifest: Manifest = {
       version: 1,
@@ -236,7 +240,7 @@ export async function applyFixes(opts: {
       root: opts.root,
       target,
       createdAt: now(),
-      findings: result.applied.map((a) => a.finding.id),
+      findings: result.applied.map((planned) => planned.finding.id),
       files: before.map((b) => {
         const abs = join(opts.root, b.path);
         return { ...b, after: existsSync(abs) ? hash(readFileSync(abs)) : null };
@@ -248,10 +252,10 @@ export async function applyFixes(opts: {
       result.verify = await runVerify(opts.verifyCommands, opts.root);
   }
 
-  for (const a of result.applied) {
-    await opts.store.findings.update(a.finding.id, { status: "applied" });
-    await opts.store.fixes.update(a.fix.id, {
-      patch: a.fix.patch,
+  for (const planned of result.applied) {
+    await opts.store.findings.update(planned.finding.id, { status: "applied" });
+    await opts.store.fixes.update(planned.fix.id, {
+      patch: planned.fix.patch,
       ...(result.verify ? { verify: result.verify } : {}),
     });
   }
@@ -261,7 +265,7 @@ export async function applyFixes(opts: {
       target,
       ...(result.backupDir ? { backupDir: result.backupDir } : {}),
       ...(result.branch ? { branch: result.branch } : {}),
-      findings: result.applied.map((a) => a.finding.id),
+      findings: result.applied.map((planned) => planned.finding.id),
     });
   }
   return result;
@@ -291,14 +295,16 @@ export async function undoApply(opts: {
   for (const reviewId of opts.reviewIds) {
     const events = await opts.store.events.list(reviewId);
     const undone = new Set(
-      events.filter((e) => e.type === "undo").map((e) => (e.payload as { apply: string }).apply),
+      events
+        .filter((event) => event.type === "undo")
+        .map((e) => (e.payload as { apply: string }).apply),
     );
-    for (const e of events) {
-      if (e.type !== "apply") continue;
-      const p = e.payload as ApplyEvent;
-      if (undone.has(p.id)) continue;
-      if (!latest || e.createdAt >= latest.createdAt)
-        latest = { reviewId, payload: p, createdAt: e.createdAt };
+    for (const event of events) {
+      if (event.type !== "apply") continue;
+      const applyEvent = event.payload as ApplyEvent;
+      if (undone.has(applyEvent.id)) continue;
+      if (!latest || event.createdAt >= latest.createdAt)
+        latest = { reviewId, payload: applyEvent, createdAt: event.createdAt };
     }
   }
   if (!latest) throw new Error("crit: nothing to undo");
@@ -316,25 +322,25 @@ export async function undoApply(opts: {
   } else {
     const dir = payload.backupDir!;
     const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")) as Manifest;
-    const changed = manifest.files.filter((f) => {
-      const abs = join(opts.root, f.path);
+    const changed = manifest.files.filter((file) => {
+      const abs = join(opts.root, file.path);
       const now = existsSync(abs) ? hash(readFileSync(abs)) : null;
-      return now !== f.after;
+      return now !== file.after;
     });
     if (changed.length && !opts.force) {
       throw new Error(
         `crit: ${changed.map((f) => f.path).join(", ")} changed after the fixes were applied; pass --force to restore anyway`,
       );
     }
-    for (const f of manifest.files) {
-      const abs = join(opts.root, f.path);
-      if (f.existed) {
+    for (const file of manifest.files) {
+      const abs = join(opts.root, file.path);
+      if (file.existed) {
         mkdirSync(dirname(abs), { recursive: true });
-        writeFileSync(abs, readFileSync(join(dir, "files", f.path)));
-        result.restored.push(f.path);
+        writeFileSync(abs, readFileSync(join(dir, "files", file.path)));
+        result.restored.push(file.path);
       } else if (existsSync(abs)) {
         unlinkSync(abs);
-        result.removed.push(f.path);
+        result.removed.push(file.path);
       }
     }
   }

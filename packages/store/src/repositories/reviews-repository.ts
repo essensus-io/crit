@@ -28,7 +28,7 @@ export const createReviewsRepository = (db: Db): Repositories["reviews"] => {
         .where(repoId ? and(eq(t.reviews.repoId, repoId), match) : match)
         .orderBy(desc(t.reviews.startedAt))
         .all();
-      const exact = rows.find((r) => r.id === needle);
+      const exact = rows.find((row) => row.id === needle);
       return (exact ? [exact] : rows).map(reviewFromRow);
     },
     async latest(repoId) {
@@ -64,7 +64,7 @@ export const createReviewsRepository = (db: Db): Repositories["reviews"] => {
           ),
         )
         .all();
-      const ids = rows.map((r) => r.id);
+      const ids = rows.map((row) => row.id);
       if (ids.length > 0) {
         await db
           .update(t.reviews)
@@ -82,7 +82,7 @@ export const createReviewsRepository = (db: Db): Repositories["reviews"] => {
         : lt(t.reviews.startedAt, before);
       const rows = await db.select({ id: t.reviews.id }).from(t.reviews).where(where).all();
       if (rows.length > 0) await db.delete(t.reviews).where(where);
-      return rows.map((r) => r.id);
+      return rows.map((row) => row.id);
     },
   };
   return reviews;

@@ -21,11 +21,11 @@ export const createEventsRepository = (db: Db): Repositories["events"] => ({
       ? and(eq(t.events.reviewId, reviewId), eq(t.events.type, type))
       : eq(t.events.reviewId, reviewId);
     const rows = await db.select().from(t.events).where(where).orderBy(asc(t.events.id)).all();
-    return rows.map((r) => ({
-      id: r.id,
-      type: r.type,
-      payload: JSON.parse(r.payload),
-      createdAt: r.createdAt,
+    return rows.map((row) => ({
+      id: row.id,
+      type: row.type,
+      payload: JSON.parse(row.payload),
+      createdAt: row.createdAt,
     }));
   },
 });

@@ -54,7 +54,11 @@ export function buildStream(input: StreamInput): Stream {
   };
 
   const byFile = new Map<string, FindingView[]>();
-  for (const it of items) byFile.set(it.finding.file, [...(byFile.get(it.finding.file) ?? []), it]);
+  for (const findingView of items)
+    byFile.set(findingView.finding.file, [
+      ...(byFile.get(findingView.finding.file) ?? []),
+      findingView,
+    ]);
 
   for (const [file, list] of byFile) {
     rows.push({
@@ -67,19 +71,22 @@ export function buildStream(input: StreamInput): Stream {
     });
     const info = code.get(file);
     if (!info) {
-      for (const it of list) pushCard(it);
+      for (const findingView of list) pushCard(findingView);
       rows.push({ kind: "gap", line: [{ t: " " }] });
       continue;
     }
     const total = info.lines.length;
-    const range = (it: FindingView) => ({
-      start: Math.min(total, Math.max(1, it.finding.range.start)),
-      end: Math.min(total, Math.max(1, it.finding.range.end)),
+    const range = (findingView: FindingView) => ({
+      start: Math.min(total, Math.max(1, findingView.finding.range.start)),
+      end: Math.min(total, Math.max(1, findingView.finding.range.end)),
     });
     const windows: { s: number; e: number }[] = [];
-    for (const it of list) {
-      const r = range(it);
-      const w = { s: Math.max(1, r.start - CONTEXT), e: Math.min(total, r.end + CONTEXT) };
+    for (const findingView of list) {
+      const result = range(findingView);
+      const w = {
+        s: Math.max(1, result.start - CONTEXT),
+        e: Math.min(total, result.end + CONTEXT),
+      };
       const last = windows.at(-1);
       if (last && w.s <= last.e + 2) last.e = Math.max(last.e, w.e);
       else windows.push(w);
@@ -115,14 +122,14 @@ export function buildStream(input: StreamInput): Stream {
             { t: ` ${String(n).padStart(nw)} `, dim: true },
             inFocus ? { t: "▎", color: T.orange } : { t: " " },
             added ? { t: "+ ", color: T.mint } : { t: "  " },
-            ...toks.map((k) => ({
-              t: k.t,
-              ...(k.color ? { color: k.color } : {}),
+            ...toks.map((tok) => ({
+              t: tok.t,
+              ...(tok.color ? { color: tok.color } : {}),
               ...(added || inFocus ? {} : { dim: true }),
             })),
           ],
         });
-        for (const it of list) if (range(it).end === n) pushCard(it);
+        for (const findingView of list) if (range(findingView).end === n) pushCard(findingView);
       }
       prevEnd = w.e;
     }

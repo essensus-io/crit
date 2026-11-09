@@ -63,27 +63,29 @@ export function ruleApplies(
 ): boolean {
   if (rule.alwaysApply) return true;
   const inDir = rule.scopeDir
-    ? files.filter((f) => f === rule.scopeDir || f.startsWith(`${rule.scopeDir}/`))
+    ? files.filter((file) => file === rule.scopeDir || file.startsWith(`${rule.scopeDir}/`))
     : files;
   if (inDir.length === 0) return false;
   if (rule.globs.length === 0) return true;
-  const positive = rule.globs.filter((g) => !g.startsWith("!"));
-  const negative = rule.globs.filter((g) => g.startsWith("!")).map((g) => g.slice(1));
+  const positive = rule.globs.filter((glob) => !glob.startsWith("!"));
+  const negative = rule.globs.filter((glob) => glob.startsWith("!")).map((g) => g.slice(1));
   const yes = positive.length ? picomatch(positive, { dot: true }) : () => true;
   const no = negative.length ? picomatch(negative, { dot: true }) : () => false;
   return inDir.some((f) => yes(f) && !no(f));
 }
 
-function excluded(r: ParsedRule, patterns: string[]): boolean {
-  return patterns.some((p) => {
-    const [path, section] = p.split("#");
+function excluded(parsedRule: ParsedRule, patterns: string[]): boolean {
+  return patterns.some((pattern) => {
+    const [path, section] = pattern.split("#");
     const pathMatch =
-      r.path === path || r.path.endsWith(`/${path}`) || picomatch(path!, { dot: true })(r.path);
+      parsedRule.path === path ||
+      parsedRule.path.endsWith(`/${path}`) ||
+      picomatch(path!, { dot: true })(parsedRule.path);
     if (!pathMatch) return false;
     return (
       section === undefined ||
-      r.section?.toLowerCase() === section.toLowerCase() ||
-      r.title.toLowerCase() === section.toLowerCase()
+      parsedRule.section?.toLowerCase() === section.toLowerCase() ||
+      parsedRule.title.toLowerCase() === section.toLowerCase()
     );
   });
 }
@@ -115,18 +117,22 @@ export async function loadRules(opts: LoadRulesOptions): Promise<RuleSet> {
       errors.push((err as Error).message);
     }
   }
-  parsed = parsed.filter((r) => !excluded(r, opts.exclude ?? []) && !disabled.has(r.key));
+  parsed = parsed.filter(
+    (parsedRule) => !excluded(parsedRule, opts.exclude ?? []) && !disabled.has(parsedRule.key),
+  );
 
-  const relevance = new Map<string, boolean>(parsed.map((r) => [r.hash, isReviewRelevant(r)]));
+  const relevance = new Map<string, boolean>(
+    parsed.map((parsedRule) => [parsedRule.hash, isReviewRelevant(parsedRule)]),
+  );
   if (opts.tagger) {
-    const candidates = parsed.filter((r) =>
-      ["claude-md", "agents-md", "copilot-instructions", "cursorrules"].includes(r.kind),
+    const candidates = parsed.filter((parsedRule) =>
+      ["claude-md", "agents-md", "copilot-instructions", "cursorrules"].includes(parsedRule.kind),
     );
     const pending: ParsedRule[] = [];
-    for (const r of candidates) {
-      const cached = await opts.tagCache?.get(r.hash);
-      if (cached === undefined) pending.push(r);
-      else relevance.set(r.hash, cached);
+    for (const parsedRule of candidates) {
+      const cached = await opts.tagCache?.get(parsedRule.hash);
+      if (cached === undefined) pending.push(parsedRule);
+      else relevance.set(parsedRule.hash, cached);
     }
     if (pending.length) {
       try {
@@ -144,7 +150,7 @@ export async function loadRules(opts: LoadRulesOptions): Promise<RuleSet> {
   }
 
   const ordered = parsed
-    .map((r, i) => ({ r, i }))
+    .map((parsedRule, i) => ({ r: parsedRule, i }))
     .sort(
       (a, b) =>
         RULE_LAYER_PRECEDENCE[b.r.layer] - RULE_LAYER_PRECEDENCE[a.r.layer] ||
@@ -157,8 +163,12 @@ export async function loadRules(opts: LoadRulesOptions): Promise<RuleSet> {
   const all: Rule[] = [];
   const filtered: Rule[] = [];
   let n = 0;
-  for (const p of ordered) {
-    const rule = Rule.parse({ ...p, id: "", reviewRelevant: relevance.get(p.hash) ?? true });
+  for (const parsedRule of ordered) {
+    const rule = Rule.parse({
+      ...parsedRule,
+      id: "",
+      reviewRelevant: relevance.get(parsedRule.hash) ?? true,
+    });
     if (!rule.reviewRelevant) {
       filtered.push({ ...rule, id: "-" });
       continue;
@@ -185,15 +195,15 @@ export async function loadRules(opts: LoadRulesOptions): Promise<RuleSet> {
   const conflicts: RuleConflict[] = [];
   const losers = new Set<string>();
   for (const [topic, rules] of byTopic) {
-    const layers = new Set(rules.map((r) => r.layer));
+    const layers = new Set(rules.map((rule) => rule.layer));
     if (rules.length < 2 || layers.size < 2) continue;
     const winner = [...rules].sort(
       (a, b) =>
         RULE_LAYER_PRECEDENCE[b.layer] - RULE_LAYER_PRECEDENCE[a.layer] ||
         b.scopeDir.length - a.scopeDir.length,
     )[0]!;
-    for (const r of rules) if (r !== winner) losers.add(r.id);
-    conflicts.push({ topic, ruleIds: rules.map((r) => r.id), winner: winner.id });
+    for (const rule of rules) if (rule !== winner) losers.add(rule.id);
+    conflicts.push({ topic, ruleIds: rules.map((rule) => rule.id), winner: winner.id });
   }
 
   const kept = applicable.filter((r) => !losers.has(r.id));

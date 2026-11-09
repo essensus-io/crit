@@ -9,10 +9,10 @@ export function normalizePatch(patch: string): string {
   let p = patch.replace(/\r\n/g, "\n");
   p = p.replace(/^```(?:diff|patch)?\n/, "").replace(/\n```\s*$/, "\n");
   const lines = p.split("\n");
-  const fixed = lines.map((l) => {
-    const m = /^(---|\+\+\+) (?!a\/|b\/|\/dev\/null)(\S.*)$/.exec(l);
-    if (!m) return l;
-    return `${m[1]} ${m[1] === "---" ? "a" : "b"}/${m[2]}`;
+  const fixed = lines.map((line) => {
+    const match = /^(---|\+\+\+) (?!a\/|b\/|\/dev\/null)(\S.*)$/.exec(line);
+    if (!match) return line;
+    return `${match[1]} ${match[1] === "---" ? "a" : "b"}/${match[2]}`;
   });
   p = fixed.join("\n");
   if (!p.endsWith("\n")) p += "\n";
@@ -21,20 +21,24 @@ export function normalizePatch(patch: string): string {
 
 function applyFlags(patch: string): string[] {
   const flags = ["--recount", "--whitespace=nowarn"];
-  const hunks = parseUnifiedDiff(patch).flatMap((f) => f.hunks);
-  if (hunks.some((h) => !h.body.some((l) => l.startsWith(" ")))) flags.push("--unidiff-zero");
+  const hunks = parseUnifiedDiff(patch).flatMap((parsedFile) => parsedFile.hunks);
+  if (hunks.some((parsedHunk) => !parsedHunk.body.some((l) => l.startsWith(" "))))
+    flags.push("--unidiff-zero");
   return flags;
 }
 
 export async function checkPatch(root: string, patch: string): Promise<PatchCheck> {
   const p = normalizePatch(patch);
   const files = parseUnifiedDiff(p);
-  if (files.every((f) => f.hunks.length === 0)) {
+  if (files.every((parsedFile) => parsedFile.hunks.length === 0)) {
     return { ok: false, error: "not a unified diff (expected ---/+++ headers and @@ hunks)" };
   }
-  const r = await gitRaw(root, ["apply", "--check", ...applyFlags(p), "-"], p);
-  if (r.exitCode !== 0)
-    return { ok: false, error: r.stderr.trim() || `git apply exited ${r.exitCode}` };
+  const gitResult = await gitRaw(root, ["apply", "--check", ...applyFlags(p), "-"], p);
+  if (gitResult.exitCode !== 0)
+    return {
+      ok: false,
+      error: gitResult.stderr.trim() || `git apply exited ${gitResult.exitCode}`,
+    };
   return { ok: true, patch: p, files: files.map(diffPath) };
 }
 

@@ -49,11 +49,11 @@ export function mergeFindings(input: Finding[], similarity = 0.5): MergeResult {
   for (const group of byFp.values()) {
     const keep = group.reduce(better);
     const others = group.filter((f) => f !== keep);
-    removed.push(...others.map((f) => f.id));
+    removed.push(...others.map((other) => other.id));
     merged.push({
       ...keep,
       ruleIds: [...new Set(group.flatMap((f) => f.ruleIds))],
-      mergedFrom: [...new Set([...keep.mergedFrom, ...others.map((f) => f.id)])],
+      mergedFrom: [...new Set([...keep.mergedFrom, ...others.map((other) => other.id)])],
     });
   }
   merged.sort(
@@ -63,9 +63,9 @@ export function mergeFindings(input: Finding[], similarity = 0.5): MergeResult {
 
   const parent = new Map(merged.map((f) => [f.id, f.id]));
   const root = (id: string): string => {
-    let r = id;
-    while (parent.get(r) !== r) r = parent.get(r)!;
-    return r;
+    let result = id;
+    while (parent.get(result) !== result) result = parent.get(result)!;
+    return result;
   };
   for (let i = 0; i < merged.length; i++) {
     for (let j = i + 1; j < merged.length; j++) {
@@ -80,9 +80,9 @@ export function mergeFindings(input: Finding[], similarity = 0.5): MergeResult {
   const sizes = new Map<string, number>();
   for (const f of merged) sizes.set(root(f.id), (sizes.get(root(f.id)) ?? 0) + 1);
   const findings = merged.map((f) => {
-    const r = root(f.id);
+    const result = root(f.id);
     const { groupId: _g, ...rest } = f;
-    return (sizes.get(r) ?? 0) > 1 ? { ...rest, groupId: r } : rest;
+    return (sizes.get(result) ?? 0) > 1 ? { ...rest, groupId: result } : rest;
   });
   return { findings, removed };
 }

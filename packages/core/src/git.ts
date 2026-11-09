@@ -25,19 +25,19 @@ export async function gitRaw(cwd: string, args: string[], input?: string): Promi
   if (input !== undefined) {
     proc.process?.stdin?.end(input);
   }
-  const r = await proc;
-  return { stdout: r.stdout, stderr: r.stderr, exitCode: r.exitCode ?? 1 };
+  const output = await proc;
+  return { stdout: output.stdout, stderr: output.stderr, exitCode: output.exitCode ?? 1 };
 }
 
 export async function git(cwd: string, args: string[], input?: string): Promise<string> {
-  const r = await gitRaw(cwd, args, input);
-  if (r.exitCode !== 0) throw new GitError(args, r.exitCode, r.stderr);
-  return r.stdout;
+  const gitResult = await gitRaw(cwd, args, input);
+  if (gitResult.exitCode !== 0) throw new GitError(args, gitResult.exitCode, gitResult.stderr);
+  return gitResult.stdout;
 }
 
 export async function tryGit(cwd: string, args: string[]): Promise<string | undefined> {
-  const r = await gitRaw(cwd, args);
-  return r.exitCode === 0 ? r.stdout.trim() : undefined;
+  const gitResult = await gitRaw(cwd, args);
+  return gitResult.exitCode === 0 ? gitResult.stdout.trim() : undefined;
 }
 
 export async function repoRoot(cwd: string): Promise<string> {

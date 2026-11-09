@@ -23,9 +23,10 @@ import {
 import { type Choice, type Switcher } from "@/features/model-switching/lib/create-switcher.ts";
 import { type Editor, terminalEditor } from "@/shared/lib/terminal-editor.ts";
 
-function runFor(ctx: CliContext, file: ProvidersFile, c: Choice): ProviderRun {
-  const base = file.providers.find((p) => p.name === c.provider) ?? file.providers[0]!;
-  const profile = { ...base, model: c.model, effort: c.effort };
+function runFor(ctx: CliContext, file: ProvidersFile, choice: Choice): ProviderRun {
+  const base =
+    file.providers.find((provider) => provider.name === choice.provider) ?? file.providers[0]!;
+  const profile = { ...base, model: choice.model, effort: choice.effort };
   return { profile, adapter: adapterFor(ctx, profile) };
 }
 
@@ -50,12 +51,15 @@ export async function makeSession(
   const read = async (p: string) =>
     scope ? readAtRevision(scope, p) : readFileSync(join(root, p), "utf8");
   const added = new Map(
-    parseUnifiedDiff(scope?.diff ?? "").map((f) => [diffPath(f), addedLines(f)]),
+    parseUnifiedDiff(scope?.diff ?? "").map((parsedFile) => [
+      diffPath(parsedFile),
+      addedLines(parsedFile),
+    ]),
   );
   let fixContext: FixContext | undefined;
   let recheck: ((file: string) => Promise<string>) | undefined;
   let rebase;
-  if (providers?.providers.some((p) => p.enabled) && review) {
+  if (providers?.providers.some((provider) => provider.enabled) && review) {
     const evaluator = resolveProvider(providers, { role: "evaluate" }).profile;
     const holder = {
       run: { profile: evaluator, adapter: adapterFor(ctx, evaluator) } as ProviderRun,
@@ -70,7 +74,7 @@ export async function makeSession(
     rebase = (...args: Parameters<ReturnType<typeof agentRebaser>>) =>
       agentRebaser(holder.run, root, config)(...args);
     recheck = async (file) => {
-      const r = await runReview({
+      const reviewResult = await runReview({
         cwd: root,
         spec: { kind: "paths", paths: [file], diff: false },
         config,
@@ -82,12 +86,12 @@ export async function makeSession(
         configDir: ctx.paths.config,
         useCache: false,
       });
-      return r.review.id;
+      return reviewResult.review.id;
     };
-    opts.switcher?.subscribe((c) => {
-      holder.run = runFor(ctx, providers, c);
+    opts.switcher?.subscribe((choice) => {
+      holder.run = runFor(ctx, providers, choice);
       fixContext!.provider = holder.run;
-      config.depth = c.depth;
+      config.depth = choice.depth;
     });
   }
   const session = createReviewSession({
@@ -114,10 +118,10 @@ export async function makeSession(
     void ctx.registry
       .create(fixContext.provider.profile, { env: ctx.env, tmpDir: ctx.paths.cache })
       .detect()
-      .then((d) => {
-        if (d.installed && d.untestedVersion)
+      .then((detectResult) => {
+        if (detectResult.installed && detectResult.untestedVersion)
           session.notify(
-            `${fixContext.provider.profile.name} ${d.version ?? ""} has not been tested with this crit version; if something misbehaves, run crit doctor.`,
+            `${fixContext.provider.profile.name} ${detectResult.version ?? ""} has not been tested with this crit version; if something misbehaves, run crit doctor.`,
           );
       })
       .catch(() => undefined);

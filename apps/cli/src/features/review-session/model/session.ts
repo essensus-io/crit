@@ -87,7 +87,7 @@ export const createReviewSession = (deps: SessionDeps) => {
 
   const set = (patch: Partial<SessionState>) => {
     state = { ...state, ...patch };
-    for (const l of listeners) l();
+    for (const listener of listeners) listener();
   };
 
   const load = async (): Promise<SessionState> => {
@@ -113,18 +113,18 @@ export const createReviewSession = (deps: SessionDeps) => {
       }),
     ];
     const items = findings.map((finding): FindingView => {
-      const own = fixes.filter((f) => f.findingId === finding.id);
-      const v: FindingView = {
+      const own = fixes.filter((fix) => fix.findingId === finding.id);
+      const findingView: FindingView = {
         finding,
-        messages: messages.filter((m) => m.findingId === finding.id),
+        messages: messages.filter((message) => message.findingId === finding.id),
       };
       const active = own.find((f) => f.active);
       const ai = own.filter((f) => f.author === "ai").at(-1);
       const user = own.filter((f) => f.author === "user").at(-1);
-      if (active) v.fix = active;
-      if (ai) v.aiFix = ai;
-      if (user) v.userFix = user;
-      return v;
+      if (active) findingView.fix = active;
+      if (ai) findingView.aiFix = ai;
+      if (user) findingView.userFix = user;
+      return findingView;
     });
     await loadCode([...new Set(items.map((i) => i.finding.file))]);
     state = {
@@ -132,12 +132,12 @@ export const createReviewSession = (deps: SessionDeps) => {
       review,
       code: codeCache,
       items,
-      rules: new Map((ruleEvent?.rules ?? []).map((r) => [r.id, r])),
+      rules: new Map((ruleEvent?.rules ?? []).map((ruleRef) => [ruleRef.id, ruleRef])),
       disabledRules: await getDisabledRules(deps.store, review.repoId),
       drafting: [...draftingIds],
       omitted,
     };
-    for (const l of listeners) l();
+    for (const listener of listeners) listener();
     return state;
   };
 
@@ -164,10 +164,10 @@ export const createReviewSession = (deps: SessionDeps) => {
     set({ busy, error: undefined, notice: undefined });
     codeCache.clear();
     try {
-      const r = await fn();
+      const result = await fn();
       await load();
       set({ busy: undefined });
-      return r;
+      return result;
     } catch (err) {
       await load().catch(() => undefined);
       set({ busy: undefined, error: (err as Error).message });
@@ -227,8 +227,10 @@ export const createReviewSession = (deps: SessionDeps) => {
     }
     const selected = !it.finding.selected;
     set({
-      items: state.items.map((v) =>
-        v.finding.id === id ? { ...v, finding: { ...v.finding, selected } } : v,
+      items: state.items.map((findingView) =>
+        findingView.finding.id === id
+          ? { ...findingView, finding: { ...findingView.finding, selected } }
+          : findingView,
       ),
     });
     await deps.store.findings.update(id, { selected });
@@ -286,36 +288,36 @@ export const createReviewSession = (deps: SessionDeps) => {
   };
 
   const editFix = async (id: string) => {
-    const it = item(id)!;
-    const original = current(it.finding.file);
+    const findingView = item(id)!;
+    const original = current(findingView.finding.file);
     let start = original;
     try {
-      if (it.fix) start = patchedContent(original, it.fix.patch);
+      if (findingView.fix) start = patchedContent(original, findingView.fix.patch);
     } catch {
       start = original;
     }
-    const edited = await withTerminal(() => deps.editor(start, it.finding.file));
+    const edited = await withTerminal(() => deps.editor(start, findingView.finding.file));
     if (edited === undefined || edited === start) {
       notify("No changes.");
       return;
     }
-    const patch = diffFromEdit(it.finding.file, original, edited);
+    const patch = diffFromEdit(findingView.finding.file, original, edited);
     if (!patch) {
       notify("Your edit matches the current file; nothing to save.");
       return;
     }
     await run("Saving your edit…", async () => {
-      await saveEditedFix(deps.store, deps.root, it.finding, patch);
+      await saveEditedFix(deps.store, deps.root, findingView.finding, patch);
       await deps.store.findings.update(id, { selected: true });
     });
   };
 
   const proposeFromEditor = async (id: string): Promise<ProposalOutcome | undefined> => {
-    const it = item(id)!;
-    const original = current(it.finding.file);
-    const edited = await withTerminal(() => deps.editor(original, it.finding.file));
+    const findingView = item(id)!;
+    const original = current(findingView.finding.file);
+    const edited = await withTerminal(() => deps.editor(original, findingView.finding.file));
     const patch =
-      edited === undefined ? undefined : diffFromEdit(it.finding.file, original, edited);
+      edited === undefined ? undefined : diffFromEdit(findingView.finding.file, original, edited);
     if (!patch) {
       notify("No changes; nothing to propose.");
       return undefined;
@@ -328,7 +330,7 @@ export const createReviewSession = (deps: SessionDeps) => {
     only?: string[],
   ): Promise<ApplyResult | undefined> => {
     return run("Applying fixes…", async () => {
-      const r = await applyFixes({
+      const applyResult = await applyFixes({
         store: deps.store,
         reviewId: deps.reviewId,
         root: deps.root,
@@ -337,7 +339,7 @@ export const createReviewSession = (deps: SessionDeps) => {
         ...(only ? { only } : {}),
         ...(deps.verifyCommands.length ? { verifyCommands: deps.verifyCommands } : {}),
       });
-      return r;
+      return applyResult;
     }).then((r) => {
       if (r) {
         const parts = [`Applied ${r.applied.length}`];
@@ -362,10 +364,12 @@ export const createReviewSession = (deps: SessionDeps) => {
   };
 
   const recheck = (id: string) => {
-    const it = item(id)!;
+    const findingView = item(id)!;
     if (!deps.recheck)
       return Promise.resolve(set({ error: "re-check needs a provider (crit providers add)" }));
-    return run(`Re-checking ${it.finding.file}…`, () => recheckFile(it.finding.file));
+    return run(`Re-checking ${findingView.finding.file}…`, () =>
+      recheckFile(findingView.finding.file),
+    );
   };
 
   const recheckFile = async (file: string) => {
@@ -385,7 +389,7 @@ export const createReviewSession = (deps: SessionDeps) => {
     const it = item(id);
     if (!it) return;
     const refs = it.finding.ruleIds
-      .map((r) => state.rules.get(r))
+      .map((ruleId) => state.rules.get(ruleId))
       .filter((r): r is RuleRef => r !== undefined);
     const text = findingPrompt(it.finding, it.fix, refs);
     const via = (deps.copy ?? copyToClipboard)(text);
@@ -427,7 +431,7 @@ export const createReviewSession = (deps: SessionDeps) => {
     await run(
       `Re-checking ${files.length} file${files.length === 1 ? "" : "s"} without ${row.ref.id}…`,
       async () => {
-        for (const f of files) await recheckFile(f);
+        for (const file of files) await recheckFile(file);
       },
     );
     notify(`${row.ref.id} is off; re-checked ${files.length} file(s).`);

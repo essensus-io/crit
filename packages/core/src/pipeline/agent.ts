@@ -21,7 +21,7 @@ export async function runAgent(
   agent: AgentRunner,
   task: AgentTask,
   signal: AbortSignal,
-  onEvent?: (e: AgentEvent) => void,
+  onEvent?: (agentEvent: AgentEvent) => void,
 ): Promise<AgentOutcome> {
   const out: AgentOutcome = {
     exitCode: 1,
@@ -34,27 +34,28 @@ export async function runAgent(
   let running = emptyUsage();
   let final: ReturnType<typeof emptyUsage> | undefined;
   try {
-    for await (const e of agent.run(task, signal)) {
-      onEvent?.(e);
-      switch (e.type) {
+    for await (const agentEvent of agent.run(task, signal)) {
+      onEvent?.(agentEvent);
+      switch (agentEvent.type) {
         case "message":
-          out.message = e.text;
+          out.message = agentEvent.text;
           break;
         case "usage":
-          if (e.partial) running = { ...emptyUsage(), ...stripUndefined(e) };
-          else final = addUsage(final ?? emptyUsage(), e);
+          if (agentEvent.partial) running = { ...emptyUsage(), ...stripUndefined(agentEvent) };
+          else final = addUsage(final ?? emptyUsage(), agentEvent);
           break;
         case "rate-limited":
-          out.rateLimited = e.retryAfterMs === undefined ? {} : { retryAfterMs: e.retryAfterMs };
+          out.rateLimited =
+            agentEvent.retryAfterMs === undefined ? {} : { retryAfterMs: agentEvent.retryAfterMs };
           break;
         case "session":
-          out.sessionId = e.id;
+          out.sessionId = agentEvent.id;
           break;
         case "error":
-          out.errors.push(e.message);
+          out.errors.push(agentEvent.message);
           break;
         case "done":
-          out.exitCode = e.exitCode;
+          out.exitCode = agentEvent.exitCode;
           break;
       }
     }

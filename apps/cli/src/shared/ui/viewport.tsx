@@ -69,9 +69,9 @@ export const Viewport = ({
   return (
     <Box width={width} height={height} overflow="hidden">
       <Box flexDirection="column" width={bar ? width - 1 : width} height={height}>
-        {slice.map((l, i) => (
+        {slice.map((reactNode, i) => (
           <Text key={shown + i} wrap="truncate">
-            {l}
+            {reactNode}
           </Text>
         ))}
       </Box>

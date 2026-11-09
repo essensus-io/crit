@@ -13,26 +13,28 @@ export async function listProviders(ctx: CliContext): Promise<number> {
     return EXIT.ok;
   }
   const rows: string[][] = [[c.dim("  NAME"), c.dim("TYPE"), c.dim("MODEL"), c.dim("STATUS"), ""]];
-  for (const p of file.providers) {
+  for (const provider of file.providers) {
     let status = "disabled";
-    if (p.enabled) {
-      const factory = ctx.registry.get(p.type);
-      if (!factory) status = c.red(`unknown type ${p.type}`);
+    if (provider.enabled) {
+      const factory = ctx.registry.get(provider.type);
+      if (!factory) status = c.red(`unknown type ${provider.type}`);
       else {
-        const d = await ctx.registry.create(p, { env: ctx.env, tmpDir: ctx.paths.cache }).detect();
-        status = !d.installed
+        const detectResult = await ctx.registry
+          .create(provider, { env: ctx.env, tmpDir: ctx.paths.cache })
+          .detect();
+        status = !detectResult.installed
           ? c.red("not installed")
-          : d.untestedVersion
-            ? c.yellow(`ready (${d.version}, untested)`)
-            : c.green(d.version ? `ready (${d.version})` : "ready");
+          : detectResult.untestedVersion
+            ? c.yellow(`ready (${detectResult.version}, untested)`)
+            : c.green(detectResult.version ? `ready (${detectResult.version})` : "ready");
       }
     }
     rows.push([
-      `${file.default === p.name ? "●" : " "} ${p.name}`,
-      p.type,
-      p.model ?? "CLI default",
+      `${file.default === provider.name ? "●" : " "} ${provider.name}`,
+      provider.type,
+      provider.model ?? "CLI default",
       status,
-      file.default === p.name ? "default" : "",
+      file.default === provider.name ? "default" : "",
     ]);
   }
   ctx.out(`\n${table(rows)}\n`);

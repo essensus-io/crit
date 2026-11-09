@@ -14,7 +14,11 @@ export function findingPrompt(finding: Finding, fix: Fix | undefined, rules: Rul
   if (finding.failureScenario) out.push("", `How it fails: ${finding.failureScenario.trim()}`);
   out.push("", "Code at that location:", "```", finding.anchor, "```");
   if (rules.length)
-    out.push("", "Project rules involved:", ...rules.map((r) => `- ${r.title} (${r.path})`));
+    out.push(
+      "",
+      "Project rules involved:",
+      ...rules.map((ruleRef) => `- ${ruleRef.title} (${ruleRef.path})`),
+    );
   if (fix) out.push("", `Suggested fix: ${fix.summary}`, "```diff", fix.patch.trim(), "```");
   out.push(
     "",

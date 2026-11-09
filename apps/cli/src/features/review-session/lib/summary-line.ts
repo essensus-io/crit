@@ -8,11 +8,13 @@ export async function summaryLine(
   const review = await store.reviews.get(reviewId);
   if (!review) return undefined;
   const row = (await listHistory(store.db, { repoId: review.repoId, limit: 20 })).find(
-    (r) => r.review.id === reviewId,
+    (historyRow) => historyRow.review.id === reviewId,
   );
   if (!row) return undefined;
   const findings = await store.findings.listByReview(reviewId);
-  const shown = findings.filter((f) => f.verdict !== "rejected" && f.status !== "dismissed");
+  const shown = findings.filter(
+    (finding) => finding.verdict !== "rejected" && finding.status !== "dismissed",
+  );
   const selected = shown.filter((f) => f.selected).length;
   const tokens = row.tokens.effective > 0 ? ` · ~${formatTokens(row.tokens.effective)} tokens` : "";
   const state = review.status === "partial" ? " (stopped early)" : "";

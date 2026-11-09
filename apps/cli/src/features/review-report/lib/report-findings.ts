@@ -12,7 +12,7 @@ import {
 export const visible = (f: Finding) => f.verdict !== "rejected" && f.status !== "closed";
 
 export function activeFixes(doc: ReviewExport): Map<string, Fix> {
-  return new Map(doc.fixes.filter((f) => f.active).map((f) => [f.findingId, f]));
+  return new Map(doc.fixes.filter((fix) => fix.active).map((f) => [f.findingId, f]));
 }
 
 export function sortFindings(list: Finding[]): Finding[] {
@@ -25,7 +25,7 @@ export function sortFindings(list: Finding[]): Finding[] {
 }
 
 export function reviewerTokens(doc: ReviewExport) {
-  const u = doc.shards.reduce(
+  const tokenUsage = doc.shards.reduce(
     (a, s) =>
       addUsage(a, {
         inputTokens: s.inputTokens ?? 0,
@@ -34,12 +34,12 @@ export function reviewerTokens(doc: ReviewExport) {
       }),
     emptyUsage(),
   );
-  return { ...u, effective: effectiveTokens(u) };
+  return { ...tokenUsage, effective: effectiveTokens(tokenUsage) };
 }
 
 export function severityCounts(findings: Finding[]): Record<Severity, number> {
   const out: Record<Severity, number> = { critical: 0, major: 0, minor: 0, nit: 0 };
-  for (const f of findings) out[f.severity]++;
+  for (const finding of findings) out[finding.severity]++;
   return out;
 }
 

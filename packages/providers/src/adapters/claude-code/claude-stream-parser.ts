@@ -38,9 +38,9 @@ const claudeUsage = (u: ClaudeUsage) => ({
 
 const short = (s: string, n = 80) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-function describeTool(b: Block): string | undefined {
-  const i = b.input ?? {};
-  switch (b.name) {
+function describeTool(block: Block): string | undefined {
+  const i = block.input ?? {};
+  switch (block.name) {
     case "Read":
       return typeof i.file_path === "string" ? `reading ${basename(i.file_path)}` : undefined;
     case "Grep":
@@ -77,7 +77,7 @@ export const createClaudeStreamParser = (loginHint: string) => {
       case "system":
         if (d.subtype === "init") {
           if (d.session_id) out.push({ type: "session", id: d.session_id });
-          const crit = d.mcp_servers?.find((s) => s.name === "crit");
+          const crit = d.mcp_servers?.find((mcp_server) => mcp_server.name === "crit");
           if (crit && crit.status !== "connected") {
             out.push({
               type: "error",
@@ -97,22 +97,23 @@ export const createClaudeStreamParser = (loginHint: string) => {
           }
           out.push({ type: "usage", partial: true, ...total });
         }
-        for (const b of d.message?.content ?? []) {
-          if (b.type === "tool_use" && b.name) {
-            out.push({ type: "tool", name: b.name });
-            const text = describeTool(b);
+        for (const block of d.message?.content ?? []) {
+          if (block.type === "tool_use" && block.name) {
+            out.push({ type: "tool", name: block.name });
+            const text = describeTool(block);
             if (text) out.push({ type: "progress", text });
-          } else if (b.type === "text" && b.text?.trim()) {
-            out.push({ type: "progress", text: short(b.text.trim().split("\n")[0]!) });
+          } else if (block.type === "text" && block.text?.trim()) {
+            out.push({ type: "progress", text: short(block.text.trim().split("\n")[0]!) });
           }
         }
         break;
       case "rate_limit_event": {
         const info = d.rate_limit_info;
         if (info?.status === "rejected") {
-          const e: AgentEvent = { type: "rate-limited" };
-          if (info.resetsAt) e.retryAfterMs = Math.max(0, info.resetsAt * 1000 - Date.now());
-          out.push(e);
+          const agentEvent: AgentEvent = { type: "rate-limited" };
+          if (info.resetsAt)
+            agentEvent.retryAfterMs = Math.max(0, info.resetsAt * 1000 - Date.now());
+          out.push(agentEvent);
         }
         break;
       }

@@ -14,10 +14,10 @@ export const runTui = async (
   store: SqliteStore,
   root: string,
   config: ResolvedConfig,
-  start: (onEvent: (e: ReviewEvent) => void, signal: AbortSignal) => Promise<unknown>,
+  start: (onEvent: (reviewEvent: ReviewEvent) => void, signal: AbortSignal) => Promise<unknown>,
   initial?: Partial<Choice> & { provider: string },
 ): Promise<RunRecovery | undefined> => {
-  const listeners = new Set<(e: ReviewEvent) => void>();
+  const listeners = new Set<(reviewEvent: ReviewEvent) => void>();
   let recovery: RunRecovery | undefined;
   let reviewId: string | undefined;
   const ac = new AbortController();
@@ -37,9 +37,9 @@ export const runTui = async (
       {...(switcher ? { switcher } : {})}
     />,
   );
-  const running = start((e) => {
-    if (e.type === "review-started") reviewId = e.reviewId;
-    for (const l of listeners) l(e);
+  const running = start((reviewEvent) => {
+    if (reviewEvent.type === "review-started") reviewId = reviewEvent.reviewId;
+    for (const listener of listeners) listener(reviewEvent);
   }, ac.signal).catch(() => undefined);
   await ui;
   ac.abort();

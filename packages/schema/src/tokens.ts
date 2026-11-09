@@ -12,10 +12,10 @@ export const emptyUsage = (): TokenUsage => ({
   cachedInputTokens: 0,
 });
 
-export const addUsage = (a: TokenUsage, b: Partial<TokenUsage>): TokenUsage => ({
-  inputTokens: a.inputTokens + (b.inputTokens ?? 0),
-  outputTokens: a.outputTokens + (b.outputTokens ?? 0),
-  cachedInputTokens: a.cachedInputTokens + (b.cachedInputTokens ?? 0),
+export const addUsage = (tokenUsage: TokenUsage, b: Partial<TokenUsage>): TokenUsage => ({
+  inputTokens: tokenUsage.inputTokens + (b.inputTokens ?? 0),
+  outputTokens: tokenUsage.outputTokens + (b.outputTokens ?? 0),
+  cachedInputTokens: tokenUsage.cachedInputTokens + (b.cachedInputTokens ?? 0),
 });
 
 export function effectiveTokens(u: Partial<TokenUsage>): number {

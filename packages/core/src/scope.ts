@@ -82,7 +82,7 @@ function untrackedDiff(root: string, path: string): string {
   const lines = content.split("\n");
   const noEol = !content.endsWith("\n");
   if (!noEol) lines.pop();
-  const body = lines.map((l) => `+${l}`).join("\n");
+  const body = lines.map((line) => `+${line}`).join("\n");
   return [
     `diff --git a/${path} b/${path}`,
     "new file mode 100644",
@@ -137,23 +137,23 @@ function scopedFromDiff(
 ): { files: ScopedFile[]; skipped: { path: string; reason: string }[] } {
   const out: ScopedFile[] = [];
   const skipped: { path: string; reason: string }[] = [];
-  for (const f of files) {
-    const path = diffPath(f);
-    if (f.binary || BINARY_EXTENSIONS.test(path)) {
+  for (const parsedFile of files) {
+    const path = diffPath(parsedFile);
+    if (parsedFile.binary || BINARY_EXTENSIONS.test(path)) {
       skipped.push({ path, reason: "binary file" });
       continue;
     }
-    if (f.status === "renamed" && f.hunks.length === 0) {
+    if (parsedFile.status === "renamed" && parsedFile.hunks.length === 0) {
       skipped.push({ path, reason: "renamed without changes" });
       continue;
     }
     const sf: ScopedFile = {
       path,
-      status: f.status,
-      hunks: hunksOf(f),
-      size: f.status === "deleted" ? 0 : fileSize(join(root, path)),
+      status: parsedFile.status,
+      hunks: hunksOf(parsedFile),
+      size: parsedFile.status === "deleted" ? 0 : fileSize(join(root, path)),
     };
-    if (f.status === "renamed" && f.oldPath) sf.oldPath = f.oldPath;
+    if (parsedFile.status === "renamed" && parsedFile.oldPath) sf.oldPath = parsedFile.oldPath;
     out.push(sf);
   }
   return { files: out, skipped };
@@ -176,7 +176,8 @@ export function pathMatcher(root: string, cwd: string, args: string[]): (file: s
   }
   const isGlobMatch = globs.length ? picomatch(globs, { dot: true }) : () => false;
   return (file) =>
-    prefixes.some((p) => p === "" || file === p || file.startsWith(`${p}/`)) || isGlobMatch(file);
+    prefixes.some((prefix) => prefix === "" || file === prefix || file.startsWith(`${prefix}/`)) ||
+    isGlobMatch(file);
 }
 
 function filterIgnored<T extends { path: string }>(
@@ -186,10 +187,10 @@ function filterIgnored<T extends { path: string }>(
 ) {
   const kept: T[] = [];
   const skipped: { path: string; reason: string }[] = [];
-  for (const it of items) {
-    const reason = why(it.path, named.has(it.path));
-    if (reason) skipped.push({ path: it.path, reason });
-    else kept.push(it);
+  for (const t of items) {
+    const reason = why(t.path, named.has(t.path));
+    if (reason) skipped.push({ path: t.path, reason });
+    else kept.push(t);
   }
   return { kept, skipped };
 }
@@ -236,18 +237,18 @@ export async function resolveScope(opts: ResolveScopeOptions): Promise<ResolvedS
   ): ResolvedScope => {
     const dropped: { path: string; reason: string }[] = [];
     const files: ScopedFile[] = [];
-    for (const p of paths) {
-      const abs = join(root, p);
-      if (BINARY_EXTENSIONS.test(p) || looksBinary(abs)) {
-        dropped.push({ path: p, reason: "binary file" });
+    for (const path of paths) {
+      const abs = join(root, path);
+      if (BINARY_EXTENSIONS.test(path) || looksBinary(abs)) {
+        dropped.push({ path: path, reason: "binary file" });
         continue;
       }
       const size = fileSize(abs);
-      if (size > maxFileBytes && !named.has(p)) {
-        dropped.push({ path: p, reason: `larger than ${fmtTokens(maxFileBytes / 4)} tokens` });
+      if (size > maxFileBytes && !named.has(path)) {
+        dropped.push({ path: path, reason: `larger than ${fmtTokens(maxFileBytes / 4)} tokens` });
         continue;
       }
-      files.push({ path: p, status: "unchanged", size });
+      files.push({ path: path, status: "unchanged", size });
     }
     const { kept, skipped } = filterIgnored(files, why, named);
     const all = [...skipped, ...dropped];
@@ -265,15 +266,15 @@ export async function resolveScope(opts: ResolveScopeOptions): Promise<ResolvedS
       });
     }
     case "staged": {
-      const d = await diffAgainst(root, ["--cached", ...(head ? [] : [EMPTY_TREE])], false);
-      return fromDiff(d, "staged changes", head ? { baseSha: head, baseRef: "HEAD" } : {});
+      const diffSet = await diffAgainst(root, ["--cached", ...(head ? [] : [EMPTY_TREE])], false);
+      return fromDiff(diffSet, "staged changes", head ? { baseSha: head, baseRef: "HEAD" } : {});
     }
     case "commit": {
       const sha = await tryGit(root, ["rev-parse", "--verify", "-q", `${spec.sha}^{commit}`]);
       if (!sha) throw new ScopeError(`crit: unknown commit ${spec.sha}`);
       const parent = (await tryGit(root, ["rev-parse", "--verify", "-q", `${sha}^`])) ?? EMPTY_TREE;
-      const d = await diffAgainst(root, [parent, sha], false);
-      return fromDiff(d, `commit ${sha.slice(0, 7)}`, { baseSha: parent, headSha: sha });
+      const diffSet = await diffAgainst(root, [parent, sha], false);
+      return fromDiff(diffSet, `commit ${sha.slice(0, 7)}`, { baseSha: parent, headSha: sha });
     }
     case "paths": {
       const match = pathMatcher(root, opts.cwd, spec.paths);
@@ -281,11 +282,11 @@ export async function resolveScope(opts: ResolveScopeOptions): Promise<ResolvedS
       if (spec.diff) {
         const d = await branchDiff(root, spec.base);
         named = namedFiles(root, opts.cwd, spec.paths, d.files.map(diffPath));
-        const r = fromDiff(d, `${label} (changed vs ${d.base})`, {
+        const result = fromDiff(d, `${label} (changed vs ${d.base})`, {
           baseSha: d.baseSha,
           baseRef: d.base,
         });
-        return { ...r, files: r.files.filter((f) => match(f.path)) };
+        return { ...result, files: result.files.filter((file) => match(file.path)) };
       }
       const tracked = (await trackedFiles(root)).filter(match);
       if (tracked.length === 0) throw new ScopeError(`crit: no tracked files match ${label}`);
@@ -312,5 +313,5 @@ export function namedFiles(
 }
 
 export function reportableFiles(scope: ResolvedScope): Set<string> {
-  return new Set(scope.files.filter((f) => f.status !== "deleted").map((f) => f.path));
+  return new Set(scope.files.filter((file) => file.status !== "deleted").map((f) => f.path));
 }

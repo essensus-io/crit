@@ -5,9 +5,9 @@ import { parseUnifiedDiff } from "@crit/core";
 export const diffRows = (patch: string): ReactNode[] => {
   const rows: { n: string; sign: string; text: string }[] = [];
   for (const file of parseUnifiedDiff(patch)) {
-    for (const h of file.hunks) {
-      let n = h.newStart;
-      for (const l of h.body) {
+    for (const parsedHunk of file.hunks) {
+      let n = parsedHunk.newStart;
+      for (const l of parsedHunk.body) {
         const sign = l[0] ?? " ";
         if (sign === "\\") continue;
         const text = l.slice(1);
@@ -19,17 +19,17 @@ export const diffRows = (patch: string): ReactNode[] => {
       }
     }
   }
-  const width = Math.max(3, ...rows.map((r) => r.n.length));
-  return rows.map((r, i) => (
+  const width = Math.max(3, ...rows.map((row) => row.n.length));
+  return rows.map((row, i) => (
     <Text
       key={i}
-      {...(r.sign === "+"
+      {...(row.sign === "+"
         ? { color: "#86efac" }
-        : r.sign === "-"
+        : row.sign === "-"
           ? { color: "#f87171" }
           : { dimColor: true })}
     >
-      {`   ${r.n.padStart(width)}  ${r.sign} ${r.text}`}
+      {`   ${row.n.padStart(width)}  ${row.sign} ${row.text}`}
     </Text>
   ));
 };
@@ -38,9 +38,9 @@ type Props = { patch: string; maxLines?: number };
 export const DiffView = ({ patch, maxLines = 30 }: Props) => {
   const rows: { n: string; sign: string; text: string }[] = [];
   for (const file of parseUnifiedDiff(patch)) {
-    for (const h of file.hunks) {
-      let n = h.newStart;
-      for (const l of h.body) {
+    for (const parsedHunk of file.hunks) {
+      let n = parsedHunk.newStart;
+      for (const l of parsedHunk.body) {
         const sign = l[0] ?? " ";
         if (sign === "\\") continue;
         const text = l.slice(1);

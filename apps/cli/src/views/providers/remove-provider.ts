@@ -22,7 +22,7 @@ export async function removeProviderCmd(
     if (!ok) return EXIT.cancelled;
   }
   let newDefault = args.default;
-  const rest = file.providers.filter((p) => p.name !== name);
+  const rest = file.providers.filter((provider) => provider.name !== name);
   if (isDefault && rest.length > 0 && !newDefault) {
     if (rest.length === 1) newDefault = rest[0]!.name;
     else if (ctx.interactive)

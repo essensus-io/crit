@@ -7,7 +7,7 @@ import { load, need } from "./providers-file.ts";
 
 export async function testProviders(ctx: CliContext, name?: string): Promise<number> {
   const file = load(ctx);
-  const list = name ? [need(file, name)] : file.providers.filter((p) => p.enabled);
+  const list = name ? [need(file, name)] : file.providers.filter((provider) => provider.enabled);
   if (list.length === 0)
     throw new CliError("crit: no providers to test", {
       hint: "Add one with `crit providers add`.",
@@ -15,11 +15,12 @@ export async function testProviders(ctx: CliContext, name?: string): Promise<num
   const c = colors(ctx.color);
   let failed = 0;
   for (const p of list) {
-    const r = await testProvider(ctx, p);
-    if (r.ok) ctx.out(`${c.green("✓")} ${p.name.padEnd(12)} replied in ${duration(r.ms)}\n`);
+    const testResult = await testProvider(ctx, p);
+    if (testResult.ok)
+      ctx.out(`${c.green("✓")} ${p.name.padEnd(12)} replied in ${duration(testResult.ms)}\n`);
     else {
       failed++;
-      ctx.out(`${c.red("✗")} ${p.name.padEnd(12)} ${r.error}\n`);
+      ctx.out(`${c.red("✗")} ${p.name.padEnd(12)} ${testResult.error}\n`);
     }
   }
   return failed ? EXIT.error : EXIT.ok;

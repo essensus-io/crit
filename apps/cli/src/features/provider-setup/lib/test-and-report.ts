@@ -10,13 +10,14 @@ export async function testAndReport(ctx: CliContext, profiles: ProviderProfile[]
   s.start("Testing providers");
   const lines: string[] = [];
   let failed = false;
-  for (const p of profiles) {
-    const r = await testProvider(ctx, p);
-    if (r.ok) lines.push(`✓ ${p.name.padEnd(10)} replied in ${duration(r.ms)}`);
+  for (const profile of profiles) {
+    const testResult = await testProvider(ctx, profile);
+    if (testResult.ok)
+      lines.push(`✓ ${profile.name.padEnd(10)} replied in ${duration(testResult.ms)}`);
     else {
       failed = true;
-      lines.push(`✗ ${p.name.padEnd(10)} ${r.error}`);
+      lines.push(`✗ ${profile.name.padEnd(10)} ${testResult.error}`);
     }
   }
-  s.stop(`Testing providers\n${lines.map((l) => c.dim(l)).join("\n")}`, failed);
+  s.stop(`Testing providers\n${lines.map((line) => c.dim(line)).join("\n")}`, failed);
 }

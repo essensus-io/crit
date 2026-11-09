@@ -33,19 +33,25 @@ export async function doctor(ctx: CliContext, opts: { test?: boolean } = {}): Pr
     checks.push({ name: "sqlite", ok: false, detail: (err as Error).message });
   }
 
-  for (const f of ctx.registry.list()) {
+  for (const adapterFactory of ctx.registry.list()) {
     const adapter = ctx.registry.create(
-      { name: f.type, type: f.type, command: f.defaultCommand, model: null, enabled: true },
+      {
+        name: adapterFactory.type,
+        type: adapterFactory.type,
+        command: adapterFactory.defaultCommand,
+        model: null,
+        enabled: true,
+      },
       { env: ctx.env, tmpDir: ctx.paths.cache },
     );
-    const d = await adapter.detect();
+    const detectResult = await adapter.detect();
     checks.push({
-      name: f.defaultCommand,
-      ok: d.installed,
-      warn: !d.installed || d.untestedVersion,
-      detail: !d.installed
+      name: adapterFactory.defaultCommand,
+      ok: detectResult.installed,
+      warn: !detectResult.installed || detectResult.untestedVersion,
+      detail: !detectResult.installed
         ? "not installed"
-        : `${d.version ?? "unknown version"}${d.untestedVersion ? " · not tested with this crit version" : ""} · ${d.path}`,
+        : `${detectResult.version ?? "unknown version"}${detectResult.untestedVersion ? " · not tested with this crit version" : ""} · ${detectResult.path}`,
     });
   }
 
@@ -85,26 +91,30 @@ export async function doctor(ctx: CliContext, opts: { test?: boolean } = {}): Pr
 
   if (opts.test && providers) {
     const { testProvider } = await import("@/features/provider-setup/lib/test-provider.ts");
-    for (const p of providers.providers.filter((x) => x.enabled)) {
-      const r = await testProvider(ctx, p);
-      checks.push({ name: `test ${p.name}`, ok: r.ok, detail: r.ok ? "replied" : r.error });
+    for (const p of providers.providers.filter((provider) => provider.enabled)) {
+      const testResult = await testProvider(ctx, p);
+      checks.push({
+        name: `test ${p.name}`,
+        ok: testResult.ok,
+        detail: testResult.ok ? "replied" : testResult.error,
+      });
     }
   }
 
   const c = colors(ctx.color);
-  for (const ch of checks) {
-    const mark = !ch.ok ? c.red("✗") : ch.warn ? c.yellow("!") : c.green("✓");
-    ctx.out(`${mark} ${ch.name.padEnd(20)} ${ch.ok ? ch.detail : c.red(ch.detail)}\n`);
+  for (const check of checks) {
+    const mark = !check.ok ? c.red("✗") : check.warn ? c.yellow("!") : c.green("✓");
+    ctx.out(`${mark} ${check.name.padEnd(20)} ${check.ok ? check.detail : c.red(check.detail)}\n`);
   }
-  const agents = checks.filter((ch) =>
-    ctx.registry.list().some((f) => f.defaultCommand === ch.name),
+  const agents = checks.filter((check) =>
+    ctx.registry.list().some((adapterFactory) => adapterFactory.defaultCommand === check.name),
   );
-  if (!agents.some((a) => a.ok))
+  if (!agents.some((check) => check.ok))
     ctx.out(
       c.yellow(
         "\nNo supported agent CLI is installed. Install Claude Code, Codex or Cursor's agent CLI.\n",
       ),
     );
-  const critical = checks.filter((ch) => !ch.ok && !agents.includes(ch));
+  const critical = checks.filter((check) => !check.ok && !agents.includes(check));
   return critical.length ? EXIT.error : EXIT.ok;
 }

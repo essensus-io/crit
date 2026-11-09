@@ -11,22 +11,27 @@ export async function listProviderModels(
   args: { search?: string; json?: boolean },
 ): Promise<number> {
   const file = loadProviders(ctx.paths);
-  const profile = target ? file?.providers.find((p) => p.name === target) : undefined;
-  const byDefault = !target ? file?.providers.find((p) => p.name === file.default) : undefined;
+  const profile = target ? file?.providers.find((provider) => provider.name === target) : undefined;
+  const byDefault = !target
+    ? file?.providers.find((provider) => provider.name === file.default)
+    : undefined;
   const chosen = profile ?? byDefault;
   const factory = ctx.registry.get(chosen?.type ?? target ?? "");
   if (!factory)
     throw new CliError(`crit: ${target ?? "no provider"} is not a provider name or type`, {
-      hint: `Providers: ${file?.providers.map((p) => p.name).join(", ") || "none"}. Types: ${ctx.registry
+      hint: `Providers: ${file?.providers.map((provider) => provider.name).join(", ") || "none"}. Types: ${ctx.registry
         .list()
-        .map((f) => f.type)
+        .map((adapterFactory) => adapterFactory.type)
         .join(", ")}.`,
     });
   const command = chosen?.command ?? factory.defaultCommand;
   const { models, live } = await listModels(factory, { command, env: ctx.env });
   const q = args.search?.toLowerCase();
   const shown = q
-    ? models.filter((m) => m.id.toLowerCase().includes(q) || m.label.toLowerCase().includes(q))
+    ? models.filter(
+        (modelInfo) =>
+          modelInfo.id.toLowerCase().includes(q) || modelInfo.label.toLowerCase().includes(q),
+      )
     : models;
   if (args.json) {
     ctx.out(
@@ -36,13 +41,13 @@ export async function listProviderModels(
   }
   const c = colors(ctx.color);
   const rows = [["", c.dim("MODEL ID"), c.dim("NAME"), c.dim("EFFORTS")]];
-  for (const m of shown)
+  for (const modelInfo of shown)
     rows.push([
-      m.id === chosen?.model ? "●" : " ",
-      m.id,
-      m.label,
-      m.efforts?.length
-        ? `${m.efforts.join(" ")}${m.defaultEffort ? c.dim(` (default ${m.defaultEffort})`) : ""}`
+      modelInfo.id === chosen?.model ? "●" : " ",
+      modelInfo.id,
+      modelInfo.label,
+      modelInfo.efforts?.length
+        ? `${modelInfo.efforts.join(" ")}${modelInfo.defaultEffort ? c.dim(` (default ${modelInfo.defaultEffort})`) : ""}`
         : factory.efforts.length
           ? c.dim("per CLI")
           : c.dim("in the model id"),

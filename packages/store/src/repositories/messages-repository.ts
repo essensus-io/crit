@@ -28,6 +28,6 @@ export const createMessagesRepository = (db: Db): Repositories["messages"] => ({
       .where(eq(t.findings.reviewId, reviewId))
       .orderBy(asc(t.messages.id))
       .all();
-    return rows.map((r) => messageFromRow(r.m));
+    return rows.map((row) => messageFromRow(row.m));
   },
 });

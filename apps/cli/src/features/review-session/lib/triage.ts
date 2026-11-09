@@ -1,13 +1,15 @@
 import type { FindingView } from "@/features/review-session/model/session.ts";
 
-export const isFiltered = (v: FindingView) =>
-  v.finding.verdict === "rejected" || v.finding.status === "closed";
+export const isFiltered = (findingView: FindingView) =>
+  findingView.finding.verdict === "rejected" || findingView.finding.status === "closed";
 
-export const triage = (v: FindingView): "pending" | "accepted" | "dismissed" | "applied" =>
-  v.finding.status === "applied" || v.finding.status === "fixed"
+export const triage = (
+  findingView: FindingView,
+): "pending" | "accepted" | "dismissed" | "applied" =>
+  findingView.finding.status === "applied" || findingView.finding.status === "fixed"
     ? "applied"
-    : v.finding.status === "dismissed"
+    : findingView.finding.status === "dismissed"
       ? "dismissed"
-      : v.finding.selected
+      : findingView.finding.selected
         ? "accepted"
         : "pending";

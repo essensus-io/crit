@@ -44,11 +44,11 @@ export type FakeCall = { task: AgentTask; run: FakeRun | undefined };
 const sleep = (ms: number, signal: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
     if (signal.aborted) return reject(new Error("aborted"));
-    const t = setTimeout(resolve, ms);
+    const timeout = setTimeout(resolve, ms);
     signal.addEventListener(
       "abort",
       () => {
-        clearTimeout(t);
+        clearTimeout(timeout);
         reject(new Error("aborted"));
       },
       { once: true },
@@ -56,10 +56,10 @@ const sleep = (ms: number, signal: AbortSignal) =>
   });
 
 export function findingsInPrompt(prompt: string): { id: string; title: string }[] {
-  const m = /<findings>\s*([\s\S]*?)\s*<\/findings>/.exec(prompt);
-  if (!m) return [];
+  const match = /<findings>\s*([\s\S]*?)\s*<\/findings>/.exec(prompt);
+  if (!match) return [];
   try {
-    const list = JSON.parse(m[1]!) as { id: string; title: string }[];
+    const list = JSON.parse(match[1]!) as { id: string; title: string }[];
     return list.map(({ id, title }) => ({ id, title }));
   } catch {
     return [];

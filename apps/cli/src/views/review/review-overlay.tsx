@@ -118,10 +118,10 @@ export const reviewOverlay = ({
     return (
       <Picker
         title="rules in this review · enter toggles"
-        options={rows.map((r) => ({
-          value: r.ref.id,
-          label: `${r.disabled ? "[ ]" : "[x]"} ${r.ref.id}  ${r.ref.title}`,
-          hint: r.ref.path,
+        options={rows.map((row) => ({
+          value: row.ref.id,
+          label: `${row.disabled ? "[ ]" : "[x]"} ${row.ref.id}  ${row.ref.title}`,
+          hint: row.ref.path,
         }))}
         width={width}
         height={height}

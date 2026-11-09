@@ -21,10 +21,10 @@ export function sarifReport(doc: ReviewExport, toolVersion: string): object {
             name: "crit",
             version: toolVersion,
             informationUri: "https://github.com/crit-dev/crit",
-            rules: categories.map((c) => ({
-              id: `crit/${c}`,
-              name: c,
-              shortDescription: { text: `crit ${c} finding` },
+            rules: categories.map((category) => ({
+              id: `crit/${category}`,
+              name: category,
+              shortDescription: { text: `crit ${category} finding` },
             })),
           },
         },

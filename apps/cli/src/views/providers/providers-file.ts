@@ -9,10 +9,10 @@ export function load(ctx: CliContext): ProvidersFile {
 }
 
 export const need = (file: ProvidersFile, name: string) => {
-  const p = file.providers.find((x) => x.name === name);
+  const p = file.providers.find((provider) => provider.name === name);
   if (!p)
     throw new CliError(`crit: no provider named "${name}"`, {
-      hint: `Have: ${file.providers.map((x) => x.name).join(", ") || "none"}. Add one with \`crit providers add\`.`,
+      hint: `Have: ${file.providers.map((provider) => provider.name).join(", ") || "none"}. Add one with \`crit providers add\`.`,
     });
   return p;
 };

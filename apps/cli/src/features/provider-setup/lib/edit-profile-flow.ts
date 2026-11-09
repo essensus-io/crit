@@ -92,12 +92,12 @@ export async function editProfileFlow(
       ? await ctx.prompter.confirm({ message: "Test now?", initialValue: true })
       : false);
   if (test) {
-    const r = await testProvider(
+    const testResult = await testProvider(
       ctx,
-      next.providers.find((x) => x.name === existing.name)!,
+      next.providers.find((provider) => provider.name === existing.name)!,
     );
-    if (r.ok) ctx.prompter.success(`replied in ${duration(r.ms)}`);
-    else ctx.prompter.warn(r.error);
+    if (testResult.ok) ctx.prompter.success(`replied in ${duration(testResult.ms)}`);
+    else ctx.prompter.warn(testResult.error);
   }
   return next;
 }

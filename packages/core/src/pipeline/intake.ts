@@ -33,8 +33,8 @@ export async function readAtRevision(
   const spec = scope.spec;
   if (spec.kind === "commit" || spec.kind === "staged") {
     const ref = spec.kind === "commit" ? `${scope.headSha}:${path}` : `:${path}`;
-    const r = await gitRaw(scope.root, ["show", ref]);
-    return r.exitCode === 0 ? r.stdout : undefined;
+    const gitResult = await gitRaw(scope.root, ["show", ref]);
+    return gitResult.exitCode === 0 ? gitResult.stdout : undefined;
   }
   try {
     return readFileSync(join(scope.root, path), "utf8");
@@ -112,13 +112,15 @@ export const createIntake = (intakeOptions: IntakeOptions): Intake => {
 
     if (scoped.hunks && scoped.status !== "added" && scoped.hunks.length > 0) {
       const onChange = scoped.hunks.some(
-        (h) =>
-          range.start <= h.start + Math.max(h.lines, 1) - 1 + HUNK_SLACK &&
-          range.end >= h.start - HUNK_SLACK,
+        (hunk) =>
+          range.start <= hunk.start + Math.max(hunk.lines, 1) - 1 + HUNK_SLACK &&
+          range.end >= hunk.start - HUNK_SLACK,
       );
       if (!onChange) {
         const changed = scoped.hunks
-          .map((h) => (h.lines <= 1 ? `${h.start}` : `${h.start}-${h.start + h.lines - 1}`))
+          .map((hunk) =>
+            hunk.lines <= 1 ? `${hunk.start}` : `${hunk.start}-${hunk.start + hunk.lines - 1}`,
+          )
           .join(", ");
         return {
           accepted: false,

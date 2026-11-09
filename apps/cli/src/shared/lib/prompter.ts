@@ -112,10 +112,11 @@ export const createClackPrompter = (): Prompter => ({
     );
   },
   spinner() {
-    const s = p.spinner();
+    const spinnerResult = p.spinner();
     return {
-      start: (m: string) => s.start(m),
-      stop: (m: string, failed?: boolean) => (failed ? s.error(m) : s.stop(m)),
+      start: (m: string) => spinnerResult.start(m),
+      stop: (m: string, failed?: boolean) =>
+        failed ? spinnerResult.error(m) : spinnerResult.stop(m),
     };
   },
 });
@@ -133,8 +134,11 @@ export const createScriptedPrompter = (initialAnswers: Answer[] = []) => {
     return typeof answer === "function" ? answer(question) : answer;
   };
   const select = async <T>(o: { message: string; options: Option<T>[]; initialValue?: T }) => {
-    const value = next(o.message, o.initialValue ?? o.options.find((x) => !x.disabled)?.value);
-    const hit = o.options.find((x) => x.value === value || x.label === value);
+    const value = next(
+      o.message,
+      o.initialValue ?? o.options.find((option) => !option.disabled)?.value,
+    );
+    const hit = o.options.find((option) => option.value === value || option.label === value);
     if (!hit) throw new Error(`no option ${String(value)} for "${o.message}"`);
     return hit.value;
   };
@@ -158,8 +162,8 @@ export const createScriptedPrompter = (initialAnswers: Answer[] = []) => {
     async multiselect<T>(o: { message: string; options: Option<T>[]; initialValues?: T[] }) {
       const value = next(o.message, o.initialValues ?? []) as unknown[];
       return o.options
-        .filter((x) => value.includes(x.value) || value.includes(x.label))
-        .map((x) => x.value);
+        .filter((option) => value.includes(option.value) || value.includes(option.label))
+        .map((option) => option.value);
     },
     async confirm(o: { message: string; initialValue?: boolean }) {
       return Boolean(next(o.message, o.initialValue ?? true));

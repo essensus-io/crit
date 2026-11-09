@@ -25,9 +25,9 @@ export async function addRules(
     ctx.out(`Added ${source} → ${dest}\n`);
     return EXIT.ok;
   }
-  const m = /^github:([\w.-]+\/[\w.-]+)(?:#(.+))?$/.exec(source);
-  const url = m ? `https://github.com/${m[1]}.git` : source;
-  const ref = opts.ref ?? m?.[2];
+  const match = /^github:([\w.-]+\/[\w.-]+)(?:#(.+))?$/.exec(source);
+  const url = match ? `https://github.com/${match[1]}.git` : source;
+  const ref = opts.ref ?? match?.[2];
   if (!/^(https?:\/\/|git@|ssh:\/\/|file:\/\/)/.test(url))
     throw new CliError(`crit: ${source} is not a file, folder or git URL`, {
       exitCode: EXIT.usage,

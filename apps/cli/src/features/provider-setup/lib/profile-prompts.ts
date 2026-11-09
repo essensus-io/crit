@@ -4,9 +4,9 @@ import type { CliContext } from "@/shared/lib/cli-context.ts";
 import { askEffort, askFastModel, askModel } from "./model-picker.ts";
 
 const validateName = (file: ProvidersFile, except?: string) => (v: string) => {
-  const r = ProviderName.safeParse(v.trim());
-  if (!r.success) return r.error.issues[0]!.message;
-  if (v.trim() !== except && file.providers.some((p) => p.name === v.trim()))
+  const zodSafeParseResult = ProviderName.safeParse(v.trim());
+  if (!zodSafeParseResult.success) return zodSafeParseResult.error.issues[0]!.message;
+  if (v.trim() !== except && file.providers.some((provider) => provider.name === v.trim()))
     return `${v.trim()} already exists`;
   return undefined;
 };
@@ -25,7 +25,7 @@ export async function profilePrompts(
 }> {
   const suggested =
     existing?.name ??
-    (file.providers.some((p) => p.name === factory.defaultName)
+    (file.providers.some((provider) => provider.name === factory.defaultName)
       ? `${factory.defaultName}-2`
       : factory.defaultName);
   const name = (
