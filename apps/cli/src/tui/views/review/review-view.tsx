@@ -1,18 +1,9 @@
 import type { ProposalOutcome } from "@crit/core";
-import type { ReviewEvent } from "@crit/schema";
 import { Box, useApp, useInput } from "ink";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Choice, TextInput } from "../../shared/ui/index.ts";
 import { parseQuery, triage, visibleItems } from "../../features/review-session/index.ts";
 import { HelpOverlay } from "./help-overlay.tsx";
-import {
-  emptyProgress,
-  ProgressScreen,
-  type ProgressState,
-  reduceProgress,
-  type RunRecovery,
-  type Selection,
-} from "../run/index.ts";
 import { ProposalScreen } from "./proposal-screen.tsx";
 import { useScreen } from "../../shared/ui/index.ts";
 import type { ReviewSession } from "../../features/review-session/index.ts";
@@ -545,126 +536,5 @@ export function ReviewApp({
         />
       )}
     </Box>
-  );
-}
-
-/**
- * While a review runs: the progress screen, then the review screen. `enter`
- * opens the findings found so far; `q` stops the review.
- */
-export function RunApp(props: {
-  subscribe: (fn: (e: ReviewEvent) => void) => () => void;
-  makeSession: (reviewId: string) => Promise<ReviewSession>;
-  onStop: () => void;
-  onRecover?: (action: RunRecovery) => void;
-  onExit?: () => void;
-  switcher?: Switcher;
-}) {
-  const app = useApp();
-  const { width, height } = useScreen();
-  const [progress, setProgress] = useState<ProgressState>(emptyProgress);
-  const [reviewId, setReviewId] = useState<string>();
-  const [session, setSession] = useState<ReviewSession>();
-  const [open, setOpen] = useState(false);
-  const [notice, setNotice] = useState<string>();
-  const [, bump] = useState(0);
-  const initial = useRef(props.switcher?.current());
-
-  useEffect(
-    () =>
-      props.subscribe((e) => {
-        setProgress((p) => reduceProgress(p, e));
-        if (e.type === "review-started") setReviewId(e.reviewId);
-        if (e.type === "finding" || e.type === "verified" || e.type === "review-done")
-          void session?.load();
-      }),
-    [props, session],
-  );
-  useEffect(() => {
-    if (
-      progress.done &&
-      !progress.failed &&
-      !progress.rateLimited &&
-      !progress.partial &&
-      ![...progress.shards.values()].some((s) => s.status === "failed")
-    )
-      setOpen(true);
-  }, [progress]);
-  useEffect(() => {
-    if (open && reviewId && !session) void props.makeSession(reviewId).then(setSession);
-  }, [open, reviewId, session, props]);
-
-  // What the user picked on this screen, as the difference from what the run started with.
-  const now = props.switcher?.current();
-  const was = initial.current;
-  const selection: Selection = {};
-  if (now && was) {
-    if (now.provider !== was.provider) selection.provider = now.provider;
-    if (now.model !== was.model) selection.model = now.model;
-    if (now.effort !== was.effort) selection.effort = now.effort;
-    if (now.depth !== was.depth) selection.depth = now.depth;
-  }
-  const connect = () => {
-    props.onRecover?.({ kind: "provider" });
-    app.exit();
-  };
-  const { overlay, modal } = useSwitching({
-    switcher: props.switcher,
-    active: !session,
-    onNotice: setNotice,
-    ...(props.onRecover ? { onConnect: connect } : {}),
-    onChange: () => bump((n) => n + 1),
-  });
-
-  useInput(
-    (typed, key) => {
-      const input = typed.toLowerCase();
-      if (input === "r" && progress.done && props.onRecover) {
-        props.onRecover({ kind: "retry", ...selection });
-        app.exit();
-        return;
-      }
-      if (input === "b" && progress.budget && props.onRecover) {
-        props.onRecover({ kind: "budget", maxShards: progress.budget.required });
-        app.exit();
-        return;
-      }
-      if (input === "q" || (key.ctrl && input === "c")) {
-        if (progress.done) {
-          props.onExit?.();
-          app.exit();
-        } else props.onStop();
-        return;
-      }
-      if (key.return && reviewId) setOpen(true);
-    },
-    { isActive: !session && !modal },
-  );
-
-  if (session)
-    return (
-      <ReviewApp
-        session={session}
-        {...(props.onExit ? { onExit: props.onExit } : {})}
-        {...(props.switcher ? { switcher: props.switcher } : {})}
-        {...(props.onRecover
-          ? {
-              onRerun: (fresh) =>
-                props.onRecover!({ kind: "retry", ...selection, ...(fresh ? { fresh } : {}) }),
-              onBack: () => props.onRecover!({ kind: "home" }),
-            }
-          : {})}
-      />
-    );
-  if (overlay) return overlay;
-  return (
-    <ProgressScreen
-      progress={progress}
-      width={width}
-      height={height}
-      selection={selection}
-      {...(was ? { depth: was.depth, effort: was.effort } : {})}
-      {...(notice ? { notice } : {})}
-    />
   );
 }

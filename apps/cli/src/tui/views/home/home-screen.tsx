@@ -10,7 +10,8 @@ import {
 } from "../../features/model-switching/index.ts";
 import { T } from "../../shared/lib/index.ts";
 import { useSwitching } from "../../features/model-switching/index.ts";
-import { Menu, Panel, Spinner, truncate } from "../../shared/ui/index.ts";
+import { Menu, Panel, Spinner } from "../../shared/ui/index.ts";
+import { truncate } from "../../shared/lib/index.ts";
 
 export type HomeChoice =
   | { kind: "start"; spec: ScopeSpec; choice: Choice | undefined }

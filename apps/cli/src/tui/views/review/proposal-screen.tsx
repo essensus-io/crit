@@ -4,7 +4,8 @@ import type { ReactNode } from "react";
 import { diffRows, Footer, HRule, Status } from "../../shared/ui/index.ts";
 import type { SessionState } from "../../features/review-session/index.ts";
 import { T } from "../../shared/lib/index.ts";
-import { Viewport, wrapText } from "../../shared/ui/index.ts";
+import { Viewport } from "../../shared/ui/index.ts";
+import { wrapText } from "../../shared/lib/index.ts";
 
 const VERDICT_COLOR = { accepted: T.mint, concerns: T.yellow, rejected: T.red } as const;
 

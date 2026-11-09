@@ -3,7 +3,8 @@ import { Box, Text, useInput } from "ink";
 import { Fragment, type ReactNode, useState } from "react";
 import { TextInput } from "../../../shared/ui/index.ts";
 import { useScreen } from "../../../shared/ui/index.ts";
-import { describeChoice, type Switcher } from "../lib/switcher.ts";
+import { describeChoice } from "../lib/describe-choice.ts";
+import { type Switcher } from "../lib/create-switcher.ts";
 import { Panel, Picker, type PickOption } from "../../../shared/ui/index.ts";
 
 const DEFAULT = "__default__";

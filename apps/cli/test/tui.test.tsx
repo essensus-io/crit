@@ -8,8 +8,10 @@ import { openStore, type SqliteStore } from "@crit/store";
 import { createFixtureRepo, type FixtureRepo } from "@crit/testkit";
 import { render } from "ink-testing-library";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ReviewApp, RunApp } from "../src/tui/views/review/index.ts";
-import { emptyProgress, ProgressScreen, reduceProgress } from "../src/tui/views/run/index.ts";
+import { ReviewApp } from "../src/tui/views/review/index.ts";
+import { RunApp } from "../src/tui/views/run/index.ts";
+import { emptyProgress, reduceProgress } from "../src/tui/features/run-progress/index.ts";
+import { ProgressScreen } from "../src/tui/views/run/index.ts";
 import {
   type Editor,
   ReviewSession,

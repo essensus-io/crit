@@ -7,7 +7,9 @@ import { fileTree, type ListFilter, triage } from "../../features/review-session
 import type { FindingView, SessionState } from "../../features/review-session/index.ts";
 import { buildStream } from "../../features/review-session/index.ts";
 import { SPINNER, T } from "../../shared/lib/index.ts";
-import { Panel, truncate, useTick, Viewport } from "../../shared/ui/index.ts";
+import { Panel, Viewport } from "../../shared/ui/index.ts";
+import { truncate } from "../../shared/lib/index.ts";
+import { useTick } from "../../shared/hooks/index.ts";
 
 /** A row of styled segments as one terminal line. */
 function Row({ line }: { line: Line }) {
