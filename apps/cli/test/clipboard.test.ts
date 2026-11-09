@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { copyToClipboard } from "../src/clipboard.ts";
+import { copyToClipboard } from "../src/shared/lib/index.ts";
 
 describe("copyToClipboard", () => {
   it("returns how it copied; without a clipboard tool it falls back to an OSC 52 sequence", () => {

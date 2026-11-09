@@ -31,8 +31,8 @@ import {
 } from "@crit/store";
 import { defineCommand } from "citty";
 import { type CliContext, sessionsDir } from "../context.ts";
-import { CliError, EXIT } from "../errors.ts";
-import { dryRunJson, renderDryRun } from "../dryrun.ts";
+import { CliError, EXIT } from "../shared/lib/index.ts";
+import { dryRunJson, renderDryRun } from "../features/review-report/index.ts";
 import { markdownReport, sarifReport, textReport } from "../report.ts";
 import { adapterFor, ensureProviders } from "../setup.ts";
 import { colors, duration, plural, when } from "../ui.ts";
@@ -114,7 +114,8 @@ async function runHome(
     prepare: (spec: ScopeSpec) => Promise<Prepared>;
   },
 ): Promise<number> {
-  const { homeTui, openTui } = await import("../tui/index.ts");
+  const { homeTui } = await import("../views/home/index.ts");
+  const { openTui } = await import("../views/review/index.ts");
   const { root, store, config, profile } = home;
   const repo = await store.repos.getByRoot(root);
   const history = repo ? await listHistory(store.db, { repoId: repo.id, limit: 12 }) : [];
@@ -439,7 +440,7 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
       }))
     )
       return EXIT.cancelled;
-    const { runTui } = await import("../tui/index.ts");
+    const { runTui } = await import("../views/run/index.ts");
     const recovery = await runTui(
       ctx,
       store,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { clipToks, highlightFile, highlightLine, languageOf } from "../src/tui/shared/lib/index.ts";
-import { T } from "../src/tui/shared/lib/index.ts";
+import { clipToks, highlightFile, highlightLine, languageOf } from "../src/shared/lib/index.ts";
+import { T } from "../src/shared/lib/index.ts";
 
 const colorOfText = (line: { t: string; color?: string }[], text: string) =>
   line.find((k) => k.t.includes(text))?.color;

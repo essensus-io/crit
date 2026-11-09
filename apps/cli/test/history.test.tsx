@@ -5,8 +5,8 @@ import { listHistory } from "@crit/store";
 import { render } from "ink-testing-library";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { outcomeOf, parseAge, parseSince } from "../src/commands/history.ts";
-import { HistoryView, previousOf } from "../src/tui/views/history/index.ts";
-import { ReviewSession } from "../src/tui/features/review-session/index.ts";
+import { HistoryView, previousOf } from "../src/views/history/index.ts";
+import { ReviewSession } from "../src/features/review-session/index.ts";
 import { fakeProvidersJson, type TestEnv, testContext } from "./helpers.ts";
 
 const FILE = ["const a = 1;", "const b = 2;", "const c = 3;", "const d = 4;"].join("\n") + "\n";

@@ -1,5 +1,5 @@
 import { repoRoot } from "@crit/core";
-import { CliError } from "../errors.ts";
+import { CliError } from "../shared/lib/index.ts";
 
 export async function repoRootOrThrow(cwd: string): Promise<string> {
   try {

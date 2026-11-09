@@ -15,8 +15,14 @@ import {
 import { type ProviderProfile, ProviderName, type ProvidersFile, type Role } from "@crit/schema";
 import { loadProviders, providersPath, saveProviders } from "@crit/store";
 import type { CliContext } from "./context.ts";
-import { askEffort, askFastModel, askModel, CLI_DEFAULT, loadModels } from "./model-picker.ts";
-import { CliError } from "./errors.ts";
+import {
+  askEffort,
+  askFastModel,
+  askModel,
+  CLI_DEFAULT,
+  loadModels,
+} from "./features/provider-setup/index.ts";
+import { CliError } from "./shared/lib/index.ts";
 import { colors, duration } from "./ui.ts";
 
 export { CLI_DEFAULT };

@@ -8,16 +8,13 @@ import { openStore, type SqliteStore } from "@crit/store";
 import { createFixtureRepo, type FixtureRepo } from "@crit/testkit";
 import { render } from "ink-testing-library";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ReviewView } from "../src/tui/views/review/index.ts";
-import { RunView } from "../src/tui/views/run/index.ts";
-import { emptyProgress, reduceProgress } from "../src/tui/features/run-progress/index.ts";
-import { ProgressView } from "../src/tui/views/run/index.ts";
-import {
-  type Editor,
-  ReviewSession,
-  type SessionDeps,
-} from "../src/tui/features/review-session/index.ts";
-import type { Choice, Switcher } from "../src/tui/features/model-switching/index.ts";
+import { ReviewView } from "../src/views/review/index.ts";
+import { RunView } from "../src/views/run/index.ts";
+import { emptyProgress, reduceProgress } from "../src/features/run-progress/index.ts";
+import { ProgressView } from "../src/views/run/index.ts";
+import { ReviewSession, type SessionDeps } from "../src/features/review-session/index.ts";
+import type { Editor } from "../src/shared/lib/index.ts";
+import type { Choice, Switcher } from "../src/features/model-switching/index.ts";
 
 const CODE = `export async function refund(order, amount, provider) {
   if (amount > order.capturedAmount) {
