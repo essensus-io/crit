@@ -123,14 +123,19 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
     useCache: args.cache !== false,
   };
   if (useTui && !args.now && !args["dry-run"])
-    return runHome(ctx, args, {
-      root,
-      store,
-      config,
-      profile,
-      spec,
-      prepare: (s) => prepareReview({ ...base, spec: s }),
-    });
+    return runHome(
+      ctx,
+      args,
+      {
+        root,
+        store,
+        config,
+        profile,
+        spec,
+        prepare: (s) => prepareReview({ ...base, spec: s }),
+      },
+      runReviewCommand,
+    );
   if (args["dry-run"]) {
     const prep = await prepareReview(base);
     const info = { provider: resolved.profile.name, model: resolved.profile.model, config };

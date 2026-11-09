@@ -7,12 +7,12 @@ import type {
   ProviderProfile,
 } from "@crit/schema";
 
-export interface ProviderAdapter {
+export type ProviderAdapter = {
   readonly type: string;
   detect(): Promise<DetectResult>;
   readonly capabilities: AdapterCapabilities;
   run(task: AgentTask, signal: AbortSignal): AsyncIterable<AgentEvent>;
-}
+};
 
 export type AdapterEnv = {
   env: NodeJS.ProcessEnv;

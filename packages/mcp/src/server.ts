@@ -25,12 +25,12 @@ export type ReportResult =
   | { accepted: true; id: string; warnings?: string[] }
   | { accepted: false; errors: string[] };
 
-export interface SessionHandler {
+export type SessionHandler = {
   getScope(): Promise<ScopeView>;
   getRules(ids?: string[]): Promise<RuleView[]>;
   reportFinding(finding: FindingInputT): Promise<ReportResult>;
   finish(input: FinishInputT): Promise<{ ok: true }>;
-}
+};
 
 export const TOOL_NAMES = [
   "get_scope",

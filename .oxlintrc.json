@@ -4,7 +4,29 @@
   "categories": {
     "correctness": "error"
   },
-  "rules": {},
+  "rules": {
+    "unicorn/filename-case": ["error", { "case": "kebabCase" }],
+    "import/no-default-export": "error",
+    "import/no-cycle": "error",
+    "typescript/consistent-type-definitions": ["error", "type"],
+    "typescript/no-explicit-any": "error",
+    "no-console": "error"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.config.ts", "**/drizzle.config.ts"],
+      "rules": { "import/no-default-export": "off" }
+    },
+    {
+      "files": [
+        "apps/cli/src/**/*",
+        "apps/cli/test/**/*",
+        "scripts/**/*",
+        "packages/*/scripts/**/*"
+      ],
+      "rules": { "no-console": "off" }
+    }
+  ],
   "env": {
     "builtin": true
   },

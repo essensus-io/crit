@@ -6,7 +6,6 @@ import { type CliContext } from "@/shared/lib/cli-context.ts";
 import { EXIT } from "@/shared/lib/errors.ts";
 import { plural, when } from "@/shared/lib/format.ts";
 import { type ReviewArgs, withoutNow, withScope } from "./review-args.ts";
-import { runReviewCommand } from "./run-review-command.ts";
 
 export async function runHome(
   ctx: CliContext,
@@ -19,6 +18,7 @@ export async function runHome(
     spec: ScopeSpec;
     prepare: (spec: ScopeSpec) => Promise<Prepared>;
   },
+  runReviewCommand: (ctx: CliContext, args: ReviewArgs) => Promise<number>,
 ): Promise<number> {
   const { homeTui } = await import("@/views/home/launch-home.tsx");
   const { openTui } = await import("@/views/review/launch-review.tsx");

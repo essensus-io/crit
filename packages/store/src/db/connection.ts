@@ -40,11 +40,13 @@ export function openDatabase(path: string = ":memory:"): Connection {
   if (path !== ":memory:") raw.exec("PRAGMA journal_mode = WAL");
 
   const db = drizzle(
-    async (sql, params, method) => exec(raw, sql, params, method) as { rows: any[] },
+    async (sql, params, method) => exec(raw, sql, params, method) as { rows: unknown[][] },
     async (queries) => {
       raw.exec("BEGIN IMMEDIATE");
       try {
-        const results = queries.map((q) => exec(raw, q.sql, q.params, q.method) as { rows: any[] });
+        const results = queries.map(
+          (q) => exec(raw, q.sql, q.params, q.method) as { rows: unknown[][] },
+        );
         raw.exec("COMMIT");
         return results;
       } catch (err) {

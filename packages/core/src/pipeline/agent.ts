@@ -1,9 +1,9 @@
 import { addUsage, type AgentEvent, type AgentTask, emptyUsage } from "@crit/schema";
 
-export interface AgentRunner {
+export type AgentRunner = {
   readonly capabilities: { mcp: boolean; nativeContext: import("@crit/schema").RuleSourceKind[] };
   run(task: AgentTask, signal: AbortSignal): AsyncIterable<AgentEvent>;
-}
+};
 
 export type AgentOutcome = {
   message?: string;
