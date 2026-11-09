@@ -11,16 +11,17 @@ const Ctx = createContext<ScreenSize>({ width: 100, height: 30 });
 /** The size every screen lays out in. Tests and non-TTY streams fall back to 100×30. */
 export const useScreen = () => useContext(Ctx);
 
-function read(stdout: NodeJS.WriteStream): ScreenSize {
+const read = (stdout: NodeJS.WriteStream): ScreenSize => {
   return { width: stdout.columns || 100, height: stdout.rows || 30 };
-}
+};
+type Props = { children: ReactNode };
 
 /**
  * The full-screen root. It is exactly as tall as the terminal and clips its
  * content, so nothing ever scrolls the terminal itself: anything longer than
  * the screen scrolls inside a Viewport.
  */
-export function Screen({ children }: { children: ReactNode }) {
+export const Screen = ({ children }: Props) => {
   const stdout = useStdout().stdout as NodeJS.WriteStream;
   const [size, setSize] = useState(() => read(stdout));
   useEffect(() => {
@@ -45,4 +46,4 @@ export function Screen({ children }: { children: ReactNode }) {
       </Box>
     </Ctx.Provider>
   );
-}
+};

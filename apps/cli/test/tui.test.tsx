@@ -8,10 +8,10 @@ import { openStore, type SqliteStore } from "@crit/store";
 import { createFixtureRepo, type FixtureRepo } from "@crit/testkit";
 import { render } from "ink-testing-library";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ReviewApp } from "../src/tui/views/review/index.ts";
-import { RunApp } from "../src/tui/views/run/index.ts";
+import { ReviewView } from "../src/tui/views/review/index.ts";
+import { RunView } from "../src/tui/views/run/index.ts";
 import { emptyProgress, reduceProgress } from "../src/tui/features/run-progress/index.ts";
-import { ProgressScreen } from "../src/tui/views/run/index.ts";
+import { ProgressView } from "../src/tui/views/run/index.ts";
 import {
   type Editor,
   ReviewSession,
@@ -197,7 +197,7 @@ const TAB = "\t";
 
 async function mount(s: ReviewSession, switcher?: Switcher, ready = "of 2 looked at") {
   await s.load();
-  const app = render(<ReviewApp session={s} {...(switcher ? { switcher } : {})} />);
+  const app = render(<ReviewView session={s} {...(switcher ? { switcher } : {})} />);
   await until(app.lastFrame, ready);
   const press = async (...keys: string[]) => {
     for (const k of keys) {
@@ -463,7 +463,7 @@ describe("review stream", () => {
     await store.findings.update(ids["Unused import"]!, { status: "closed" });
     const s = session();
     await s.load();
-    const app = render(<ReviewApp session={s} />);
+    const app = render(<ReviewView session={s} />);
     const f = await until(app.lastFrame, "No findings match");
     expect(f).toContain("/ search · o options · ? help · q quit");
     expect(f).not.toContain("a accept");
@@ -680,7 +680,7 @@ describe("run progress", () => {
     let emit: (e: ReviewEvent) => void = () => {};
     let recovery: unknown;
     const app = render(
-      <RunApp
+      <RunView
         subscribe={(fn) => {
           emit = fn;
           return () => {};
@@ -775,7 +775,7 @@ describe("run progress", () => {
     let stopped = false;
     const s = session();
     const app = render(
-      <RunApp
+      <RunView
         subscribe={(fn) => {
           emit = fn;
           return () => {};
@@ -978,7 +978,7 @@ describe("switching model, provider, effort and depth", () => {
     let emit: (e: ReviewEvent) => void = () => {};
     let recovery: unknown;
     const app = render(
-      <RunApp
+      <RunView
         subscribe={(fn) => ((emit = fn), () => {})}
         makeSession={async () => {
           throw new Error("stay");
@@ -1072,7 +1072,7 @@ describe("full-screen layout", () => {
   ])(
     "the run dashboard never exceeds the screen (%i×%i) and collapses extra shards",
     async (w, h) => {
-      const app = render(<ProgressScreen progress={run(40)} width={w} height={h} />);
+      const app = render(<ProgressView progress={run(40)} width={w} height={h} />);
       await sleep(60);
       const lines = app.lastFrame()!.split("\n");
       expect(lines.length).toBeLessThanOrEqual(h);
@@ -1210,7 +1210,7 @@ describe("re-run the review", () => {
     const s = session();
     await s.load();
     let reran = 0;
-    const app = render(<ReviewApp session={s} onRerun={() => reran++} />);
+    const app = render(<ReviewView session={s} onRerun={() => reran++} />);
     const f = await until(app.lastFrame, "of 2 looked at");
     expect(f).toContain("r re-run review");
     await sleep(80);
@@ -1382,7 +1382,7 @@ describe("going through the fixes", () => {
     const s = session();
     await s.load();
     let went = 0;
-    const withBack = render(<ReviewApp session={s} onBack={() => went++} />);
+    const withBack = render(<ReviewView session={s} onBack={() => went++} />);
     await until(withBack.lastFrame, "of 2 looked at");
     await sleep(80);
     withBack.stdin.write("q");

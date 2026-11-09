@@ -10,7 +10,7 @@ import {
   severitySummary,
 } from "../../../commands/history.ts";
 import { truncate, when } from "../../../ui.ts";
-import { ReviewApp } from "../review/index.ts";
+import { ReviewView } from "../review/index.ts";
 import { Choice, Footer, HRule, TextInput } from "../../shared/ui/index.ts";
 import type { ReviewSession } from "../../features/review-session/index.ts";
 
@@ -22,19 +22,15 @@ export type HistoryActions = {
   remove(row: HistoryRow): Promise<void>;
   open(row: HistoryRow): Promise<ReviewSession>;
 };
-
-/** Review history (mockup 7): newest first; enter opens, c compares with the previous run on the same scope. */
-export function HistoryApp({
-  initial,
-  actions,
-  now,
-  width: widthProp,
-}: {
+type Props = {
   initial: HistoryRow[];
   actions: HistoryActions;
   now: number;
   width?: number;
-}) {
+};
+
+/** Review history (mockup 7): newest first; enter opens, c compares with the previous run on the same scope. */
+export const HistoryView = ({ initial, actions, now, width: widthProp }: Props) => {
   const app = useApp();
   const screen = useScreen();
   const width = widthProp ?? screen.width;
@@ -71,7 +67,7 @@ export function HistoryApp({
     { isActive: mode === "none" && !session },
   );
 
-  if (session) return <ReviewApp session={session} onExit={() => setSession(undefined)} />;
+  if (session) return <ReviewView session={session} onExit={() => setSession(undefined)} />;
 
   const cols = (r: HistoryRow, i: number) => (
     <Text key={r.review.id} {...(i === cursor ? { inverse: true } : {})}>
@@ -144,10 +140,10 @@ export function HistoryApp({
       />
     </Box>
   );
-}
+};
 
 /** Previous review of the same scope (and branch) before `row`. */
-export function previousOf(row: HistoryRow, rows: HistoryRow[]): HistoryRow | undefined {
+export const previousOf = (row: HistoryRow, rows: HistoryRow[]): HistoryRow | undefined => {
   return rows.find(
     (r) =>
       r.review.startedAt < row.review.startedAt &&
@@ -155,4 +151,4 @@ export function previousOf(row: HistoryRow, rows: HistoryRow[]): HistoryRow | un
       r.review.branch === row.review.branch &&
       r.review.repoId === row.review.repoId,
   );
-}
+};

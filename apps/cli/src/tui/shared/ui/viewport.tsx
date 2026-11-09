@@ -1,24 +1,7 @@
 import { Box, Text, useInput } from "ink";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { T } from "../lib/index.ts";
-
-/**
- * Lines that scroll inside their own box: ↑/↓, j/k, PgUp/PgDn, g/G, Home/End
- * (and the mouse wheel, which terminals send as arrows on the alternate
- * screen). The terminal itself never scrolls. `follow` keeps the bottom in view
- * until the user scrolls up, for logs.
- */
-export function Viewport({
-  lines,
-  height,
-  width,
-  active = true,
-  follow = false,
-  resetKey,
-  vim = true,
-  arrows = true,
-  reveal,
-}: {
+type Props = {
   lines: ReactNode[];
   height: number;
   width: number;
@@ -32,7 +15,25 @@ export function Viewport({
   arrows?: boolean;
   /** When `key` changes, scroll just enough to show rows `from`..`to`. */
   reveal?: { key: string; from: number; to: number };
-}) {
+};
+
+/**
+ * Lines that scroll inside their own box: ↑/↓, j/k, PgUp/PgDn, g/G, Home/End
+ * (and the mouse wheel, which terminals send as arrows on the alternate
+ * screen). The terminal itself never scrolls. `follow` keeps the bottom in view
+ * until the user scrolls up, for logs.
+ */
+export const Viewport = ({
+  lines,
+  height,
+  width,
+  active = true,
+  follow = false,
+  resetKey,
+  vim = true,
+  arrows = true,
+  reveal,
+}: Props) => {
   const [offset, setOffset] = useState(0);
   const pinned = useRef(follow);
   const max = Math.max(0, lines.length - height);
@@ -95,4 +96,4 @@ export function Viewport({
       ) : null}
     </Box>
   );
-}
+};

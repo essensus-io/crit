@@ -67,13 +67,7 @@ const optionsFor = (base: string | undefined): Option[] => [
 /** The scope row that matches a spec, so `crit review src` opens with it selected. */
 const indexOfSpec = (spec: ScopeSpec | undefined) =>
   spec ? Math.max(0, ["branch", "staged", "commit", "project", "paths"].indexOf(spec.kind)) : 0;
-
-/**
- * The start screen: pick what to review, see what it would cost, and start it
- * yourself. Nothing runs until you press enter. Past reviews are listed to the
- * right and open with enter.
- */
-export function HomeApp(props: {
+type Props = {
   info: HomeInfo;
   /** Branches the review can be compared against (b changes it). */
   bases?: { ref: string; ahead: number }[];
@@ -82,7 +76,14 @@ export function HomeApp(props: {
   switcher?: Switcher | undefined;
   estimate: (spec: ScopeSpec) => Promise<Estimate>;
   onDone: (choice: HomeChoice) => void;
-}) {
+};
+
+/**
+ * The start screen: pick what to review, see what it would cost, and start it
+ * yourself. Nothing runs until you press enter. Past reviews are listed to the
+ * right and open with enter.
+ */
+export const HomeView = (props: Props) => {
   const app = useApp();
   const { width, height } = useScreen();
   const [base, setBase] = useState(props.info.base);
@@ -358,4 +359,4 @@ export function HomeApp(props: {
       />
     </Box>
   );
-}
+};

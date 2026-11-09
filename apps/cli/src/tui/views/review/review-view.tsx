@@ -3,11 +3,11 @@ import { Box, useApp, useInput } from "ink";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Choice, TextInput } from "../../shared/ui/index.ts";
 import { parseQuery, triage, visibleItems } from "../../features/review-session/index.ts";
-import { HelpOverlay } from "./help-overlay.tsx";
-import { ProposalScreen } from "./proposal-screen.tsx";
+import { HelpView } from "./help-view.tsx";
+import { ProposalView } from "./proposal-view.tsx";
 import { useScreen } from "../../shared/ui/index.ts";
 import type { ReviewSession } from "../../features/review-session/index.ts";
-import { StreamScreen } from "./stream-screen.tsx";
+import { StreamView } from "./stream-view.tsx";
 import { describeChoice, type Switcher } from "../../features/model-switching/index.ts";
 import { useSwitching } from "../../features/model-switching/index.ts";
 import { Menu, type MenuItem, Picker } from "../../shared/ui/index.ts";
@@ -27,19 +27,7 @@ type Mode =
   | "apply"
   | "instruct"
   | "rerun";
-
-/**
- * The interactive review screen: one stream of code with a card under every
- * finding. a / d triage, enter expands, `.` and `o` open the menus.
- */
-export function ReviewApp({
-  session,
-  onExit,
-  switcher,
-  onConnect,
-  onRerun,
-  onBack,
-}: {
+type Props = {
   session: ReviewSession;
   onExit?: () => void;
   switcher?: Switcher;
@@ -48,7 +36,13 @@ export function ReviewApp({
   onRerun?: (fresh: boolean) => void;
   /** Go back to the start screen. When set, q goes back instead of quitting. */
   onBack?: () => void;
-}) {
+};
+
+/**
+ * The interactive review screen: one stream of code with a card under every
+ * finding. a / d triage, enter expands, `.` and `o` open the menus.
+ */
+export const ReviewView = ({ session, onExit, switcher, onConnect, onRerun, onBack }: Props) => {
   const app = useApp();
   useEffect(() => {
     session.suspend = (fn) => app.suspendTerminal(fn);
@@ -408,7 +402,7 @@ export function ReviewApp({
       />
     );
 
-  if (mode === "help") return <HelpOverlay width={width} height={height} onClose={done} />;
+  if (mode === "help") return <HelpView width={width} height={height} onClose={done} />;
   if (mode === "actions" && current) {
     const items2: MenuItem[] = [
       { key: "p", label: "Propose a different fix", hint: "in $EDITOR or in words" },
@@ -509,7 +503,7 @@ export function ReviewApp({
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
       {screen === "stream" || !current || !outcome ? (
-        <StreamScreen
+        <StreamView
           state={state}
           items={items}
           filter={filter}
@@ -527,7 +521,7 @@ export function ReviewApp({
           seenCount={items.filter((i) => seen.has(i.finding.id) || i === current).length}
         />
       ) : (
-        <ProposalScreen
+        <ProposalView
           state={state}
           outcome={outcome}
           width={width}
@@ -537,4 +531,4 @@ export function ReviewApp({
       )}
     </Box>
   );
-}
+};

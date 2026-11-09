@@ -1,8 +1,9 @@
 import { Box, Text } from "ink";
 import { HRule } from "./hrule.tsx";
+type Props = { keys: [string, string][]; width: number };
 
 /** Key hints at the bottom: "j/k move · space select · …" */
-export function Footer({ keys, width }: { keys: [string, string][]; width: number }) {
+export const Footer = ({ keys, width }: Props) => {
   return (
     <Box flexDirection="column">
       <HRule width={width} />
@@ -17,4 +18,4 @@ export function Footer({ keys, width }: { keys: [string, string][]; width: numbe
       </Text>
     </Box>
   );
-}
+};

@@ -4,20 +4,7 @@ import { T } from "../lib/index.ts";
 import { Panel } from "./panel.tsx";
 
 export type MenuItem = { key: string; label: string; hint?: string };
-
-/**
- * A short list where each row has its own letter: press it, or move with the
- * arrows and press enter. Used for the actions and options menus.
- */
-export function Menu({
-  title,
-  items,
-  width,
-  height,
-  note,
-  onPick,
-  onCancel,
-}: {
+type Props = {
   title: string;
   items: MenuItem[];
   width: number;
@@ -25,7 +12,13 @@ export function Menu({
   note?: string;
   onPick: (key: string) => void;
   onCancel: () => void;
-}) {
+};
+
+/**
+ * A short list where each row has its own letter: press it, or move with the
+ * arrows and press enter. Used for the actions and options menus.
+ */
+export const Menu = ({ title, items, width, height, note, onPick, onCancel }: Props) => {
   const [index, setIndex] = useState(0);
   useInput((input, key) => {
     // Letters belong to the rows, so only arrows move.
@@ -52,4 +45,4 @@ export function Menu({
       <Text dimColor> {note ? `${note} · ` : ""}press a letter · ↑/↓ + enter · esc close</Text>
     </Box>
   );
-}
+};

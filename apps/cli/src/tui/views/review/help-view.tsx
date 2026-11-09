@@ -35,17 +35,14 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
     ],
   },
 ];
-
-/** The cheat sheet: every key, grouped by what it is for. */
-export function HelpOverlay({
-  width,
-  height,
-  onClose,
-}: {
+type Props = {
   width: number;
   height: number;
   onClose: () => void;
-}) {
+};
+
+/** The cheat sheet: every key, grouped by what it is for. */
+export const HelpView = ({ width, height, onClose }: Props) => {
   useInput((input, key) => {
     if (key.escape || input === "q" || input === "?") onClose();
   });
@@ -74,4 +71,4 @@ export function HelpOverlay({
       <Text dimColor> any of esc · q · ? closes</Text>
     </Box>
   );
-}
+};

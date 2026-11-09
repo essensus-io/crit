@@ -3,7 +3,7 @@ import { type ReactNode } from "react";
 import { parseUnifiedDiff } from "@crit/core";
 
 /** A diff as one colored row per line, for a scrolling Viewport. */
-export function diffRows(patch: string): ReactNode[] {
+export const diffRows = (patch: string): ReactNode[] => {
   const rows: { n: string; sign: string; text: string }[] = [];
   for (const file of parseUnifiedDiff(patch)) {
     for (const h of file.hunks) {
@@ -33,10 +33,11 @@ export function diffRows(patch: string): ReactNode[] {
       {`   ${r.n.padStart(width)}  ${r.sign} ${r.text}`}
     </Text>
   ));
-}
+};
+type Props = { patch: string; maxLines?: number };
 
 /** A unified diff with new-side line numbers, + green and - red, as in the finding detail mockup. */
-export function DiffView({ patch, maxLines = 30 }: { patch: string; maxLines?: number }) {
+export const DiffView = ({ patch, maxLines = 30 }: Props) => {
   const rows: { n: string; sign: string; text: string }[] = [];
   for (const file of parseUnifiedDiff(patch)) {
     for (const h of file.hunks) {
@@ -70,4 +71,4 @@ export function DiffView({ patch, maxLines = 30 }: { patch: string; maxLines?: n
       ) : null}
     </Box>
   );
-}
+};

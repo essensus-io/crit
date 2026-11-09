@@ -23,9 +23,10 @@ const STATUS_TONE: Record<Shard["status"], Tone> = {
   failed: "red",
   cancelled: "red",
 };
+type FlowProps = { active: boolean; tick: number };
 
 /** A short connector with a dot that travels along it while work is running. */
-function Flow({ active, tick }: { active: boolean; tick: number }) {
+const Flow = ({ active, tick }: FlowProps) => {
   const cells = ["╌", "╌", "╌", "╌", "▶"];
   const dot = active ? tick % 4 : -1;
   return (
@@ -35,19 +36,15 @@ function Flow({ active, tick }: { active: boolean; tick: number }) {
       </Text>
     </Box>
   );
-}
-
-function Node({
-  title,
-  state,
-  width,
-  lines,
-}: {
+};
+type NodeProps = {
   title: string;
   state: "idle" | "active" | "done";
   width: number;
   lines: [string, string];
-}) {
+};
+
+const Node = ({ title, state, width, lines }: NodeProps) => {
   const tone: Tone = state === "active" ? "orange" : state === "done" ? "mint" : "gray";
   return (
     <Panel title={title} tone={tone} width={width} height={4}>
@@ -57,18 +54,8 @@ function Node({
       </Text>
     </Panel>
   );
-}
-
-/** The run dashboard: pipeline, shard cards, tokens, session log, status bar. */
-export function ProgressScreen({
-  progress,
-  width,
-  height,
-  selection = {},
-  depth = "standard",
-  effort = null,
-  notice,
-}: {
+};
+type ProgressViewProps = {
   progress: ProgressState;
   width: number;
   height: number;
@@ -76,7 +63,18 @@ export function ProgressScreen({
   depth?: string;
   effort?: string | null;
   notice?: string;
-}) {
+};
+
+/** The run dashboard: pipeline, shard cards, tokens, session log, status bar. */
+export const ProgressView = ({
+  progress,
+  width,
+  height,
+  selection = {},
+  depth = "standard",
+  effort = null,
+  notice,
+}: ProgressViewProps) => {
   const running = !progress.done;
   const tick = useTick(300, running);
   const rows = [...progress.shards.values()];
@@ -303,4 +301,4 @@ export function ProgressScreen({
       />
     </Box>
   );
-}
+};

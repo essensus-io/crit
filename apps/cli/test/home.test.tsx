@@ -3,7 +3,7 @@ import { render } from "ink-testing-library";
 import { describe, expect, it, vi } from "vitest";
 import {
   type Estimate,
-  HomeApp,
+  HomeView,
   type HomeChoice,
   type RecentReview,
 } from "../src/tui/views/home/index.ts";
@@ -53,7 +53,7 @@ function mount(
       (async () => ({ ok: true, files: 27, skipped: 4, runs: 3, tokens: 30_000, cached: 2 })),
   );
   const app = render(
-    <HomeApp
+    <HomeView
       info={{ repo: "fieldhive", branch: "fix/portal", base: "origin/develop" }}
       bases={over.bases ?? []}
       recent={over.recent ?? RECENT}

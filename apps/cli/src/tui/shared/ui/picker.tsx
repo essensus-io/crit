@@ -4,21 +4,7 @@ import { T } from "../lib/index.ts";
 import { Panel } from "./panel.tsx";
 
 export type PickOption<V> = { value: V; label: string; hint?: string };
-
-/**
- * A searchable list as a full-screen overlay (model, provider, effort, depth).
- * Type to filter, ↑/↓ to move, enter to pick, esc to cancel.
- */
-export function Picker<V>({
-  title,
-  options,
-  initial,
-  width,
-  height,
-  note,
-  onPick,
-  onCancel,
-}: {
+type Props<V> = {
   title: string;
   options: PickOption<V>[];
   initial?: V;
@@ -27,7 +13,22 @@ export function Picker<V>({
   note?: string;
   onPick: (value: V) => void;
   onCancel: () => void;
-}) {
+};
+
+/**
+ * A searchable list as a full-screen overlay (model, provider, effort, depth).
+ * Type to filter, ↑/↓ to move, enter to pick, esc to cancel.
+ */
+export const Picker = <V,>({
+  title,
+  options,
+  initial,
+  width,
+  height,
+  note,
+  onPick,
+  onCancel,
+}: Props<V>) => {
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(() =>
     Math.max(
@@ -93,4 +94,4 @@ export function Picker<V>({
       </Text>
     </Box>
   );
-}
+};

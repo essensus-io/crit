@@ -2,7 +2,7 @@ import { type ResolvedConfig, type ScopeSpec } from "@crit/schema";
 import { type CliContext } from "../../context.ts";
 import {
   type Estimate,
-  HomeApp,
+  HomeView,
   type HomeChoice,
   type HomeInfo,
   type RecentReview,
@@ -13,7 +13,7 @@ import { renderFullScreen } from "./render-full-screen.tsx";
 
 /** `crit open` in a terminal: the review screen for a saved review. */
 /** The start screen. Nothing runs until the user picks something and presses enter. */
-export async function homeTui(
+export const homeTui = async (
   ctx: CliContext,
   config: ResolvedConfig,
   props: {
@@ -24,11 +24,11 @@ export async function homeTui(
     initialChoice: Partial<Choice> & { provider: string };
     estimate: (spec: ScopeSpec) => Promise<Estimate>;
   },
-): Promise<HomeChoice> {
+): Promise<HomeChoice> => {
   let result: HomeChoice = { kind: "quit" };
   const switcher = makeSwitcher(ctx, config, props.initialChoice);
   await renderFullScreen(
-    <HomeApp
+    <HomeView
       info={props.info}
       bases={props.bases ?? []}
       recent={props.recent}
@@ -41,4 +41,4 @@ export async function homeTui(
     />,
   );
   return result;
-}
+};

@@ -11,7 +11,7 @@ const ALT_SCROLL_OFF = "\u001B[?1007l";
  * untouched and comes back on exit), a root exactly as tall as the window, and
  * wheel scrolling delivered as arrow keys. Nothing scrolls the outer terminal.
  */
-export async function renderFullScreen(node: ReactElement): Promise<void> {
+export const renderFullScreen = async (node: ReactElement): Promise<void> => {
   const tty = Boolean(process.stdout.isTTY);
   if (tty) process.stdout.write(ALT_SCROLL_ON);
   const app = render(<Screen>{node}</Screen>, { alternateScreen: true });
@@ -21,4 +21,4 @@ export async function renderFullScreen(node: ReactElement): Promise<void> {
     app.unmount();
     if (tty) process.stdout.write(ALT_SCROLL_OFF);
   }
-}
+};

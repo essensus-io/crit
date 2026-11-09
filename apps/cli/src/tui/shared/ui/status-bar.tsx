@@ -1,14 +1,12 @@
 import { Text } from "ink";
 import { T, type Tone } from "../lib/index.ts";
-
-/** `[key: value] [key: value]` on one line, clipped to the width. */
-export function StatusBar({
-  items,
-  width,
-}: {
+type Props = {
   items: { k: string; v: string; tone?: Tone }[];
   width: number;
-}) {
+};
+
+/** `[key: value] [key: value]` on one line, clipped to the width. */
+export const StatusBar = ({ items, width }: Props) => {
   let used = 0;
   const shown: typeof items = [];
   for (const it of items) {
@@ -28,4 +26,4 @@ export function StatusBar({
       ))}
     </Text>
   );
-}
+};

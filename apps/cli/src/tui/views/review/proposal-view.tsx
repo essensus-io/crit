@@ -8,15 +8,16 @@ import { Viewport } from "../../shared/ui/index.ts";
 import { wrapText } from "../../shared/lib/index.ts";
 
 const VERDICT_COLOR = { accepted: T.mint, concerns: T.yellow, rejected: T.red } as const;
-
-/** The result of checking a user proposal: verdict, the user's diff, the AI's reply and a reply box. */
-export function ProposalScreen(props: {
+type Props = {
   state: SessionState;
   outcome: ProposalOutcome;
   width: number;
   height: number;
   input?: ReactNode;
-}) {
+};
+
+/** The result of checking a user proposal: verdict, the user's diff, the AI's reply and a reply box. */
+export const ProposalView = (props: Props) => {
   const { outcome, width, height, state } = props;
   const e = outcome.evaluation;
   const verify = outcome.verify;
@@ -108,4 +109,4 @@ export function ProposalScreen(props: {
       />
     </Box>
   );
-}
+};

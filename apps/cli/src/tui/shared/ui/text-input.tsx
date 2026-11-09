@@ -1,18 +1,14 @@
 import { Text, useInput } from "ink";
 import { useRef, useState } from "react";
-
-/** One-line text input: type, backspace, enter submits, esc cancels. */
-export function TextInput({
-  label,
-  onSubmit,
-  onCancel,
-  initial = "",
-}: {
+type Props = {
   label: string;
   onSubmit: (v: string) => void;
   onCancel: () => void;
   initial?: string;
-}) {
+};
+
+/** One-line text input: type, backspace, enter submits, esc cancels. */
+export const TextInput = ({ label, onSubmit, onCancel, initial = "" }: Props) => {
   const [value, setValue] = useState(initial);
   // Keys can arrive faster than renders (pastes); keep the latest value in a ref.
   const ref = useRef(initial);
@@ -34,4 +30,4 @@ export function TextInput({
       <Text inverse> </Text>
     </Text>
   );
-}
+};

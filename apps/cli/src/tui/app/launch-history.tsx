@@ -5,14 +5,14 @@ import { type HistoryRow, loadProjectConfig, loadUserConfig, type SqliteStore } 
 import { compareReviews, type HistoryArgs, historyRows } from "../../commands/history.ts";
 import { repoRootOrThrow } from "../../commands/shared.ts";
 import type { CliContext } from "../../context.ts";
-import { type HistoryActions, HistoryApp, previousOf } from "../views/history/index.ts";
+import { type HistoryActions, HistoryView, previousOf } from "../views/history/index.ts";
 
-export async function historyTui(
+export const historyTui = async (
   ctx: CliContext,
   store: SqliteStore,
   rows: HistoryRow[],
   args: HistoryArgs,
-): Promise<void> {
+): Promise<void> => {
   const root = await repoRootOrThrow(ctx.cwd);
   const config = resolveConfig(loadUserConfig(ctx.paths), loadProjectConfig(root));
   const actions: HistoryActions = {
@@ -24,5 +24,5 @@ export async function historyTui(
     remove: (row) => store.reviews.delete(row.review.id),
     open: (row) => makeSession(ctx, store, root, row.review.id, config),
   };
-  await renderFullScreen(<HistoryApp initial={rows} actions={actions} now={ctx.now()} />);
-}
+  await renderFullScreen(<HistoryView initial={rows} actions={actions} now={ctx.now()} />);
+};

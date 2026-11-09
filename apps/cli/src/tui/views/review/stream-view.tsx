@@ -10,9 +10,10 @@ import { SPINNER, T } from "../../shared/lib/index.ts";
 import { Panel, Viewport } from "../../shared/ui/index.ts";
 import { truncate } from "../../shared/lib/index.ts";
 import { useTick } from "../../shared/hooks/index.ts";
+type RowProps = { line: Line };
 
 /** A row of styled segments as one terminal line. */
-function Row({ line }: { line: Line }) {
+const Row = ({ line }: RowProps) => {
   return (
     <Text>
       {line.map((s, i) => (
@@ -28,10 +29,10 @@ function Row({ line }: { line: Line }) {
       ))}
     </Text>
   );
-}
+};
 
 /** Drop the least important hints, in this order, until the line fits. */
-function fitKeys(keys: [string, string][], width: number): [string, string][] {
+const fitKeys = (keys: [string, string][], width: number): [string, string][] => {
   const size = (ks: [string, string][]) =>
     ks.reduce((n, [k, l], i) => n + (i ? 3 : 0) + k.length + l.length + 1, 1);
   const out = [...keys];
@@ -41,10 +42,10 @@ function fitKeys(keys: [string, string][], width: number): [string, string][] {
       if (at >= 0) out.splice(at, 1);
     }
   return out;
-}
+};
 
 /** What is left to do, for the line under the panels. */
-export function progressOf(items: FindingView[]) {
+export const progressOf = (items: FindingView[]) => {
   const live = items.filter((i) => triage(i) !== "applied");
   const reviewed = live.filter((i) => triage(i) !== "pending").length;
   const accepted = items.filter((i) => triage(i) === "accepted").length;
@@ -52,9 +53,8 @@ export function progressOf(items: FindingView[]) {
     (i) => i.finding.selected && i.finding.status === "open" && i.fix,
   ).length;
   return { total: live.length, reviewed, accepted, applicable };
-}
-
-export function StreamScreen(props: {
+};
+type StreamViewProps = {
   state: SessionState;
   items: FindingView[];
   filter: ListFilter;
@@ -74,7 +74,9 @@ export function StreamScreen(props: {
   canGoBack?: boolean;
   /** Findings the cursor has been on. */
   seenCount?: number;
-}) {
+};
+
+export const StreamView = (props: StreamViewProps) => {
   const { state, items, width, height } = props;
   const review = state.review;
   const current = items[Math.min(props.cursor, Math.max(0, items.length - 1))];
@@ -257,4 +259,4 @@ export function StreamScreen(props: {
       <Footer width={width} keys={keys} />
     </Box>
   );
-}
+};

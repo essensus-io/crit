@@ -1,7 +1,7 @@
 import { type ResolvedConfig, type ReviewEvent } from "@crit/schema";
 import { type SqliteStore } from "@crit/store";
 import { type CliContext } from "../../context.ts";
-import { RunApp } from "../views/run/index.ts";
+import { RunView } from "../views/run/index.ts";
 import type { RunRecovery } from "../features/run-progress/index.ts";
 import { type Choice } from "../features/model-switching/index.ts";
 import { makeSession } from "./make-session.ts";
@@ -13,21 +13,21 @@ import { summaryLine } from "./summary-line.ts";
  * `crit review` in a terminal: the run dashboard, then the review screen.
  * Returns what the user asked for when leaving (retry, connect a provider…).
  */
-export async function runTui(
+export const runTui = async (
   ctx: CliContext,
   store: SqliteStore,
   root: string,
   config: ResolvedConfig,
   start: (onEvent: (e: ReviewEvent) => void, signal: AbortSignal) => Promise<unknown>,
   initial?: Partial<Choice> & { provider: string },
-): Promise<RunRecovery | undefined> {
+): Promise<RunRecovery | undefined> => {
   const listeners = new Set<(e: ReviewEvent) => void>();
   let recovery: RunRecovery | undefined;
   let reviewId: string | undefined;
   const ac = new AbortController();
   const switcher = initial ? makeSwitcher(ctx, config, initial) : undefined;
   const ui = renderFullScreen(
-    <RunApp
+    <RunView
       subscribe={(fn) => {
         listeners.add(fn);
         return () => void listeners.delete(fn);
@@ -57,4 +57,4 @@ export async function runTui(
     if (line) ctx.out(line);
   }
   return recovery;
-}
+};

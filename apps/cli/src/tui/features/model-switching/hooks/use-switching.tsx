@@ -37,7 +37,7 @@ export const DEPTH_HINTS: Record<Depth, string> = {
  * `S` saves the current choice as the profile's default. While an overlay is
  * open `modal` is true and the screen should ignore its own keys.
  */
-export function useSwitching(opts: {
+export const useSwitching = (opts: {
   switcher: Switcher | undefined;
   /** Keys are live only while this is true (a text prompt elsewhere turns them off). */
   active: boolean;
@@ -48,7 +48,7 @@ export function useSwitching(opts: {
   onChange?: () => void;
   /** Off when the screen opens the pickers itself (through `open`). */
   hotkeys?: boolean;
-}): { overlay: ReactNode; modal: boolean; open: (key: "m" | "p" | "e" | "d" | "s") => void } {
+}): { overlay: ReactNode; modal: boolean; open: (key: "m" | "p" | "e" | "d" | "s") => void } => {
   const { switcher, active, onNotice } = opts;
   const screen = useScreen();
   const [stage, setStage] = useState<Stage | undefined>();
@@ -344,4 +344,4 @@ export function useSwitching(opts: {
   }
   // a new key per stage: one picker must not inherit the previous one's search text
   return { overlay: <Fragment key={stage.kind}>{overlay}</Fragment>, modal: true, open: trigger };
-}
+};

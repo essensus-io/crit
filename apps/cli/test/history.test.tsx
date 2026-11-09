@@ -5,7 +5,7 @@ import { listHistory } from "@crit/store";
 import { render } from "ink-testing-library";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { outcomeOf, parseAge, parseSince } from "../src/commands/history.ts";
-import { HistoryApp, previousOf } from "../src/tui/views/history/index.ts";
+import { HistoryView, previousOf } from "../src/tui/views/history/index.ts";
 import { ReviewSession } from "../src/tui/features/review-session/index.ts";
 import { fakeProvidersJson, type TestEnv, testContext } from "./helpers.ts";
 
@@ -164,7 +164,7 @@ describe("history screen", () => {
     expect(outcomeOf(rows[1]!)).toBe("superseded");
     let removed = "";
     const app = render(
-      <HistoryApp
+      <HistoryView
         initial={rows}
         now={Date.now()}
         actions={{

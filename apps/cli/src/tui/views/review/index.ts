@@ -1,4 +1,4 @@
-export * from "./help-overlay.tsx";
-export * from "./proposal-screen.tsx";
+export * from "./help-view.tsx";
+export * from "./proposal-view.tsx";
 export * from "./review-view.tsx";
-export * from "./stream-screen.tsx";
+export * from "./stream-view.tsx";

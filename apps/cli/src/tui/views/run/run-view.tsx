@@ -8,25 +8,26 @@ import {
   type RunRecovery,
   type Selection,
 } from "../../features/run-progress/index.ts";
-import { ProgressScreen } from "./index.ts";
+import { ProgressView } from "./index.ts";
 import { useScreen } from "../../shared/ui/index.ts";
 import type { ReviewSession } from "../../features/review-session/index.ts";
 import { type Switcher } from "../../features/model-switching/index.ts";
 import { useSwitching } from "../../features/model-switching/index.ts";
-import { ReviewApp } from "../review/index.ts";
-
-/**
- * While a review runs: the progress screen, then the review screen. `enter`
- * opens the findings found so far; `q` stops the review.
- */
-export function RunApp(props: {
+import { ReviewView } from "../review/index.ts";
+type Props = {
   subscribe: (fn: (e: ReviewEvent) => void) => () => void;
   makeSession: (reviewId: string) => Promise<ReviewSession>;
   onStop: () => void;
   onRecover?: (action: RunRecovery) => void;
   onExit?: () => void;
   switcher?: Switcher;
-}) {
+};
+
+/**
+ * While a review runs: the progress screen, then the review screen. `enter`
+ * opens the findings found so far; `q` stops the review.
+ */
+export const RunView = (props: Props) => {
   const app = useApp();
   const { width, height } = useScreen();
   const [progress, setProgress] = useState<ProgressState>(emptyProgress);
@@ -110,7 +111,7 @@ export function RunApp(props: {
 
   if (session)
     return (
-      <ReviewApp
+      <ReviewView
         session={session}
         {...(props.onExit ? { onExit: props.onExit } : {})}
         {...(props.switcher ? { switcher: props.switcher } : {})}
@@ -125,7 +126,7 @@ export function RunApp(props: {
     );
   if (overlay) return overlay;
   return (
-    <ProgressScreen
+    <ProgressView
       progress={progress}
       width={width}
       height={height}
@@ -134,4 +135,4 @@ export function RunApp(props: {
       {...(notice ? { notice } : {})}
     />
   );
-}
+};
