@@ -260,8 +260,14 @@ export class ReviewSession {
       this.set({ notice: "This finding has no fix to apply. Press i to tell the AI the fix." });
       return;
     }
-    await this.deps.store.findings.update(id, { selected: !it.finding.selected });
-    await this.load();
+    // Show the new state at once; the write follows. Nothing here waits on the AI or the files.
+    const selected = !it.finding.selected;
+    this.set({
+      items: this.state.items.map((v) =>
+        v.finding.id === id ? { ...v, finding: { ...v.finding, selected } } : v,
+      ),
+    });
+    await this.deps.store.findings.update(id, { selected });
   }
 
   dismiss(id: string, reason: DismissReason) {
@@ -374,7 +380,8 @@ export class ReviewSession {
         backupRoot: this.deps.backupRoot,
         ...(only ? { only } : {}),
         ...(this.deps.verifyCommands.length ? { verifyCommands: this.deps.verifyCommands } : {}),
-        ...(this.deps.rebase ? { rebase: this.deps.rebase } : {}),
+        // Fixes are applied exactly as shown. A fix that no longer applies cleanly is skipped;
+        // no AI is called here.
       });
       return r;
     }).then((r) => {
