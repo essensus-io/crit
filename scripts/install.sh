@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run from a checkout, or pipe this file from the team's GitHub repository.
+# Run from a checkout, or distribute this script to teammates directly.
 set -euo pipefail
 
 fail() { printf 'crit setup: %s\n' "$*" >&2; exit 1; }
@@ -27,11 +27,12 @@ if [[ -z "$source_root" ]]; then
   install_repo="${CRIT_INSTALL_REPO:-ihornovykov/crit}"
   install_ref="${CRIT_INSTALL_REF:-main}"
   printf 'Fetching %s (%s)…\n' "$install_repo" "$install_ref"
-  if command -v gh >/dev/null 2>&1; then
-    gh repo clone "$install_repo" "$setup_tmp/source" -- --depth 1 --branch "$install_ref"
-  else
-    git clone --depth 1 --branch "$install_ref" "git@github.com:$install_repo.git" "$setup_tmp/source"
-  fi
+  # Use the same SSH keys / credential helper as normal Git operations.
+  case "$install_repo" in
+    *://*|git@*|/*) install_url="$install_repo" ;;
+    *) install_url="git@github.com:${install_repo%.git}.git" ;;
+  esac
+  git clone --depth 1 --branch "$install_ref" "$install_url" "$setup_tmp/source"
   source_root="$setup_tmp/source"
 fi
 
@@ -58,7 +59,8 @@ case ":$PATH:" in
     # Persist the path once. A child process cannot change its parent's PATH,
     # so the new command is available after opening a new terminal.
     shell_config=''
-    case "${SHELL##*/}" in
+    setup_shell="${SHELL:-}"
+    case "${setup_shell##*/}" in
       zsh) shell_config="${ZDOTDIR:-$HOME}/.zshrc" ;;
       bash)
         if [[ "$(uname -s)" == Darwin ]]; then

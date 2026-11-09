@@ -17,12 +17,15 @@ logged in.
 
 ### Internal team setup (macOS / Linux)
 
-With access to this GitHub repository and the GitHub CLI already logged in
-(`gh auth login`), run:
+With read access to this repository and normal Git SSH authentication, run:
 
 ```sh
-gh api -H 'Accept: application/vnd.github.raw+json' repos/ihornovykov/crit/contents/scripts/install.sh | bash
+git clone --depth 1 git@github.com:ihornovykov/crit.git && bash crit/scripts/install.sh
 ```
+
+No GitHub CLI is needed. For an organization repository, replace
+`ihornovykov/crit` with your organization's repository path. HTTPS Git URLs also
+work if your Git credential helper is configured.
 
 Setup builds the CLI and installs the `crit` command into `~/.local/bin` without
 sudo or publishing anything to npm. pnpm is downloaded automatically at the
@@ -37,18 +40,31 @@ crit doctor             # check the local setup
 crit review             # connect a provider and open the review screen
 ```
 
-Already have a checkout, or prefer Git over SSH instead of the GitHub CLI?
+Already have a checkout? Run this from its root:
 
 ```sh
-git clone git@github.com:ihornovykov/crit.git
-bash crit/scripts/install.sh
+bash scripts/install.sh
 ```
 
-Rerun the GitHub setup command to update to the latest `main`. From a local
-checkout, pull the latest changes and rerun `bash scripts/install.sh`. Updates
+To update, run this from your Crit checkout:
+
+```sh
+git pull --ff-only && bash scripts/install.sh
+```
+
+Updates
 preserve each person's provider settings and review history; the installed app
 works even if the checkout is removed. `CRIT_INSTALL_PREFIX` overrides the
 default `~/.local` installation directory.
+
+You can also share `scripts/install.sh` directly. Outside a checkout it fetches
+the source into a temporary directory and removes it after installation. Set
+`CRIT_INSTALL_REPO` to your organization's `org/repo` or a full Git URL, and
+optionally `CRIT_INSTALL_REF` to a branch or tag (default: `main`):
+
+```sh
+CRIT_INSTALL_REPO=your-org/crit bash install.sh
+```
 
 To remove the command (settings and history are kept):
 
