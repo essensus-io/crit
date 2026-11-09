@@ -46,15 +46,18 @@ crit is a TypeScript (strict, ESM, Node 24) pnpm + Turborepo monorepo. Formattin
 
 ## Comments
 
-- Comment **why**, never **what**: a non-obvious constraint, a workaround with its cause, an invariant.
-  If a comment restates the next line or a section banner (`// ---- helpers ----`), delete it.
-- Public functions of a package get a one-line doc comment only when the name and types do not say enough.
-- No TODO without an issue or a concrete next step.
+- No comments in code: no line comments, block comments, JSDoc, section banners or TODOs. Names, types and
+  structure carry the meaning. If something needs explaining, rename it, extract a function with a name that
+  says it, or encode it in a type.
+- The only exceptions are comments that tools read: `@ts-expect-error` (with the reason on the same line),
+  lint directives and coverage ignores. Use them sparingly.
+- A non-obvious decision belongs in the commit message or the pull request, not in the code.
 
 ## Errors
 
 - Expected failures (bad user input, missing provider, git conflicts) are values or typed errors with a
-  message that says how to fix it. Do not swallow errors: an empty `catch` needs a comment saying why it is safe.
+  message that says how to fix it. Do not swallow errors: a `catch` either handles the error or rethrows it; a deliberate ignore is a named
+  function (`ignoreMissingFile`) so the intent is in the name.
 - Never `console.log` in packages. Output goes through the CLI's `ctx.out` / `ctx.err`.
 
 ## Imports
