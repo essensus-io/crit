@@ -3,7 +3,7 @@ import type { BatchItem } from "drizzle-orm/batch";
 import { eq } from "drizzle-orm";
 import * as t from "./db/schema.ts";
 import { findingToRow, fixToRow, reviewToRow, shardToRow } from "./mappers.ts";
-import type { SqliteStore } from "./store.ts";
+import type { SqliteStore } from "./repositories/open-store.ts";
 
 export async function exportReview(store: SqliteStore, reviewId: string): Promise<ReviewExport> {
   const review = await store.reviews.get(reviewId);

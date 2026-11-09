@@ -8,4 +8,13 @@ export {
   listHistory,
 } from "./history.ts";
 export * from "./settings.ts";
-export * from "./store.ts";
+export { createRepositories } from "./repositories/create-repositories.ts";
+export { openStore, type SqliteStore } from "./repositories/open-store.ts";
+export type {
+  CacheEntry,
+  FindingPatch,
+  FixPatch,
+  Repositories,
+  ReviewPatch,
+  ShardPatch,
+} from "./repositories/repositories-types.ts";
