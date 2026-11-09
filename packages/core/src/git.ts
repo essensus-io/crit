@@ -77,6 +77,12 @@ export async function detectBase(cwd: string): Promise<string | undefined> {
   const branch = await currentBranch(cwd);
   const upstream = await tryGit(cwd, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]);
   if (upstream && branch && upstream.split("/").slice(1).join("/") !== branch) return upstream;
+  // The base the branch was created for, when git or `gh` recorded it.
+  if (branch)
+    for (const key of ["gh-merge-base", "vscode-merge-base"]) {
+      const configured = await tryGit(cwd, ["config", "--get", `branch.${branch}.${key}`]);
+      if (configured && (await refExists(cwd, configured))) return configured;
+    }
   const names: string[] = [];
   const originHead = await tryGit(cwd, [
     "symbolic-ref",
@@ -104,11 +110,12 @@ export async function detectBase(cwd: string): Promise<string | undefined> {
     if (!(await refExists(cwd, ref))) continue;
     anyExisting ??= ref;
     const ahead = Number(await tryGit(cwd, ["rev-list", "--count", `${ref}..HEAD`]));
-    if (Number.isFinite(ahead) && ahead > 0) scored.push({ ref, ahead });
+    if (Number.isFinite(ahead)) scored.push({ ref, ahead });
   }
-  // A branch with no commits of its own still gets a base (and an empty review).
+  // Nothing to compare against: fall back to any existing branch.
   if (scored.length === 0) return anyExisting;
-  // Fewest commits ahead wins; ties keep the order above (origin/HEAD first).
+  // The branch it will merge into is the nearest one: fewest commits ahead wins (0 means
+  // already merged there); ties keep the order above (origin/HEAD first).
   return scored.reduce((best, c) => (c.ahead < best.ahead ? c : best)).ref;
 }
 
