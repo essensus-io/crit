@@ -1,6 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import {
+  candidateBases,
   currentBranch,
   detectBase,
   estimateDurationMs,
@@ -130,6 +131,7 @@ async function runHome(
     home.spec.kind === "branch" && home.spec.base ? home.spec.base : await detectBase(root);
   const pick = await homeTui(ctx, config, {
     info: { repo: basename(root), branch, base },
+    bases: await candidateBases(root),
     recent: history.map((r) => ({
       id: r.review.id,
       label: r.review.scopeLabel,

@@ -44,6 +44,7 @@ function mount(
     estimate?: (s: ScopeSpec) => Promise<Estimate>;
     recent?: RecentReview[];
     initialSpec?: ScopeSpec;
+    bases?: { ref: string; ahead: number }[];
   } = {},
 ) {
   const done: HomeChoice[] = [];
@@ -54,6 +55,7 @@ function mount(
   const app = render(
     <HomeApp
       info={{ repo: "fieldhive", branch: "fix/portal", base: "origin/develop" }}
+      bases={over.bases ?? []}
       recent={over.recent ?? RECENT}
       initialSpec={over.initialSpec}
       estimate={estimate}
@@ -188,5 +190,40 @@ describe("start screen", () => {
     await press(TAB);
     expect(app.lastFrame()).toContain("j/k choose · enter start");
     app.unmount();
+  });
+
+  it("warns when the estimate is huge, and b picks another base to compare against", async () => {
+    const { app, done, estimate, press } = mount({
+      bases: [
+        { ref: "origin/main", ahead: 353 },
+        { ref: "origin/develop", ahead: 2 },
+      ],
+      estimate: async (s) => ({
+        ok: true,
+        files: s.kind === "branch" && s.base === "origin/main" ? 1472 : 35,
+        skipped: 0,
+        runs: 3,
+        tokens: s.kind === "branch" && s.base === "origin/main" ? 4_800_000 : 90_000,
+        cached: 0,
+      }),
+    });
+    await until(app.lastFrame, "35 files");
+    await press("b");
+    await until(app.lastFrame, "compare this branch against");
+    await sleep(80);
+    await press("1");
+    await until(app.lastFrame, "Press b to pick another.");
+    expect(app.lastFrame()).toContain("1472 files");
+    expect(estimate).toHaveBeenLastCalledWith({ kind: "branch", base: "origin/main" });
+    await press("b");
+    await until(app.lastFrame, "compare this branch against");
+    await sleep(80);
+    await press("2");
+    await until(app.lastFrame, "35 files");
+    await press(ENTER);
+    expect(done[0]).toMatchObject({
+      kind: "start",
+      spec: { kind: "branch", base: "origin/develop" },
+    });
   });
 });

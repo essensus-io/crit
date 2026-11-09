@@ -68,6 +68,8 @@ const indexOfSpec = (spec: ScopeSpec | undefined) =>
  */
 export function HomeApp(props: {
   info: HomeInfo;
+  /** Branches the review can be compared against (b changes it). */
+  bases?: { ref: string; ahead: number }[];
   recent: RecentReview[];
   initialSpec?: ScopeSpec | undefined;
   switcher?: Switcher | undefined;
@@ -76,14 +78,15 @@ export function HomeApp(props: {
 }) {
   const app = useApp();
   const { width, height } = useScreen();
-  const options = optionsFor(props.info.base);
+  const [base, setBase] = useState(props.info.base);
+  const options = optionsFor(base);
   const [sel, setSel] = useState(indexOfSpec(props.initialSpec));
   const [paths, setPaths] = useState(
     props.initialSpec?.kind === "paths" ? props.initialSpec.paths.join(" ") : "",
   );
   const [focus, setFocus] = useState<"scope" | "recent">("scope");
   const [recentAt, setRecentAt] = useState(0);
-  const [mode, setMode] = useState<"none" | "paths" | "options">("none");
+  const [mode, setMode] = useState<"none" | "paths" | "options" | "base">("none");
   const [estimate, setEstimate] = useState<Estimate | "loading" | "idle">("idle");
   const [notice, setNotice] = useState<string>();
   const [, bump] = useState(0);
@@ -104,7 +107,7 @@ export function HomeApp(props: {
     void props.estimate(spec).then((e) => {
       if (ticket === latest.current) setEstimate(e);
     });
-  }, [sel, paths]);
+  }, [sel, paths, base]);
 
   const switching = useSwitching({
     switcher: props.switcher,
@@ -134,6 +137,7 @@ export function HomeApp(props: {
       setNotice(undefined);
       if (input === "q" || key.escape) return finish({ kind: "quit" });
       if (input === "o") return setMode("options");
+      if (input === "b" && (props.bases?.length ?? 0) > 1) return setMode("base");
       if (key.tab || input === "h" || input === "l" || key.leftArrow || key.rightArrow) {
         if (props.recent.length === 0) return;
         return setFocus((f) => (f === "scope" ? "recent" : "scope"));
@@ -157,6 +161,26 @@ export function HomeApp(props: {
   );
 
   if (switching.overlay) return switching.overlay;
+  if (mode === "base" && props.bases) {
+    return (
+      <Menu
+        title="compare this branch against"
+        width={width}
+        height={height}
+        items={props.bases.map((b, i) => ({
+          key: String(i + 1),
+          label: b.ref + (b.ref === base ? "  (current)" : ""),
+          hint: b.ahead === 0 ? "already merged: nothing to review" : `${b.ahead} commits ahead`,
+        }))}
+        onCancel={() => setMode("none")}
+        onPick={(k) => {
+          setBase(props.bases![Number(k) - 1]?.ref ?? base);
+          setSel(0);
+          setMode("none");
+        }}
+      />
+    );
+  }
   if (mode === "options" && props.switcher) {
     const c = props.switcher.current();
     return (
@@ -234,6 +258,13 @@ export function HomeApp(props: {
                 {estimate.cached ? <Text dimColor>{` · ${estimate.cached} cached`}</Text> : null}
                 {estimate.skipped ? <Text dimColor>{` · ${estimate.skipped} skipped`}</Text> : null}
               </Text>
+              {estimate.tokens > 1_000_000 && options[sel]!.id === "branch" ? (
+                <Text color={T.yellow} wrap="wrap">
+                  {(props.bases?.length ?? 0) > 1
+                    ? "That is a lot for one branch: the base may be wrong. Press b to pick another."
+                    : "That is a lot of tokens for one branch."}
+                </Text>
+              ) : null}
             </>
           ) : (
             <Text color={T.red} wrap="truncate">
@@ -310,6 +341,9 @@ export function HomeApp(props: {
                 ["j/k", "choose"],
                 ["enter", "start"],
                 ...(props.recent.length ? ([["tab", "recent reviews"]] as [string, string][]) : []),
+                ...((props.bases?.length ?? 0) > 1 && options[sel]!.id === "branch"
+                  ? ([["b", "change base"]] as [string, string][])
+                  : []),
                 ["o", "model & depth"],
                 ["q", "quit"],
               ]

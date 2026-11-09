@@ -112,6 +112,29 @@ export async function detectBase(cwd: string): Promise<string | undefined> {
   return scored.reduce((best, c) => (c.ahead < best.ahead ? c : best)).ref;
 }
 
+/** Branches this one could be compared against, with how many commits it is ahead of each. */
+export async function candidateBases(cwd: string): Promise<{ ref: string; ahead: number }[]> {
+  const branch = await currentBranch(cwd);
+  const out: { ref: string; ahead: number }[] = [];
+  for (const ref of [
+    "origin/main",
+    "origin/master",
+    "origin/develop",
+    "origin/trunk",
+    "main",
+    "master",
+    "develop",
+    "trunk",
+  ]) {
+    if (ref === branch || ref === `origin/${branch}`) continue;
+    if (out.some((o) => o.ref === `origin/${ref}`)) continue;
+    if (!(await refExists(cwd, ref))) continue;
+    const ahead = Number(await tryGit(cwd, ["rev-list", "--count", `${ref}..HEAD`]));
+    out.push({ ref, ahead: Number.isFinite(ahead) ? ahead : 0 });
+  }
+  return out;
+}
+
 /** NUL-separated output → list. */
 export const splitZ = (s: string) => s.split("\0").filter(Boolean);
 

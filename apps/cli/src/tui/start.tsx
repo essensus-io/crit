@@ -221,6 +221,7 @@ export async function homeTui(
   config: ResolvedConfig,
   props: {
     info: HomeInfo;
+    bases?: { ref: string; ahead: number }[];
     recent: RecentReview[];
     initialSpec?: ScopeSpec;
     initialChoice: Partial<Choice> & { provider: string };
@@ -232,6 +233,7 @@ export async function homeTui(
   await renderFullScreen(
     <HomeApp
       info={props.info}
+      bases={props.bases ?? []}
       recent={props.recent}
       initialSpec={props.initialSpec}
       switcher={switcher}
