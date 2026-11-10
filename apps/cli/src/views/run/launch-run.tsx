@@ -44,7 +44,6 @@ export const runTui = async (
   await ui;
   ac.abort();
   await running;
-  if (recovery && process.stdin.isTTY) process.stdin.ref();
   if (!recovery && reviewId) {
     const line = await summaryLine(store, reviewId);
     if (line) ctx.out(line);

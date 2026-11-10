@@ -45,6 +45,19 @@ function unwrap<T>(v: unknown): T {
   return v as T;
 }
 
+// Ink unreferences stdin when a full-screen view exits. Clack's readline
+// prompts resume the stream without referencing it, so keep it alive until
+// the answer arrives, regardless of which screen handed us the terminal.
+async function awaitPrompt<T>(prompt: () => Promise<unknown>): Promise<T> {
+  const input = process.stdin;
+  if (input.isTTY) input.ref();
+  try {
+    return unwrap<T>(await prompt());
+  } finally {
+    if (input.isTTY) input.unref();
+  }
+}
+
 export const createClackPrompter = (): Prompter => ({
   intro: (m: string) => p.intro(m),
   outro: (m: string) => p.outro(m),
@@ -54,8 +67,8 @@ export const createClackPrompter = (): Prompter => ({
   success: (m: string) => p.log.success(m),
   error: (m: string) => p.log.error(m),
   async text(o: Parameters<Prompter["text"]>[0]) {
-    return unwrap<string>(
-      await p.text({
+    return awaitPrompt<string>(() =>
+      p.text({
         message: o.message,
         ...(o.initialValue !== undefined ? { initialValue: o.initialValue } : {}),
         ...(o.placeholder !== undefined ? { placeholder: o.placeholder } : {}),
@@ -64,8 +77,8 @@ export const createClackPrompter = (): Prompter => ({
     );
   },
   async select<T>(o: { message: string; options: Option<T>[]; initialValue?: T }) {
-    return unwrap<T>(
-      await p.select<T>({
+    return awaitPrompt<T>(() =>
+      p.select<T>({
         message: o.message,
         options: o.options as never,
         ...(o.initialValue !== undefined ? { initialValue: o.initialValue } : {}),
@@ -78,8 +91,8 @@ export const createClackPrompter = (): Prompter => ({
     initialValue?: T;
     placeholder?: string;
   }) {
-    return unwrap<T>(
-      await p.autocomplete<T>({
+    return awaitPrompt<T>(() =>
+      p.autocomplete<T>({
         message: o.message,
         options: o.options as never,
         maxItems: 10,
@@ -94,8 +107,8 @@ export const createClackPrompter = (): Prompter => ({
     initialValues?: T[];
     required?: boolean;
   }) {
-    return unwrap<T[]>(
-      await p.multiselect<T>({
+    return awaitPrompt<T[]>(() =>
+      p.multiselect<T>({
         message: o.message,
         options: o.options as never,
         ...(o.initialValues ? { initialValues: o.initialValues } : {}),
@@ -104,8 +117,8 @@ export const createClackPrompter = (): Prompter => ({
     );
   },
   async confirm(o: { message: string; initialValue?: boolean }) {
-    return unwrap<boolean>(
-      await p.confirm({
+    return awaitPrompt<boolean>(() =>
+      p.confirm({
         message: o.message,
         ...(o.initialValue !== undefined ? { initialValue: o.initialValue } : {}),
       }),
