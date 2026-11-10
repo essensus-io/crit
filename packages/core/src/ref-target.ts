@@ -39,6 +39,9 @@ export async function resolveRefTarget(root: string, input: string): Promise<Ref
   const tree = TREE_URL.exec(text);
   const name = (tree ? decodeURIComponent(tree[1]!) : text).replace(/^refs\/heads\//, "");
   const branch = name.startsWith(ORIGIN_PREFIX) ? name.slice(ORIGIN_PREFIX.length) : name;
+  if (name.startsWith("-") || branch.startsWith("-")) {
+    throw new RefTargetError(`crit: invalid branch name ${name}`);
+  }
   const sha =
     (await commitOf(root, name)) ??
     (await commitOf(root, `${ORIGIN_PREFIX}${name}`)) ??
