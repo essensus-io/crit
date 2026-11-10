@@ -105,7 +105,7 @@ function toolList() {
 
 export function createCritMcpServer(
   handler: SessionHandler,
-  info = { name: "crit", version: "1.0.0" },
+  info = { name: "crit", version: "1.1.0" },
 ): Server {
   const server = new Server(info, { capabilities: { tools: {} } });
 
