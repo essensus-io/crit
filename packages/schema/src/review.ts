@@ -5,6 +5,7 @@ import { Finding, Fix, Message } from "./finding.ts";
 export const ScopeSpec = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("branch"), base: z.string().optional() }),
   z.object({ kind: z.literal("staged") }),
+  z.object({ kind: z.literal("ref"), ref: z.string().min(1), base: z.string().optional() }),
   z.object({ kind: z.literal("commit"), sha: z.string().min(1) }),
   z.object({
     kind: z.literal("paths"),

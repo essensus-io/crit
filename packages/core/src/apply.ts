@@ -154,6 +154,11 @@ export async function applyFixes(opts: {
 }): Promise<ApplyResult> {
   const now = opts.now ?? Date.now;
   const target = opts.target ?? { kind: "worktree" };
+  const reviewed = await opts.store.reviews.get(opts.reviewId);
+  if (reviewed?.scope.kind === "ref")
+    throw new Error(
+      `crit: this review is of ${reviewed.branch ?? reviewed.scopeLabel}, which is not checked out, so its fixes cannot be applied here. Post comments to its PR instead.`,
+    );
   let items = await plannedFixes(opts.store, opts.reviewId);
   if (opts.only) items = items.filter((i) => opts.only!.includes(i.finding.id));
   const result: ApplyResult = {

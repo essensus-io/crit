@@ -1,6 +1,7 @@
 export * from "./diff.ts";
 export * from "./git.ts";
 export * from "./scope.ts";
+export { RefTargetError } from "./ref-target.ts";
 export * from "./rules/index.ts";
 export * from "./pipeline/agent.ts";
 export * from "./pipeline/anchor.ts";
@@ -26,3 +27,8 @@ export * from "./apply.ts";
 export * from "./verify.ts";
 export * from "./rebase.ts";
 export * from "./fixes.ts";
+export { createGhRunner, GhError, type GhRunner } from "./github/gh-runner.ts";
+export { ghStatus, type GhStatus } from "./github/gh-auth.ts";
+export { placeFindings } from "./github/place-findings.ts";
+export { findPullRequest, type PullRequest } from "./github/pull-request.ts";
+export { type PrPublishResult, publishPrReview } from "./github/pr-review.ts";

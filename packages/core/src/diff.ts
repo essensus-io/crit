@@ -149,6 +149,12 @@ export function hunksOf(parsedFile: ParsedFile): Hunk[] {
   }));
 }
 
+export const rightSideLines = (parsedHunk: ParsedHunk): string[] =>
+  parsedHunk.body
+    .filter((line) => line.startsWith("+") || line.startsWith(" ") || line === "")
+    .slice(0, parsedHunk.newLines)
+    .map((line) => line.slice(1));
+
 export function addedLines(parsedFile: ParsedFile): Set<number> {
   const out = new Set<number>();
   for (const parsedHunk of parsedFile.hunks) {
