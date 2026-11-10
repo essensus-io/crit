@@ -108,6 +108,7 @@ export async function makeSession(
       added: (f) => added.get(f) ?? new Set<number>(),
     },
     backupRoot: join(ctx.paths.cache, "backups"),
+    gh: ctx.gh,
     verifyCommands: config.verify.commands,
     ...(fixContext ? { fixContext } : {}),
     ...(rebase ? { rebase } : {}),

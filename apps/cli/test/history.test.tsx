@@ -184,6 +184,7 @@ describe("history screen", () => {
               reviewId: row.review.id,
               editor: async () => undefined,
               backupRoot: join(t.dir, "b"),
+              gh: t.ctx.gh,
               verifyCommands: [],
             });
             await s.load();

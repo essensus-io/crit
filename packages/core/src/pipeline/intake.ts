@@ -31,8 +31,8 @@ export async function readAtRevision(
   path: string,
 ): Promise<string | undefined> {
   const spec = scope.spec;
-  if (spec.kind === "commit" || spec.kind === "staged") {
-    const ref = spec.kind === "commit" ? `${scope.headSha}:${path}` : `:${path}`;
+  if (spec.kind === "commit" || spec.kind === "staged" || spec.kind === "ref") {
+    const ref = spec.kind === "staged" ? `:${path}` : `${scope.headSha}:${path}`;
     const gitResult = await gitRaw(scope.root, ["show", ref]);
     return gitResult.exitCode === 0 ? gitResult.stdout : undefined;
   }
@@ -138,7 +138,11 @@ export const createIntake = (intakeOptions: IntakeOptions): Intake => {
     const normalized: FindingInput = { ...input, file, range, ruleIds };
     const fp = fingerprint(normalized);
 
-    if (input.fix && intakeOptions.checkPatches !== false) {
+    if (
+      input.fix &&
+      intakeOptions.checkPatches !== false &&
+      intakeOptions.scope.spec.kind !== "ref"
+    ) {
       const check = await checkPatch(intakeOptions.scope.root, input.fix.patch);
       if (check.ok) normalized.fix = { summary: input.fix.summary, patch: check.patch };
       else {

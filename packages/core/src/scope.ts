@@ -21,6 +21,7 @@ import {
   tryGit,
   untrackedFiles,
 } from "./git.ts";
+import { defaultBaseFor, resolveRefTarget } from "./ref-target.ts";
 
 export type ResolveScopeOptions = {
   cwd: string;
@@ -263,6 +264,22 @@ export async function resolveScope(opts: ResolveScopeOptions): Promise<ResolvedS
       return fromDiff(d, `${branch ?? head.slice(0, 7)} → ${d.base}`, {
         baseSha: d.baseSha,
         baseRef: d.base,
+      });
+    }
+    case "ref": {
+      const target = await resolveRefTarget(root, spec.ref);
+      const baseRef = spec.base ?? (await defaultBaseFor(root, target));
+      if (!baseRef)
+        throw new ScopeError("crit: could not detect a base branch. Pass --base <branch>.");
+      const baseSha = await tryGit(root, ["merge-base", target.sha, baseRef]);
+      if (!baseSha)
+        throw new ScopeError(`crit: no common ancestor between ${target.branch} and ${baseRef}.`);
+      const diffSet = await diffAgainst(root, [baseSha, target.sha], false);
+      return fromDiff(diffSet, `${target.label} → ${baseRef}`, {
+        baseSha,
+        baseRef,
+        headSha: target.sha,
+        branch: target.branch,
       });
     }
     case "staged": {

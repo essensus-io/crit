@@ -40,7 +40,7 @@ packages/config     shared tsconfig. No code.
 
 `apps/cli/src` is feature-sliced: `app`, `views`, `features`, `shared`. The full rule is in
 `.claude/rules/cli/folder-structure.mdc`. A command is a thin file in `app/commands` plus a runner in
-`views/<name>`; anything that is a decision belongs in `packages/core`.
+`app/runners/<name>`; anything that is a decision belongs in `packages/core`.
 
 ## Where tests live
 

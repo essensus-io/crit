@@ -1,13 +1,13 @@
 import { defineCommand } from "citty";
 import type { CliContext } from "@/shared/lib/cli-context.ts";
-import { addProvider } from "@/views/providers/add-provider.ts";
-import { editProvider } from "@/views/providers/edit-provider.ts";
-import { listProviderModels } from "@/views/providers/list-provider-models.ts";
-import { listProviders } from "@/views/providers/list-providers.ts";
-import { removeProviderCmd } from "@/views/providers/remove-provider.ts";
-import { setDefaultCmd } from "@/views/providers/set-default-provider.ts";
-import { setRoleCmd } from "@/views/providers/set-provider-role.ts";
-import { testProviders } from "@/views/providers/test-providers.ts";
+import { addProvider } from "@/app/runners/providers/add-provider.ts";
+import { editProvider } from "@/app/runners/providers/edit-provider.ts";
+import { listProviderModels } from "@/app/runners/providers/list-provider-models.ts";
+import { listProviders } from "@/app/runners/providers/list-providers.ts";
+import { removeProviderCmd } from "@/app/runners/providers/remove-provider.ts";
+import { setDefaultCmd } from "@/app/runners/providers/set-default-provider.ts";
+import { setRoleCmd } from "@/app/runners/providers/set-provider-role.ts";
+import { testProviders } from "@/app/runners/providers/test-providers.ts";
 
 const run = (fn: () => Promise<number>) => async () => {
   process.exitCode = await fn();

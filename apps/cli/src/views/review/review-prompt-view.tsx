@@ -7,7 +7,7 @@ import type {
 } from "@/features/review-session/model/session.ts";
 import { Choice } from "@/shared/ui/choice.tsx";
 import { TextInput } from "@/shared/ui/text-input.tsx";
-import type { ReviewInput, ReviewMode } from "./review-mode.ts";
+import type { ReviewInput, ReviewMode } from "@/features/review-session/model/review-mode.ts";
 
 type Props = {
   mode: ReviewMode;

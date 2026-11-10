@@ -6,6 +6,7 @@ export type ReviewArgs = {
   all?: boolean;
   staged?: boolean;
   commit?: string;
+  branch?: string;
   base?: string;
   diff?: boolean;
   provider?: string;
@@ -24,20 +25,27 @@ export type ReviewArgs = {
   budget?: string;
   "dry-run"?: boolean;
   now?: boolean;
+  gh?: boolean;
 };
 
 export function scopeFromArgs(args: ReviewArgs): ScopeSpec {
   const paths = args._.filter(Boolean);
-  const kinds = [args.all, args.staged, args.commit !== undefined, paths.length > 0].filter(
-    Boolean,
-  ).length;
+  const kinds = [
+    args.all,
+    args.staged,
+    args.commit !== undefined,
+    args.branch !== undefined,
+    paths.length > 0,
+  ].filter(Boolean).length;
   if (kinds > 1)
-    throw new CliError("crit: choose one scope: paths, --all, --staged or --commit", {
+    throw new CliError("crit: choose one scope: paths, --all, --staged, --commit or --branch", {
       exitCode: EXIT.usage,
     });
   if (args.all) return { kind: "project" };
   if (args.staged) return { kind: "staged" };
   if (args.commit !== undefined) return { kind: "commit", sha: args.commit };
+  if (args.branch !== undefined)
+    return { kind: "ref", ref: args.branch, ...(args.base ? { base: args.base } : {}) };
   if (paths.length)
     return {
       kind: "paths",
@@ -59,6 +67,7 @@ export const withScope = (args: ReviewArgs, spec: ScopeSpec): ReviewArgs => {
   delete next.all;
   delete next.staged;
   delete next.commit;
+  delete next.branch;
   delete next.diff;
   delete next.base;
   return { ...next, ...argsFromScope(spec) };
@@ -72,6 +81,8 @@ export function argsFromScope(spec: ScopeSpec): ReviewArgs {
       return { _: [], staged: true };
     case "commit":
       return { _: [], commit: spec.sha };
+    case "ref":
+      return { _: [], branch: spec.ref, ...(spec.base ? { base: spec.base } : {}) };
     case "project":
       return { _: [], all: true };
     case "paths":

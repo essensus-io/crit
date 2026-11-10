@@ -7,7 +7,7 @@ import {
   type SessionState,
 } from "@/features/review-session/model/session.ts";
 import { triage } from "@/features/review-session/lib/triage.ts";
-import type { ReviewMode } from "./review-mode.ts";
+import type { ReviewMode } from "@/features/review-session/model/review-mode.ts";
 
 type Props = {
   session: ReviewSession;
@@ -145,6 +145,7 @@ export const useReviewKeys = ({
       if (input === ".") return setMode("actions");
       if (input === "i") return setMode("instruct");
       if (input === "x") return void session.applyOne(id);
+      if (input === "c") return void session.postFindingToPr(id);
       if (input === " ") {
         if (triage(current) === "dismissed") return void session.restore(id);
         const next = () => move(cursor + 1);

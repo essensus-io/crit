@@ -10,11 +10,13 @@ import {
   draftAiFix,
   type FixContext,
   getDisabledRules,
+  type GhRunner,
   keepAiFix,
   patchedContent,
   type ProposalInput,
   type ProposalOutcome,
   proposeFix,
+  publishPrReview,
   type Rebaser,
   restoreFinding,
   saveEditedFix,
@@ -26,6 +28,7 @@ import type { SqliteStore } from "@crit/store";
 import { copyToClipboard } from "@/shared/lib/clipboard.ts";
 import { type Editor } from "@/shared/lib/terminal-editor.ts";
 import type { Tok } from "@/shared/lib/highlight.ts";
+import { describePrPost } from "@/features/review-session/lib/describe-pr-post.ts";
 import { findingPrompt } from "@/features/review-session/lib/finding-prompt.ts";
 
 const MAX_DRAFTS = 3;
@@ -66,6 +69,7 @@ export type SessionDeps = {
   fixContext?: FixContext;
   editor: Editor;
   backupRoot: string;
+  gh: GhRunner;
   verifyCommands: string[];
   rebase?: Rebaser;
   recheck?: (file: string) => Promise<string>;
@@ -234,6 +238,22 @@ export const createReviewSession = (deps: SessionDeps) => {
       ),
     });
     await deps.store.findings.update(id, { selected });
+  };
+
+  const postFindingToPr = async (id: string) => {
+    const it = item(id);
+    if (!it) return;
+    if (it.finding.status !== "open") return notify("This one is already dealt with.");
+    const result = await run("Posting to the pull request…", () =>
+      publishPrReview({
+        gh: deps.gh,
+        store: deps.store,
+        root: deps.root,
+        reviewId: deps.reviewId,
+        findingIds: [id],
+      }),
+    );
+    if (result) notify(describePrPost(result));
   };
 
   const dismiss = (id: string, reason: DismissReason) => {
@@ -453,6 +473,7 @@ export const createReviewSession = (deps: SessionDeps) => {
     draftFix,
     notify,
     toggle,
+    postFindingToPr,
     dismiss,
     restore,
     propose,

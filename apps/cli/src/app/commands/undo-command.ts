@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import type { CliContext } from "@/shared/lib/cli-context.ts";
-import { undoCommand } from "@/views/apply/run-undo.ts";
+import { undoCommand } from "@/app/runners/apply/run-undo.ts";
 
 export const undoDef = (ctx: CliContext) =>
   defineCommand({

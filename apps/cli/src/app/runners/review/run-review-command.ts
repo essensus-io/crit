@@ -1,11 +1,18 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { estimateDurationMs, prepareReview, runReview } from "@crit/core";
+import {
+  estimateDurationMs,
+  findPullRequest,
+  prepareReview,
+  publishPrReview,
+  runReview,
+} from "@crit/core";
 import { resolveProvider } from "@crit/providers";
 import { Depth, formatTokens, resolveConfig, SEVERITY_ORDER, Severity } from "@crit/schema";
 import { exportReview, loadProjectConfig, loadUserConfig } from "@crit/store";
 import { type CliContext, sessionsDir } from "@/shared/lib/cli-context.ts";
 import { CliError, EXIT } from "@/shared/lib/errors.ts";
+import { describePrPost } from "@/features/review-session/lib/describe-pr-post.ts";
 import { dryRunJson, renderDryRun } from "@/features/review-report/lib/dry-run.ts";
 import { markdownReport } from "@/features/review-report/lib/markdown-report.ts";
 import { sarifReport } from "@/features/review-report/lib/sarif-report.ts";
@@ -15,7 +22,7 @@ import { ensureProviders } from "@/features/provider-setup/lib/ensure-providers.
 import { colors } from "@/shared/lib/colors.ts";
 import { duration, plural } from "@/shared/lib/format.ts";
 import { repoRootOrThrow } from "@/shared/lib/repo-root-or-throw.ts";
-import { chooseReviewProvider } from "@/views/providers/choose-review-provider.ts";
+import { chooseReviewProvider } from "@/app/runners/providers/choose-review-provider.ts";
 import {
   type ReviewArgs,
   parseLenses,
@@ -25,6 +32,8 @@ import {
 } from "./review-args.ts";
 import { progressPrinter } from "./progress-printer.ts";
 import { runHome } from "./run-home.ts";
+
+const prBranchOf = (ref: string) => ref.replace(/^origin\//, "");
 
 export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promise<number> {
   const maxShards = args["max-shards"] === undefined ? undefined : Number(args["max-shards"]);
@@ -36,7 +45,7 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
     throw new CliError(`crit: --depth takes ${Depth.options.join(", ")}`, { exitCode: EXIT.usage });
   const spec = scopeFromArgs(args);
   const format = args.format ?? "text";
-  const useTui = ctx.interactive && args.tui !== false && !args.format && !args.output;
+  const useTui = ctx.interactive && args.tui !== false && !args.format && !args.output && !args.gh;
   if (!["text", "json", "md", "sarif"].includes(format))
     throw new CliError(`crit: unknown format ${format} (use json, md or sarif)`, {
       exitCode: EXIT.usage,
@@ -48,6 +57,10 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
     });
 
   const root = await repoRootOrThrow(ctx.cwd);
+  const pullRequest =
+    args.gh && !args["dry-run"]
+      ? await findPullRequest(ctx.gh, root, spec.kind === "ref" ? prBranchOf(spec.ref) : undefined)
+      : undefined;
   const providers = await ensureProviders(
     ctx,
     `crit review${args._.length ? ` ${args._.join(" ")}` : ""}`,
@@ -162,7 +175,7 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
       }))
     )
       return EXIT.cancelled;
-    const { runTui } = await import("@/views/run/launch-run.tsx");
+    const { runTui } = await import("@/app/runners/run/launch-run.tsx");
     const recovery = await runTui(
       ctx,
       store,
@@ -216,6 +229,17 @@ export async function runReviewCommand(ctx: CliContext, args: ReviewArgs): Promi
       writeFileSync(resolve(ctx.cwd, args.output), output);
       ctx.err(`Wrote ${args.output}\n`);
     } else ctx.out(output);
+
+    if (pullRequest) {
+      const published = await publishPrReview({
+        gh: ctx.gh,
+        store,
+        root,
+        reviewId: result.review.id,
+        pr: pullRequest,
+      });
+      ctx.err(`${describePrPost(published)}\n`);
+    }
 
     if (failOn) {
       const limit = SEVERITY_ORDER.indexOf(failOn as Severity);

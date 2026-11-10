@@ -1,9 +1,9 @@
 import { defineCommand } from "citty";
 import type { CliContext } from "@/shared/lib/cli-context.ts";
 import { CliError, EXIT } from "@/shared/lib/errors.ts";
-import { addRules } from "@/views/rules/add-rules.ts";
-import { importCursorRules } from "@/views/rules/import-cursor-rules.ts";
-import { listRules } from "@/views/rules/list-rules.ts";
+import { addRules } from "@/app/runners/rules/add-rules.ts";
+import { importCursorRules } from "@/app/runners/rules/import-cursor-rules.ts";
+import { listRules } from "@/app/runners/rules/list-rules.ts";
 
 export const rulesCommand = (ctx: CliContext) =>
   defineCommand({

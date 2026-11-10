@@ -6,7 +6,7 @@ small MCP server, and shows them in an interactive full-screen UI where you
 check what to keep, apply the fixes, and undo them. Nothing leaves your machine
 except what your agent CLI already sends.
 
-> Version: `1.0.0` (internal distribution; not published to npm). The package name `@crit/cli` and
+> Version: `1.1.0` (internal distribution; not published to npm). The package name `@crit/cli` and
 > the `$schema` URLs in the generated JSON schemas are placeholders until a final
 > name is chosen.
 
@@ -43,7 +43,7 @@ crit review             # connect a provider and open the review screen
 Already have a checkout? Run this from its root:
 
 ```sh
-bash scripts/install.sh
+pnpm install:cli          # same as: bash scripts/install.sh
 ```
 
 To update, run this from your Crit checkout:
@@ -80,14 +80,35 @@ crit review                      # the same; reviews never start by themselves
 crit review --now                # skip the start screen and review straight away
 crit review --staged             # staged changes (the start screen opens with it selected)
 crit review --commit HEAD~1      # one commit
+crit review --branch feat/x      # another branch or a PR link, no checkout; you can only post comments
 crit review src/billing          # paths, folders, globs (add --diff for changed files only)
 crit review --all                # the whole project (asks first)
 crit review --dry-run            # files, skipped files, runs and token estimate; no agent calls
 crit review --no-tui --format md # a report for CI: json, md or sarif; --fail-on major exits 3
+crit review --gh                 # review and post the findings to this branch's GitHub PR (needs gh)
 crit open                        # reopen the latest saved review
 crit apply / crit undo           # apply all checked fixes / undo the last apply
 crit history                     # browse, compare (--compare a b), rm, prune --older-than 90d
 ```
+
+### Pull request comments
+
+`crit review --gh` (or `--pr`) runs the review without the screen and posts every open finding as
+one GitHub review with inline comments on the open pull request of your branch. In the
+review screen, `c` posts the finding you are on to the PR and `enter` applies the checked
+fixes locally; that is all. Press `o` then `g` on the start screen or
+in a review to connect GitHub (it runs `gh auth login` for you). It needs the GitHub CLI (`gh`, logged in
+with `gh auth login`) and finds the PR before the review starts, so a missing PR costs no
+tokens. Findings whose code is not in the PR diff go in the review text, findings already
+posted are skipped on a re-run, and fixes are attached as `diff` blocks.
+
+### Reviewing someone else's branch
+
+`crit review --branch <name-or-PR-link>`, or **Another branch or PR…** on the start screen, reviews a branch
+you are not on. Nothing is checked out: crit diffs and reads the files straight from git (fetching the
+branch from `origin` if you don't have it) and compares it with the base branch. Fixes cannot be applied
+to your working tree, so `enter` and `x` refuse; press `c` to post a finding to that branch's PR, or add
+`--gh` to post them all.
 
 ### The start screen
 
@@ -95,7 +116,7 @@ Running `crit` in a terminal opens the start screen. Pick a scope (this branch a
 its base, staged changes, the last commit, the whole project, or paths you type), see
 how many files, runs and tokens it would cost, and press `enter` to start. Past
 reviews of the repository are listed on the right (`tab`, then `enter` reopens one).
-`o` changes the model, provider, effort and depth. When a review is finished, `q`
+`o` changes the provider, model, effort and depth. When a review is finished, `q`
 brings you back here; `q` again quits.
 
 ### The screen
@@ -116,12 +137,13 @@ untouched and comes back when you leave, and only the panels inside crit scroll.
 | `d`             | skip: dismiss with a reason, remembered as a false positive (again to restore)                                                  |
 | `enter`         | apply every checked fix, once you have been through all findings (it tells you if some were not looked at)                      |
 | `i`             | propose your fix: tell the AI what it should be; it writes it in the background, then check it or not                           |
+| `c`             | post this finding to this branch's GitHub PR as a comment, fix attached if it has one                                           |
 | `x`             | apply just this fix now                                                                                                         |
 | `r`             | re-run the review of this scope, reviewing every file again (no cache)                                                          |
 | `PgUp` `PgDn`   | scroll the code                                                                                                                 |
 | `/`             | search: words, `sev:major`, `lens:security`, `file:cart`, `has:fix`, `is:pending`, `is:filtered`                                |
 | `.`             | actions: propose a fix, edit it in `$EDITOR`, ask a question, re-check the file, copy as a prompt, use my fix                   |
-| `o`             | options: model, provider, reasoning effort, depth, save as default, rules on/off                                                |
+| `o`             | options: provider, model, reasoning effort, depth, save as default, rules on/off                                                |
 | `y`             | copy the finding as a prompt for another agent                                                                                  |
 | `tab` `]` `[`   | next / previous file (`h` `l` or the arrows switch between the files list and the code; in the list `j` `k` jump between files) |
 | `g`             | first finding                                                                                                                   |

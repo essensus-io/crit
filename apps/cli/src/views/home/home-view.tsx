@@ -9,6 +9,7 @@ import { type Choice, type Switcher } from "@/features/model-switching/lib/creat
 import { T } from "@/shared/lib/theme.ts";
 import { useSwitching } from "@/features/model-switching/hooks/use-switching.tsx";
 import { Menu } from "@/shared/ui/menu.tsx";
+import { type GithubLink } from "@/features/github-link/lib/create-github-link.ts";
 import { Panel } from "@/shared/ui/panel.tsx";
 import { Spinner } from "@/shared/ui/spinner.tsx";
 import { truncate } from "@/shared/lib/text.ts";
@@ -62,16 +63,25 @@ const optionsFor = (base: string | undefined): Option[] => [
     hint: "folders, files or globs you type",
     spec: undefined,
   },
+  {
+    id: "ref",
+    label: "Another branch or PR…",
+    hint: "paste a branch name or PR link: nothing is checked out, you can only post comments",
+    spec: undefined,
+  },
 ];
 
 const indexOfSpec = (spec: ScopeSpec | undefined) =>
-  spec ? Math.max(0, ["branch", "staged", "commit", "project", "paths"].indexOf(spec.kind)) : 0;
+  spec
+    ? Math.max(0, ["branch", "staged", "commit", "project", "paths", "ref"].indexOf(spec.kind))
+    : 0;
 type Props = {
   info: HomeInfo;
   bases?: { ref: string; ahead: number }[];
   recent: RecentReview[];
   initialSpec?: ScopeSpec | undefined;
   switcher?: Switcher | undefined;
+  github?: GithubLink | undefined;
   estimate: (spec: ScopeSpec) => Promise<Estimate>;
   onDone: (choice: HomeChoice) => void;
 };
@@ -85,9 +95,12 @@ export const HomeView = (props: Props) => {
   const [paths, setPaths] = useState(
     props.initialSpec?.kind === "paths" ? props.initialSpec.paths.join(" ") : "",
   );
+  const [refText, setRefText] = useState(
+    props.initialSpec?.kind === "ref" ? props.initialSpec.ref : "",
+  );
   const [focus, setFocus] = useState<"scope" | "recent">("scope");
   const [recentAt, setRecentAt] = useState(0);
-  const [mode, setMode] = useState<"none" | "paths" | "options" | "base">("none");
+  const [mode, setMode] = useState<"none" | "paths" | "ref" | "options" | "base">("none");
   const [estimate, setEstimate] = useState<Estimate | "loading" | "idle">("idle");
   const [notice, setNotice] = useState<string>();
   const [, bump] = useState(0);
@@ -95,6 +108,8 @@ export const HomeView = (props: Props) => {
 
   const specFor = (index: number): ScopeSpec | undefined => {
     const opt = options[index]!;
+    if (opt.id === "ref")
+      return refText ? { kind: "ref", ref: refText, ...(base ? { base } : {}) } : undefined;
     if (opt.id !== "paths") return opt.spec;
     const list = paths.split(/\s+/).filter(Boolean);
     return list.length ? { kind: "paths", paths: list, diff: false } : undefined;
@@ -108,7 +123,7 @@ export const HomeView = (props: Props) => {
     void props.estimate(spec).then((e) => {
       if (ticket === latest.current) setEstimate(e);
     });
-  }, [sel, paths, base]);
+  }, [sel, paths, refText, base]);
 
   const switching = useSwitching({
     switcher: props.switcher,
@@ -118,14 +133,29 @@ export const HomeView = (props: Props) => {
     onChange: () => bump((n) => n + 1),
   });
 
+  useEffect(() => {
+    const { github } = props;
+    if (!github) return;
+    const unsubscribe = github.subscribe(() => bump((n) => n + 1));
+    void github.refresh();
+    return unsubscribe;
+  }, [props.github]);
+  const connectGithub = () => {
+    setMode("none");
+    void props.github?.connect((fn) => app.suspendTerminal(fn)).then(setNotice);
+  };
+
   const finish = (choice: HomeChoice) => {
     props.onDone(choice);
     app.exit();
   };
   const start = () => {
     if (!spec) {
-      setNotice("Type the paths to review first.");
-      return setMode("paths");
+      const isRef = options[sel]!.id === "ref";
+      setNotice(
+        isRef ? "Paste a branch name or PR link first." : "Type the paths to review first.",
+      );
+      return setMode(isRef ? "ref" : "paths");
     }
     if (estimate !== "loading" && estimate !== "idle" && estimate.ok && estimate.files === 0)
       return setNotice("Nothing to review in that scope. Pick another.");
@@ -156,6 +186,8 @@ export const HomeView = (props: Props) => {
       if (up) return setSel((i) => Math.max(0, i - 1));
       if (input === "p" || (key.return && options[sel]!.id === "paths" && !spec))
         return setMode("paths");
+      if (input === "r" || (key.return && options[sel]!.id === "ref" && !spec))
+        return setMode("ref");
       if (key.return || input === "s") return start();
     },
     { isActive: mode === "none" && !switching.modal },
@@ -191,15 +223,20 @@ export const HomeView = (props: Props) => {
         width={width}
         height={height}
         items={[
-          { key: "m", label: "Model", hint: c.model ?? "CLI default" },
           { key: "p", label: "Provider", hint: c.provider },
+          { key: "m", label: "Model", hint: c.model ?? "CLI default" },
           { key: "e", label: "Reasoning effort", hint: c.effort ?? "CLI default" },
           { key: "d", label: "Review depth", hint: c.depth },
           { key: "s", label: "Save this as the default", hint: describeChoice(c) },
+          ...(props.github
+            ? [{ key: "g", label: "GitHub", hint: `post findings to PRs · ${props.github.hint()}` }]
+            : []),
         ]}
+        {...(notice ? { note: notice } : {})}
         onCancel={() => setMode("none")}
         onPick={(k) => {
-          setMode("none");
+          if (k === "g") return connectGithub();
+          if (k === "s") setMode("none");
           switching.open(k as "m" | "p" | "e" | "d" | "s");
         }}
       />
@@ -238,6 +275,7 @@ export const HomeView = (props: Props) => {
               <Text color={i === sel ? T.orange : T.gray}>{i === sel ? "●" : "○"}</Text>
               {` ${option.label}`}
               {option.id === "paths" && paths ? <Text color={T.cyan}>{`  ${paths}`}</Text> : null}
+              {option.id === "ref" && refText ? <Text color={T.cyan}>{`  ${refText}`}</Text> : null}
             </Text>
           ))}
           <Text> </Text>
@@ -250,7 +288,9 @@ export const HomeView = (props: Props) => {
               <Spinner /> <Text dimColor>looking at the files…</Text>
             </Text>
           ) : estimate === "idle" ? (
-            <Text dimColor>Press enter to type the paths.</Text>
+            <Text
+              dimColor
+            >{`Press enter to ${options[sel]!.id === "ref" ? "paste a branch or PR link" : "type the paths"}.`}</Text>
           ) : estimate.ok ? (
             <>
               <Text wrap="truncate">
@@ -310,7 +350,18 @@ export const HomeView = (props: Props) => {
           ))}
         </Panel>
       </Box>
-      {mode === "paths" ? (
+      {mode === "ref" ? (
+        <TextInput
+          label="Branch name or PR link (nothing is checked out) ›"
+          initial={refText}
+          onCancel={() => setMode("none")}
+          onSubmit={(v) => {
+            setRefText(v.trim());
+            setMode("none");
+            setSel(options.findIndex((option) => option.id === "ref"));
+          }}
+        />
+      ) : mode === "paths" ? (
         <TextInput
           label="Paths to review (folders, files or globs, space separated) ›"
           initial={paths}
@@ -349,6 +400,9 @@ export const HomeView = (props: Props) => {
                 ...(props.recent.length ? ([["tab", "recent reviews"]] as [string, string][]) : []),
                 ...((props.bases?.length ?? 0) > 1 && options[sel]!.id === "branch"
                   ? ([["b", "change base"]] as [string, string][])
+                  : []),
+                ...(options[sel]!.id === "ref"
+                  ? ([["r", "paste branch"]] as [string, string][])
                   : []),
                 ["o", "model & depth"],
                 ["q", "quit"],

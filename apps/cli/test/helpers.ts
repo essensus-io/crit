@@ -11,6 +11,7 @@ import {
   type ModelInfo,
 } from "@crit/providers";
 import { critPaths, dbPath, openStore, type SqliteStore } from "@crit/store";
+import type { GhRunner } from "@crit/core";
 import type { CliContext } from "@/shared/lib/cli-context.ts";
 import { runCli, VERSION } from "@/app/main.ts";
 import { createScriptedPrompter, type ScriptedPrompter } from "@/shared/lib/prompter.ts";
@@ -24,6 +25,9 @@ export type TestEnv = {
   run(...argv: string[]): Promise<number>;
   script(s: FakeScriptInput): void;
   fakes: FakeAdapter[];
+  setPrDiff(diff: string): void;
+  loginCount(): number;
+  ghCalls: { args: string[]; input?: string }[];
   cleanup(): void;
 };
 
@@ -45,6 +49,25 @@ export function testContext(
   const env: NodeJS.ProcessEnv = { PATH: bin, CRIT_HOME: join(dir, "crit") };
   let out = "";
   let err = "";
+  const ghCalls: TestEnv["ghCalls"] = [];
+  let prDiff = "";
+  let loginCalls = 0;
+  const gh: GhRunner = async (_cwd, args, input) => {
+    ghCalls.push({ args, ...(input === undefined ? {} : { input }) });
+    const ok = (stdout: string) => ({ stdout, stderr: "", exitCode: 0 });
+    if (args[0] === "pr" && args[1] === "view")
+      return ok(
+        JSON.stringify({
+          number: 7,
+          url: "https://github.com/acme/shop/pull/7",
+          headRefOid: "abc123",
+          state: "OPEN",
+        }),
+      );
+    if (args[0] === "pr" && args[1] === "diff") return ok(prDiff);
+    if (args.includes("--method")) return ok(JSON.stringify({ html_url: "https://x/review/1" }));
+    return ok("");
+  };
   const prompter = createScriptedPrompter(opts.answers ?? []);
   let script: FakeScript = FakeScript.parse({ runs: [] });
   const fakes: FakeAdapter[] = [];
@@ -84,6 +107,11 @@ export function testContext(
     err: (t) => void (err += t),
     prompter,
     registry,
+    gh,
+    loginToGithub: async () => {
+      loginCalls++;
+      return 0;
+    },
     mcpCommand: { command: "crit", args: ["mcp"] },
     version: VERSION,
     openStore: () => (store ??= openStore(dbPath(paths))),
@@ -100,6 +128,9 @@ export function testContext(
       script = FakeScript.parse(s);
     },
     fakes,
+    setPrDiff: (diff) => void (prDiff = diff),
+    loginCount: () => loginCalls,
+    ghCalls,
     cleanup: () => {
       store?.close();
       rmSync(dir, { recursive: true, force: true });

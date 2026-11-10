@@ -1,6 +1,6 @@
 {
   "name": "@crit/cli",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Local-first AI code review in your terminal, powered by the agent CLI you already use",
   "keywords": [
     "ai",

@@ -47,7 +47,7 @@ export async function historyCommand(
     return EXIT.ok;
   }
   if (ctx.interactive && args.tui !== false) {
-    const { historyTui } = await import("@/views/history/launch-history.tsx");
+    const { historyTui } = await import("./launch-history.tsx");
     await historyTui(ctx, store, rows, args);
     return EXIT.ok;
   }
