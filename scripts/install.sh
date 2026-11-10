@@ -24,7 +24,7 @@ if [[ -n "${BASH_SOURCE[0]:-}" && -f "${BASH_SOURCE[0]}" ]]; then
   fi
 fi
 if [[ -z "$source_root" ]]; then
-  install_repo="${CRIT_INSTALL_REPO:-ihornovykov/crit}"
+  install_repo="${CRIT_INSTALL_REPO:-essensus-io/crit}"
   install_ref="${CRIT_INSTALL_REF:-main}"
   printf 'Fetching %s (%s)…\n' "$install_repo" "$install_ref"
   # Use the same SSH keys / credential helper as normal Git operations.
