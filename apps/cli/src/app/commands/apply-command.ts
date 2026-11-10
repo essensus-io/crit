@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import type { CliContext } from "@/shared/lib/cli-context.ts";
-import { applyCommand } from "@/views/apply/run-apply.ts";
+import { applyCommand } from "@/app/runners/apply/run-apply.ts";
 
 export const applyDef = (ctx: CliContext) =>
   defineCommand({

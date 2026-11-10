@@ -1,6 +1,6 @@
 import { defineCommand } from "citty";
 import type { CliContext } from "@/shared/lib/cli-context.ts";
-import { openCommand } from "@/views/review/run-open.ts";
+import { openCommand } from "@/app/runners/review/run-open.ts";
 
 export const openDef = (ctx: CliContext) =>
   defineCommand({

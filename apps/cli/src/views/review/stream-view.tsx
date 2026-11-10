@@ -38,7 +38,7 @@ const fitKeys = (keys: [string, string][], width: number): [string, string][] =>
   const size = (ks: [string, string][]) =>
     ks.reduce((n, [k, l], i) => n + (i ? 3 : 0) + k.length + l.length + 1, 1);
   const out = [...keys];
-  for (const drop of ["?", "r", "i"])
+  for (const drop of ["r", "c", "i", "?"])
     if (size(out) > width) {
       const at = out.findIndex(([k]) => k === drop);
       if (at >= 0) out.splice(at, 1);
@@ -138,6 +138,7 @@ export const StreamView = (props: StreamViewProps) => {
             ["j/k", "next"],
             ["space", current.finding.selected ? "uncheck" : current.fix ? "fix it" : "get a fix"],
             ["i", current.fix ? "change the fix" : "tell the AI the fix"],
+            ["c", "comment on PR"],
             ["enter", p.applicable > 0 ? `apply ${p.applicable} checked` : "finish"],
             ...(props.canRerun ? ([["r", "re-run"]] as [string, string][]) : []),
             ["q", props.canGoBack ? "start screen" : "quit"],

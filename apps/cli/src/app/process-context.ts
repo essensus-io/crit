@@ -1,9 +1,13 @@
+import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { createGhRunner } from "@crit/core";
 import { createDefaultRegistry } from "@crit/providers";
 import { critPaths, dbPath, openStore, type SqliteStore } from "@crit/store";
 import { createClackPrompter } from "@/shared/lib/prompter.ts";
 import { type CliContext } from "@/shared/lib/cli-context.ts";
+
+const EXIT_GH_MISSING = 127;
 
 export function processContext(version: string): CliContext {
   const env = process.env;
@@ -24,6 +28,13 @@ export function processContext(version: string): CliContext {
     err: (t) => process.stderr.write(t),
     prompter: createClackPrompter(),
     registry: createDefaultRegistry(),
+    gh: createGhRunner(),
+    loginToGithub: () =>
+      new Promise((resolve) => {
+        const child = spawn("gh", ["auth", "login", "--web"], { stdio: "inherit" });
+        child.on("error", () => resolve(EXIT_GH_MISSING));
+        child.on("close", (code) => resolve(code ?? 1));
+      }),
     mcpCommand: {
       command: process.execPath,
       args: [process.argv[1]!, "mcp", "--sessions-dir", join(paths.cache, "sessions")],

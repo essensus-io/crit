@@ -3,16 +3,19 @@ import type { ReactNode } from "react";
 import { describeChoice } from "@/features/model-switching/lib/describe-choice.ts";
 import { type Switcher } from "@/features/model-switching/lib/create-switcher.ts";
 import type { FindingView, ReviewSession } from "@/features/review-session/model/session.ts";
+import { type GithubLink } from "@/features/github-link/lib/create-github-link.ts";
 import { Menu, type MenuItem } from "@/shared/ui/menu.tsx";
 import { Picker } from "@/shared/ui/picker.tsx";
 import { HelpView } from "./help-view.tsx";
-import type { ReviewMode } from "./review-mode.ts";
+import type { ReviewMode } from "@/features/review-session/model/review-mode.ts";
 
 type Props = {
   mode: ReviewMode;
   current: FindingView | undefined;
   session: ReviewSession;
   switcher: Switcher | undefined;
+  github: GithubLink | undefined;
+  notice: string | undefined;
   outcome: ProposalOutcome | undefined;
   width: number;
   height: number;
@@ -20,6 +23,7 @@ type Props = {
   setMode: (mode: ReviewMode) => void;
   setScreen: (screen: "stream" | "proposal") => void;
   openSwitching: (key: "m" | "p" | "e" | "d" | "s") => void;
+  connectGithub: () => void;
   done: () => void;
 };
 
@@ -28,6 +32,8 @@ export const reviewOverlay = ({
   current,
   session,
   switcher,
+  github,
+  notice,
   outcome,
   width,
   height,
@@ -35,6 +41,7 @@ export const reviewOverlay = ({
   setMode,
   setScreen,
   openSwitching,
+  connectGithub,
   done,
 }: Props): ReactNode => {
   if (mode === "help") return <HelpView width={width} height={height} onClose={done} />;
@@ -78,8 +85,8 @@ export const reviewOverlay = ({
     const opts2: MenuItem[] = [
       ...(switcher && c
         ? [
-            { key: "m", label: "Model", hint: c.model ?? "CLI default" },
             { key: "p", label: "Provider", hint: c.provider },
+            { key: "m", label: "Model", hint: c.model ?? "CLI default" },
             { key: "e", label: "Reasoning effort", hint: c.effort ?? "CLI default" },
             { key: "d", label: "Review depth", hint: c.depth },
             { key: "s", label: "Save this as the default", hint: describeChoice(c) },
@@ -95,6 +102,9 @@ export const reviewOverlay = ({
           ]
         : []),
       { key: "r", label: "Rules", hint: "turn rules on or off" },
+      ...(github
+        ? [{ key: "g", label: "GitHub", hint: `post findings to PRs · ${github.hint()}` }]
+        : []),
     ];
     return (
       <Menu
@@ -102,12 +112,14 @@ export const reviewOverlay = ({
         items={opts2}
         width={width}
         height={height}
+        {...(notice ? { note: notice } : {})}
         onCancel={done}
         onPick={(k) => {
-          done();
+          if (k === "g") return connectGithub();
           if (k === "r") return setMode("rules");
           if (k === "n") return setMode("rerun");
           const key = k as "m" | "p" | "e" | "d" | "s";
+          if (key === "s") done();
           openSwitching(key);
         }}
       />

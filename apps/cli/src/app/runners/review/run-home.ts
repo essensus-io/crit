@@ -20,8 +20,8 @@ export async function runHome(
   },
   runReviewCommand: (ctx: CliContext, args: ReviewArgs) => Promise<number>,
 ): Promise<number> {
-  const { homeTui } = await import("@/views/home/launch-home.tsx");
-  const { openTui } = await import("@/views/review/launch-review.tsx");
+  const { homeTui } = await import("@/app/runners/home/launch-home.tsx");
+  const { openTui } = await import("./launch-review.tsx");
   const { root, store, config, profile } = home;
   const repo = await store.repos.getByRoot(root);
   const history = repo ? await listHistory(store.db, { repoId: repo.id, limit: 12 }) : [];
@@ -30,6 +30,7 @@ export async function runHome(
   const base =
     home.spec.kind === "branch" && home.spec.base ? home.spec.base : await detectBase(root);
   const pick = await homeTui(ctx, config, {
+    root,
     info: { repo: basename(root), branch, base },
     bases: await candidateBases(root),
     recent: history.map((historyRow) => ({

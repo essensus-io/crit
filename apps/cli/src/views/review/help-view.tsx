@@ -11,6 +11,10 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
       ["i", "propose your fix: tell the AI what it should be, then check it or not"],
       ["enter", "apply every checked fix, once you have been through all findings"],
       ["x", "apply just this fix now"],
+      [
+        "c",
+        "post this finding to this branch's GitHub PR as a comment (fix attached if it has one)",
+      ],
       ["d", "skip: dismiss with a reason (again restores). Unticked = left alone"],
     ],
   },
@@ -28,7 +32,7 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
     title: "More",
     rows: [
       [".", "actions: propose, edit, ask, re-check, use my fix"],
-      ["o", "options: model, provider (add or remove a setup), effort, depth, rules"],
+      ["o", "options: provider (add or remove a setup), model, effort, depth, rules"],
       ["y", "copy this finding as a prompt for another agent"],
       ["r", "re-run the review of this scope, without the cache"],
       ["q", "back to the start screen (quit when opened with crit open)"],

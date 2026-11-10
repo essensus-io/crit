@@ -1,7 +1,7 @@
 import { defineCommand } from "citty";
 import { type CliContext } from "@/shared/lib/cli-context.ts";
-import { type ReviewArgs } from "@/views/review/review-args.ts";
-import { runReviewCommand } from "@/views/review/run-review-command.ts";
+import { type ReviewArgs } from "@/app/runners/review/review-args.ts";
+import { runReviewCommand } from "@/app/runners/review/run-review-command.ts";
 
 export const reviewCommand = (ctx: CliContext) =>
   defineCommand({
@@ -19,6 +19,11 @@ export const reviewCommand = (ctx: CliContext) =>
       all: { type: "boolean", description: "Review the whole project (sharded; asks to confirm)" },
       staged: { type: "boolean", description: "Review staged changes" },
       commit: { type: "string", description: "Review one commit" },
+      branch: {
+        type: "string",
+        description:
+          "Review another branch or a GitHub PR link without checking it out (comments only)",
+      },
       base: { type: "string", description: "Base branch for branch reviews" },
       diff: { type: "boolean", description: "With paths: only files changed versus the base" },
       provider: { type: "string", description: "Provider profile to use for this run" },
@@ -63,6 +68,12 @@ export const reviewCommand = (ctx: CliContext) =>
         type: "boolean",
         default: true,
         description: "Reuse cached results for unchanged files",
+      },
+      gh: {
+        type: "boolean",
+        alias: "pr",
+        description:
+          "Run without the screen and post every open finding to this branch's GitHub PR (needs gh)",
       },
       "fail-on": {
         type: "string",

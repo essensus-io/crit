@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createFixtureRepo, type FixtureRepo } from "@crit/testkit";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { argsFromScope, parseTokens, scopeFromArgs } from "@/views/review/review-args.ts";
+import { argsFromScope, parseTokens, scopeFromArgs } from "@/app/runners/review/review-args.ts";
 import { fakeProvidersJson, normalize, type TestEnv, testContext } from "./helpers.ts";
 
 const FEATURE = `export async function refund(orders, provider, orderId, amount) {
@@ -307,5 +307,88 @@ describe("argsFromScope", () => {
       { kind: "paths", paths: ["src"], diff: false },
     ];
     for (const spec of specs) expect(scopeFromArgs(argsFromScope(spec))).toEqual(spec);
+  });
+});
+
+describe("crit review --gh", () => {
+  const prDiff = () =>
+    `--- a/src/api/payments.ts\n+++ b/src/api/payments.ts\n@@ -0,0 +1,6 @@\n${FEATURE.trimEnd()
+      .split("\n")
+      .map((line) => `+${line}`)
+      .join("\n")}\n`;
+  const posts = () => t.ghCalls.filter((call) => call.input);
+
+  it("runs the review without the screen and posts the open findings to the branch's PR", async () => {
+    t.setPrDiff(prDiff());
+    expect(await t.run("review", "--gh")).toBe(0);
+    const post = JSON.parse(posts()[0]!.input!);
+    expect(post.comments).toHaveLength(1);
+    expect(post.comments[0]).toMatchObject({ path: "src/api/payments.ts", line: 2 });
+    expect(post.comments[0].body).toContain("```suggestion");
+    expect(post.comments[0].body).not.toContain("@@");
+    expect(t.stderr()).toContain("Posted 1 finding to PR #7: https://x/review/1");
+    expect(t.stdout()).not.toContain("Posted");
+  });
+
+  it("still accepts --pr as the same flag", async () => {
+    t.setPrDiff(prDiff());
+    expect(await t.run("review", "--pr")).toBe(0);
+    expect(posts()).toHaveLength(1);
+  });
+
+  it("posts nothing on a dry run", async () => {
+    expect(await t.run("review", "--gh", "--dry-run")).toBe(0);
+    expect(t.ghCalls).toEqual([]);
+  });
+
+  it("still exits 3 for --fail-on after posting", async () => {
+    t.setPrDiff(prDiff());
+    expect(await t.run("review", "--gh", "--fail-on", "major")).toBe(3);
+    expect(posts()).toHaveLength(1);
+  });
+
+  it("stops before the review when there is no open PR", async () => {
+    t.ctx.gh = async () => ({ stdout: "", stderr: "no pull requests found", exitCode: 1 });
+    expect(await t.run("review", "--gh")).toBe(1);
+    expect(t.stderr()).toContain("no open pull request");
+    expect(t.fakes).toHaveLength(0);
+  });
+});
+
+describe("crit review --branch", () => {
+  beforeEach(() => {
+    repo.git("checkout", "-q", "main");
+  });
+
+  it("reviews a branch that is not checked out and leaves the working tree alone", async () => {
+    expect(await t.run("review", "--branch", "feature/payments", "--no-tui")).toBe(0);
+    expect(t.stdout()).toContain("feature/payments → main");
+    expect(t.stdout()).toContain("Refund amount not validated");
+    expect(repo.git("rev-parse", "--abbrev-ref", "HEAD")).toBe("main");
+    expect(readFileSync(join(repo.root, "src/api/payments.ts"), "utf8")).toBe(
+      "export const x = 1;\n",
+    );
+  });
+
+  it("refuses to apply fixes of a branch that is not checked out", async () => {
+    expect(await t.run("review", "--branch", "feature/payments", "--no-tui")).toBe(0);
+    expect(await t.run("apply", "--yes")).toBe(1);
+    expect(t.stderr()).toContain("not checked out");
+    expect(readFileSync(join(repo.root, "src/api/payments.ts"), "utf8")).toBe(
+      "export const x = 1;\n",
+    );
+  });
+
+  it("posts to the pull request of that branch, not of the one you are on", async () => {
+    t.setPrDiff(
+      `--- a/src/api/payments.ts\n+++ b/src/api/payments.ts\n@@ -0,0 +1,6 @@\n${FEATURE.trimEnd()
+        .split("\n")
+        .map((line) => `+${line}`)
+        .join("\n")}\n`,
+    );
+    expect(await t.run("review", "--branch", "feature/payments", "--no-tui", "--gh")).toBe(0);
+    const lookup = t.ghCalls.find((call) => call.args[0] === "pr" && call.args[1] === "view")!;
+    expect(lookup.args).toContain("feature/payments");
+    expect(t.stderr()).toContain("Posted 1 finding to PR #7");
   });
 });

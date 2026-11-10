@@ -173,6 +173,7 @@ function session(
     fixContext,
     editor,
     backupRoot: backups,
+    gh: async () => ({ stdout: "", stderr: "", exitCode: 0 }),
     verifyCommands: [],
     code: {
       read: async (p) => readFileSync(join(repo.root, p), "utf8"),
@@ -389,6 +390,39 @@ describe("review stream", () => {
     expect(await until(app.lastFrame, "Nothing is checked, so nothing to apply")).toContain(
       "q goes back",
     );
+    app.unmount();
+  });
+
+  it("c posts the finding you are on to the PR in one key, with its fix attached", async () => {
+    const calls: { args: string[]; input?: string }[] = [];
+    const diff = `--- a/src/payments.ts\n+++ b/src/payments.ts\n@@ -0,0 +1,7 @@\n${CODE.trimEnd()
+      .split("\n")
+      .map((line) => `+${line}`)
+      .join("\n")}\n`;
+    const gh = async (_cwd: string, args: string[], input?: string) => {
+      calls.push({ args, ...(input === undefined ? {} : { input }) });
+      const ok = (stdout: string) => ({ stdout, stderr: "", exitCode: 0 });
+      if (args[0] === "pr" && args[1] === "view")
+        return ok(
+          JSON.stringify({
+            number: 7,
+            url: "https://github.com/acme/shop/pull/7",
+            headRefOid: "abc123",
+            state: "OPEN",
+          }),
+        );
+      if (args[0] === "pr" && args[1] === "diff") return ok(diff);
+      if (args.includes("--method")) return ok(JSON.stringify({ html_url: "https://x/review/1" }));
+      return ok("");
+    };
+    const app = await mount(session({ runs: [] }, undefined, { gh }));
+    await app.press("c");
+    await until(app.lastFrame, "Posted 1 finding to PR #7");
+    const post = JSON.parse(calls.find((call) => call.input)!.input!);
+    expect(post.comments).toHaveLength(1);
+    expect(post.comments[0].body).toContain("Refund amount not validated");
+    expect(post.comments[0].body).toContain("Suggested fix");
+    expect(post.comments[0].body).not.toContain("Unused import");
     app.unmount();
   });
 
@@ -942,7 +976,47 @@ describe("switching model, provider, effort and depth", () => {
     await until(app.lastFrame, "model · codex");
     await sleep(100);
     await app.press(ESC);
+    await until(app.lastFrame, "options ·");
+    await app.press(ESC);
+    await until(app.lastFrame, "j/k next");
+    app.unmount();
+  });
+
+  it("picking a model, provider or effort returns to the options menu, not the review", async () => {
+    const sw = stubSwitcher();
+    const app = await mount(session(), sw);
+    await options(app, "d");
+    await until(app.lastFrame, "review depth");
+    await sleep(100);
+    app.stdin.write(ENTER);
+    const menu = await until(app.lastFrame, "options ·");
+    expect(menu).toContain("Review depth");
+    await app.press(ESC);
+    await until(app.lastFrame, "j/k next");
+    app.unmount();
+  });
+
+  it("g in the options menu connects GitHub and says what happened", async () => {
+    let connected = false;
+    const listeners = new Set<() => void>();
+    const github = {
+      hint: () => (connected ? "connected as octocat" : "not connected · enter to connect"),
+      refresh: async () => {},
+      subscribe: (fn: () => void) => (listeners.add(fn), () => listeners.delete(fn)),
+      connect: async () => {
+        connected = true;
+        return "GitHub connected as octocat.";
+      },
+    };
+    const s = session();
+    await s.load();
+    const app = render(<ReviewView session={s} github={github} />);
     await until(app.lastFrame, "of 2 looked at");
+    app.stdin.write("o");
+    await until(app.lastFrame, "not connected · enter to connect");
+    app.stdin.write("g");
+    await until(app.lastFrame, "GitHub connected as octocat.");
+    expect(connected).toBe(true);
     app.unmount();
   });
 

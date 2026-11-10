@@ -4,26 +4,36 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { type Switcher } from "@/features/model-switching/lib/create-switcher.ts";
 import { useSwitching } from "@/features/model-switching/hooks/use-switching.tsx";
 import { parseQuery } from "@/features/review-session/lib/parse-query.ts";
+import { type GithubLink } from "@/features/github-link/lib/create-github-link.ts";
 import { type ReviewSession } from "@/features/review-session/model/session.ts";
 import { visibleItems } from "@/features/review-session/lib/visible-items.ts";
 import { useScreen } from "@/shared/ui/screen.tsx";
 import { ProposalView } from "./proposal-view.tsx";
-import type { ReviewInput, ReviewMode } from "./review-mode.ts";
-import { reviewOverlay } from "./review-overlay.tsx";
-import { reviewPrompt } from "./review-prompt.tsx";
+import type { ReviewInput, ReviewMode } from "@/features/review-session/model/review-mode.ts";
+import { reviewOverlay } from "./review-overlay-view.tsx";
+import { reviewPrompt } from "./review-prompt-view.tsx";
 import { StreamView } from "./stream-view.tsx";
-import { useReviewKeys } from "./use-review-keys.ts";
+import { useReviewKeys } from "@/features/review-session/hooks/use-review-keys.ts";
 
 type Props = {
   session: ReviewSession;
   onExit?: () => void;
   switcher?: Switcher;
+  github?: GithubLink;
   onConnect?: () => void;
   onRerun?: (fresh: boolean) => void;
   onBack?: () => void;
 };
 
-export const ReviewView = ({ session, onExit, switcher, onConnect, onRerun, onBack }: Props) => {
+export const ReviewView = ({
+  session,
+  onExit,
+  switcher,
+  github,
+  onConnect,
+  onRerun,
+  onBack,
+}: Props) => {
   const app = useApp();
   useEffect(() => {
     session.suspend = (fn) => app.suspendTerminal(fn);
@@ -62,6 +72,12 @@ export const ReviewView = ({ session, onExit, switcher, onConnect, onRerun, onBa
     if (id && !seen.has(id)) setSeen((s) => new Set(s).add(id));
   }, [current?.finding.id]);
   const [, bump] = useState(0);
+  useEffect(() => {
+    if (!github) return;
+    const unsubscribe = github.subscribe(() => bump((n) => n + 1));
+    void github.refresh();
+    return unsubscribe;
+  }, [github]);
   const switching = useSwitching({
     switcher,
     active: mode === "none" && !busy,
@@ -163,6 +179,8 @@ export const ReviewView = ({ session, onExit, switcher, onConnect, onRerun, onBa
     current,
     session,
     switcher,
+    github,
+    notice: state.notice,
     outcome,
     width,
     height,
@@ -170,10 +188,14 @@ export const ReviewView = ({ session, onExit, switcher, onConnect, onRerun, onBa
     setMode,
     setScreen,
     openSwitching: switching.open,
+    connectGithub: () => {
+      setMode("none");
+      void github?.connect(session.suspend).then((notice) => session.notify(notice));
+    },
     done,
   });
-  if (overlay) return overlay;
   if (switching.overlay) return switching.overlay;
+  if (overlay) return overlay;
   return (
     <Box flexDirection="column" width={width} height={height} overflow="hidden">
       {screen === "stream" || !current || !outcome ? (

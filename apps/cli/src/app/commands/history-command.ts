@@ -2,9 +2,9 @@ import { defineCommand } from "citty";
 import type { CliContext } from "@/shared/lib/cli-context.ts";
 import { CliError, EXIT } from "@/shared/lib/errors.ts";
 import { type HistoryArgs } from "@/features/review-history/lib/history-rows.ts";
-import { historyCommand } from "@/views/history/run-history.ts";
-import { pruneReviews } from "@/views/history/prune-reviews.ts";
-import { removeReview } from "@/views/history/remove-review.ts";
+import { historyCommand } from "@/app/runners/history/run-history.ts";
+import { pruneReviews } from "@/app/runners/history/prune-reviews.ts";
+import { removeReview } from "@/app/runners/history/remove-review.ts";
 
 const filterArgs = {
   branch: { type: "string", description: "Only this branch" },

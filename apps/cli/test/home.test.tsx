@@ -138,6 +138,28 @@ describe("start screen", () => {
     app.unmount();
   });
 
+  it("another branch: paste a name, it is estimated and started without a checkout", async () => {
+    const { app, done, estimate, press } = mount();
+    await until(app.lastFrame, "27 files");
+    await press("j", "j", "j", "j", "j");
+    await until(app.lastFrame, "Press enter to paste a branch or PR link.");
+    await press(ENTER);
+    await until(app.lastFrame, "Branch name or PR link");
+    await sleep(60);
+    await press(..."feature/other".split(""), ENTER);
+    await until(app.lastFrame, "feature/other");
+    await until(app.lastFrame, "27 files");
+    expect(estimate).toHaveBeenLastCalledWith({
+      kind: "ref",
+      ref: "feature/other",
+      base: "origin/develop",
+    });
+    await press(ENTER);
+    await sleep(80);
+    expect(done[0]).toMatchObject({ kind: "start", spec: { kind: "ref", ref: "feature/other" } });
+    app.unmount();
+  });
+
   it("tab moves to the recent reviews; enter opens the one you picked", async () => {
     const { app, done, press } = mount();
     await until(app.lastFrame, "27 files");
