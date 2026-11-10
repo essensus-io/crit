@@ -27,7 +27,11 @@ export function runShell(
     }, timeoutMs);
     child.on("close", (code) => {
       clearTimeout(timer);
-      resolve({ exitCode: code ?? 1, output: tail(output), durationMs: Date.now() - t0 });
+      resolve({
+        exitCode: code ?? 1,
+        output: tail(output.replaceAll("\r\n", "\n")),
+        durationMs: Date.now() - t0,
+      });
     });
     child.on("error", (err) => {
       clearTimeout(timer);

@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { x } from "tinyexec";
 
 export class GitError extends Error {
@@ -43,7 +44,8 @@ export async function tryGit(cwd: string, args: string[]): Promise<string | unde
 export async function repoRoot(cwd: string): Promise<string> {
   const out = await tryGit(cwd, ["rev-parse", "--show-toplevel"]);
   if (!out) throw new Error(`crit: ${cwd} is not inside a git repository`);
-  return out;
+  // git prints forward slashes and long names on Windows; match the paths callers hold
+  return realpathSync.native(out);
 }
 
 export async function headSha(cwd: string): Promise<string | undefined> {

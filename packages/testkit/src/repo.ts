@@ -24,7 +24,7 @@ const GIT_ENV = {
 export const gitTestEnv = (): NodeJS.ProcessEnv => ({ ...process.env, ...GIT_ENV });
 
 export function createFixtureRepo(initial?: Record<string, string>): FixtureRepo {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "crit-fixture-")));
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), "crit-fixture-")));
   const git = (...args: string[]) =>
     execFileSync("git", args, { cwd: root, env: gitTestEnv(), encoding: "utf8" }).trimEnd();
   const write = (files: Record<string, string>) => {

@@ -306,7 +306,7 @@ describe("apply to a new branch", () => {
 describe("shell commands", () => {
   it("captures output, failures, timeouts and stops at the first failure", async () => {
     expect(await runShell("echo hi", repo.root)).toMatchObject({ exitCode: 0, output: "hi\n" });
-    const slow = await runShell("sleep 5", repo.root, 100);
+    const slow = await runShell(`node -e "setTimeout(() => {}, 5000)"`, repo.root, 100);
     expect(slow.output).toContain("timed out");
     const v = await runVerify(["exit 1", "echo never"], repo.root);
     expect(v).toMatchObject({ passed: false, commands: [{ command: "exit 1", exitCode: 1 }] });
