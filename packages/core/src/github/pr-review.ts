@@ -1,7 +1,7 @@
 import type { Finding, Fix } from "@crit/schema";
 import type { Repositories } from "@crit/store";
 import { z } from "zod";
-import { parseUnifiedDiff } from "../diff.ts";
+import { diffPath, parseUnifiedDiff } from "../diff.ts";
 import { type GhRunner, runGh } from "./gh-runner.ts";
 import { type FixSuggestion, fixSuggestions } from "./fix-suggestion.ts";
 import { type InlineFinding, placeFindings } from "./place-findings.ts";
@@ -10,6 +10,7 @@ import {
   fetchPrDiff,
   findPullRequest,
   type PullRequest,
+  issuesPath,
   pullsPath,
 } from "./pull-request.ts";
 import { findingComment, partComment, reviewBody } from "./review-comment.ts";
@@ -104,19 +105,39 @@ export async function publishPrReview(input: PrPublishInput): Promise<PrPublishR
     isHeadStale: review.headSha !== null && review.headSha !== pr.headSha,
   };
   if (fresh.length === 0) return result;
-  const payload = {
-    commit_id: pr.headSha,
-    event: REVIEW_EVENT,
-    body: reviewBody(inline.length, outside, activeFixes),
-    comments: inline.flatMap((placed) =>
-      toComments(placed, activeFixes.get(placed.finding.id), suggestionsOf(placed.finding)),
-    ),
-  };
-  const response = await runGh(
-    gh,
-    root,
-    ["api", "--hostname", pr.host, "--method", "POST", `${pullsPath(pr)}/reviews`, "--input", "-"],
-    JSON.stringify(payload),
-  );
-  return { ...result, url: PostedReview.parse(JSON.parse(response)).html_url };
+  const post = (path: string, body: object) =>
+    runGh(
+      gh,
+      root,
+      ["api", "--hostname", pr.host, "--method", "POST", path, "--input", "-"],
+      JSON.stringify(body),
+    );
+  let url: string | undefined;
+  if (inline.length > 0) {
+    const response = await post(`${pullsPath(pr)}/reviews`, {
+      commit_id: pr.headSha,
+      event: REVIEW_EVENT,
+      body: reviewBody(inline.length, []),
+      comments: inline.flatMap((placed) =>
+        toComments(placed, activeFixes.get(placed.finding.id), suggestionsOf(placed.finding)),
+      ),
+    });
+    url = PostedReview.parse(JSON.parse(response)).html_url;
+  }
+  const inDiff = new Set(prFiles.map((file) => diffPath(file)));
+  for (const finding of outside) {
+    const body = findingComment(finding, activeFixes.get(finding.id));
+    const response = inDiff.has(finding.file)
+      ? await post(`${pullsPath(pr)}/comments`, {
+          commit_id: pr.headSha,
+          path: finding.file,
+          subject_type: "file",
+          body,
+        })
+      : await post(`${issuesPath(pr)}/comments`, {
+          body: `\`${finding.file}:${finding.range.start}\`\n\n${body}`,
+        });
+    url ??= PostedReview.parse(JSON.parse(response)).html_url;
+  }
+  return { ...result, ...(url ? { url } : {}) };
 }

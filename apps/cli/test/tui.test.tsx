@@ -430,7 +430,7 @@ describe("review stream", () => {
     app.unmount();
   });
 
-  it("c posts every checked finding together as one review", async () => {
+  it("c posts every checked finding, each as its own comment when it is not on the diff", async () => {
     const calls: { args: string[]; input?: string }[] = [];
     const gh = async (_cwd: string, args: string[], input?: string) => {
       calls.push({ args, ...(input === undefined ? {} : { input }) });
@@ -452,7 +452,7 @@ describe("review stream", () => {
     const app = await mount(session({ runs: [] }, undefined, { gh }));
     await app.press("c");
     await until(app.lastFrame, "Posted 2 findings to PR #7");
-    expect(calls.filter((call) => call.input)).toHaveLength(1);
+    expect(calls.filter((call) => call.input)).toHaveLength(2);
     app.unmount();
   });
 

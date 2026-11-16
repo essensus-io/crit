@@ -132,14 +132,27 @@ describe("publishPrReview", () => {
     expect(calls.some((call) => call.input)).toBe(false);
   });
 
-  it("puts a finding outside the diff in the review body instead of dropping it", async () => {
+  it("posts a finding outside the diff as its own file comment, not in the review text", async () => {
     await add("Elsewhere", { anchor: "not in the diff" });
     const { gh, calls } = fakeGh();
     const result = await run(gh);
-    const post = JSON.parse(calls.find((call) => call.input)!.input!);
+    const posts = calls.filter((call) => call.input);
     expect(result.outsideDiff).toBe(1);
-    expect(post.comments).toEqual([]);
-    expect(post.body).toContain("Elsewhere");
+    expect(posts).toHaveLength(1);
+    expect(posts[0]!.args.join(" ")).toContain("pulls/7/comments");
+    expect(JSON.parse(posts[0]!.input!)).toMatchObject({
+      path: "src/a.ts",
+      subject_type: "file",
+    });
+  });
+
+  it("posts a finding in a file the pull request does not touch as a pull request comment", async () => {
+    await add("Untouched", { file: "src/other.ts" });
+    const { gh, calls } = fakeGh();
+    await run(gh);
+    const posts = calls.filter((call) => call.input);
+    expect(posts[0]!.args.join(" ")).toContain("issues/7/comments");
+    expect(JSON.parse(posts[0]!.input!).body).toContain("Untouched");
   });
 
   it("explains when the branch has no open pull request", async () => {
