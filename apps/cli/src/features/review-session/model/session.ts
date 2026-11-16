@@ -240,17 +240,19 @@ export const createReviewSession = (deps: SessionDeps) => {
     await deps.store.findings.update(id, { selected });
   };
 
-  const postFindingToPr = async (id: string) => {
-    const it = item(id);
-    if (!it) return;
-    if (it.finding.status !== "open") return notify("This one is already dealt with.");
+  const postToPr = async (id: string) => {
+    const checked = state.items
+      .filter((i) => i.finding.selected && i.finding.status === "open")
+      .map((i) => i.finding.id);
+    const ids = checked.length > 0 ? checked : [id];
+    if (!item(id)) return;
     const result = await run("Posting to the pull request…", () =>
       publishPrReview({
         gh: deps.gh,
         store: deps.store,
         root: deps.root,
         reviewId: deps.reviewId,
-        findingIds: [id],
+        findingIds: ids,
       }),
     );
     if (result) notify(describePrPost(result));
@@ -473,7 +475,7 @@ export const createReviewSession = (deps: SessionDeps) => {
     draftFix,
     notify,
     toggle,
-    postFindingToPr,
+    postToPr,
     dismiss,
     restore,
     propose,

@@ -52,14 +52,13 @@ const headLines = (files: ParsedFile[], path: string): Map<number, string> => {
   return lines;
 };
 
-export function fixSuggestion(
-  patch: string,
+const hunkSuggestion = (
+  hunk: ParsedHunk,
   path: string,
   prFiles: ParsedFile[],
-): FixSuggestion | undefined {
-  const hunk = singleHunk(patch, path);
-  const span = hunk && changedSpan(hunk.body);
-  if (!hunk || !span) return undefined;
+): FixSuggestion | undefined => {
+  const span = changedSpan(hunk.body);
+  if (!span) return undefined;
   const from =
     span.from > 0 && !hunk.body.slice(span.from, span.to + 1).some((l) => l.startsWith("-"))
       ? span.from - 1
@@ -78,4 +77,26 @@ export function fixSuggestion(
     range: { start: oldLines[0]!.number, end: oldLines.at(-1)!.number },
     lines: slice.filter((line) => !line.startsWith("-")).map((line) => line.slice(1)),
   };
+};
+
+/** One suggestion per hunk of the fix, or none when any hunk cannot sit on the PR diff. */
+export function fixSuggestions(
+  patch: string,
+  path: string,
+  prFiles: ParsedFile[],
+): FixSuggestion[] {
+  const files = parseUnifiedDiff(patch);
+  const file = files[0];
+  if (files.length !== 1 || !file || diffPath(file) !== path || file.hunks.length === 0) return [];
+  const all = file.hunks.map((hunk) => hunkSuggestion(hunk, path, prFiles));
+  return all.every((one) => one !== undefined) ? (all as FixSuggestion[]) : [];
 }
+
+export const fixSuggestion = (
+  patch: string,
+  path: string,
+  prFiles: ParsedFile[],
+): FixSuggestion | undefined => {
+  const all = fixSuggestions(patch, path, prFiles);
+  return all.length === 1 ? all[0] : undefined;
+};

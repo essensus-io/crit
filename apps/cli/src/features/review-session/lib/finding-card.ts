@@ -36,6 +36,7 @@ export function patchLines(patch: string, w: number): Line[] {
   const rows: { n: number; sign: string; text: string; path: string | undefined }[] = [];
   for (const file of parseUnifiedDiff(patch)) {
     for (const parsedHunk of file.hunks) {
+      if (rows.length) rows.push({ n: 0, sign: "~", text: "", path: undefined });
       let n = parsedHunk.newStart;
       for (const l of parsedHunk.body) {
         const sign = l[0] ?? " ";
@@ -52,6 +53,7 @@ export function patchLines(patch: string, w: number): Line[] {
   }
   const nw = Math.max(3, ...rows.map((row) => String(row.n).length));
   return rows.map((row) => {
+    if (row.sign === "~") return [{ t: `${" ".repeat(nw)} ⋯`, dim: true }];
     const mark = row.sign === "+" || row.sign === "-" ? row.sign : " ";
     const gutter = `${String(row.n).padStart(nw)} ${mark} `;
     const room = Math.max(8, w - gutter.length);

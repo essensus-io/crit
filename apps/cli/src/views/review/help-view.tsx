@@ -9,11 +9,14 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
       ["j / k  ↑ ↓", "next / previous finding"],
       ["space", "check the fix to apply it (again to uncheck; unchecked fixes are left alone)"],
       ["i", "propose your fix: tell the AI what it should be, then check it or not"],
-      ["enter", "apply every checked fix, once you have been through all findings"],
+      [
+        "enter",
+        "apply every checked fix, once you have been through all findings (not when reviewing another branch)",
+      ],
       ["x", "apply just this fix now"],
       [
         "c",
-        "post this finding to this branch's GitHub PR as a comment (fix attached if it has one)",
+        "post every checked finding to the branch's GitHub PR in one review (just this one if none is checked)",
       ],
       ["d", "skip: dismiss with a reason (again restores). Unticked = left alone"],
     ],
@@ -21,7 +24,7 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
   {
     title: "Move around",
     rows: [
-      ["PgUp PgDn", "scroll the code (↑ ↓ move between findings, like j / k)"],
+      ["PgUp PgDn  ^d ^u", "scroll the code (↑ ↓ move between findings, like j / k)"],
       ["tab / ]", "next file (shift-tab or [ for the previous)"],
       ["h / l", "files list ⇄ code; in the list j/k jump between files"],
       ["/", "search: words, sev:major, lens:security, file:cart, has:fix, is:pending, is:filtered"],

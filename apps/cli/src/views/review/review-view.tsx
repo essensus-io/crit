@@ -91,19 +91,7 @@ export const ReviewView = ({
     if (cursor >= items.length && items.length > 0) setCursor(items.length - 1);
   }, [items.length, cursor]);
 
-  useEffect(() => {
-    for (const id of wanted.current) {
-      if (state.drafting.includes(id)) continue;
-      const it = state.items.find((findingView) => findingView.finding.id === id);
-      if (!it) continue;
-      if (!it.fix) continue;
-      wanted.current.delete(id);
-      if (!it.finding.selected) void session.toggle(id);
-    }
-  }, [state]);
-
   const wasDrafting = useRef<string[]>([]);
-  const wanted = useRef(new Set<string>());
   useEffect(() => {
     const finished = wasDrafting.current.filter((id) => !state.drafting.includes(id));
     wasDrafting.current = state.drafting;
@@ -142,7 +130,6 @@ export const ReviewView = ({
     screen,
     outcome,
     seen,
-    wanted,
     busy,
     isActive: mode === "none" && !switching.modal,
     canRerun: Boolean(onRerun),

@@ -56,6 +56,8 @@ export const pullsPath = (pr: PullRequest) => `repos/${pr.repository}/pulls/${pr
 export const fetchPrDiff = (gh: GhRunner, root: string, pr: PullRequest) =>
   runGh(gh, root, ["pr", "diff", String(pr.number), "--color", "never"]);
 
+export const issuesPath = (pr: PullRequest) => pullsPath(pr).replace("/pulls/", "/issues/");
+
 const postedBodies = (gh: GhRunner, root: string, pr: PullRequest, resource: string) =>
   runGh(gh, root, [
     "api",
@@ -64,7 +66,7 @@ const postedBodies = (gh: GhRunner, root: string, pr: PullRequest, resource: str
     "--paginate",
     "--jq",
     ".[].body",
-    `${pullsPath(pr)}/${resource}`,
+    `${resource === "issue-comments" ? issuesPath(pr) : pullsPath(pr)}/${resource === "issue-comments" ? "comments" : resource}`,
   ]);
 
 export async function fetchPostedFingerprints(
@@ -75,6 +77,7 @@ export async function fetchPostedFingerprints(
   const bodies = await Promise.all([
     postedBodies(gh, root, pr, "comments"),
     postedBodies(gh, root, pr, "reviews"),
+    postedBodies(gh, root, pr, "issue-comments"),
   ]);
   return new Set(bodies.flatMap(fingerprintsIn));
 }
