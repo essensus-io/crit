@@ -82,6 +82,8 @@ export const StreamView = (props: StreamViewProps) => {
       !(findingView.finding.verdict === "rejected" || findingView.finding.status === "closed"),
   );
   const p = progressOf(all);
+  const canApply = review.scope.kind !== "ref";
+  const checked = all.filter((i) => i.finding.selected && i.finding.status === "open").length;
   const filtered = state.items.length - all.length;
 
   const leftW = Math.min(28, Math.max(20, Math.floor(width / 5)));
@@ -136,10 +138,15 @@ export const StreamView = (props: StreamViewProps) => {
       : fitKeys(
           [
             ["j/k", "next"],
-            ["space", current.finding.selected ? "uncheck" : current.fix ? "fix it" : "get a fix"],
+            ["space", current.finding.selected ? "uncheck" : current.fix ? "check" : "get a fix"],
             ["i", current.fix ? "change the fix" : "tell the AI the fix"],
-            ["c", "comment on PR"],
-            ["enter", p.applicable > 0 ? `apply ${p.applicable} checked` : "finish"],
+            ["c", checked > 1 ? `comment ${checked} checked on PR` : "comment on PR"],
+            ...(canApply
+              ? ([["enter", p.applicable > 0 ? `apply ${p.applicable} checked` : "finish"]] as [
+                  string,
+                  string,
+                ][])
+              : []),
             ...(props.canRerun ? ([["r", "re-run"]] as [string, string][]) : []),
             ["q", props.canGoBack ? "start screen" : "quit"],
             ["?", "help"],
@@ -246,7 +253,7 @@ export const StreamView = (props: StreamViewProps) => {
             <Text color={T.yellow}>{`  ·  ${state.omitted.length} left out`}</Text>
           ) : null}
           {props.canRerun ? <Text dimColor>{"  ·  r re-run review"}</Text> : null}
-          {p.total > 0 && (props.seenCount ?? 0) >= p.total ? (
+          {canApply && p.total > 0 && (props.seenCount ?? 0) >= p.total ? (
             <Text dimColor>
               {p.applicable > 0
                 ? `  ·  enter applies ${p.applicable}`

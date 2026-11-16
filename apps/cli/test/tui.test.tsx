@@ -356,7 +356,7 @@ describe("review stream", () => {
     app.unmount();
   });
 
-  it("space on a fix checks it and goes to the next finding; on a finding without a fix the AI writes one that is checked when ready", async () => {
+  it("space on a fix checks it and goes to the next finding; on a finding without a fix the AI writes one and you check it with a second space", async () => {
     const app = await mount(
       session({
         runs: [{ match: { kind: "draft-fix" }, message: `\`\`\`diff\n${USER_PATCH}\`\`\`` }],
@@ -368,7 +368,11 @@ describe("review stream", () => {
     await until(app.lastFrame, "2/2");
     expect((await store.findings.get(ids["Refund amount not validated"]!))!.selected).toBe(true);
     await app.press(" ");
-    await until(app.lastFrame, "[x] Unused import", 10_000);
+    await until(app.lastFrame, "Fix ready for “Unused import”", 10_000);
+    expect(app.lastFrame()).toContain("2/2");
+    expect((await store.findings.get(ids["Unused import"]!))!.selected).toBe(false);
+    await app.press(" ");
+    await until(app.lastFrame, "[x] Unused import");
     expect(await store.fixes.active(ids["Unused import"]!)).toMatchObject({ author: "ai" });
     app.unmount();
   });
@@ -423,6 +427,32 @@ describe("review stream", () => {
     expect(post.comments[0].body).toContain("Refund amount not validated");
     expect(post.comments[0].body).toContain("Suggested fix");
     expect(post.comments[0].body).not.toContain("Unused import");
+    app.unmount();
+  });
+
+  it("c posts every checked finding together as one review", async () => {
+    const calls: { args: string[]; input?: string }[] = [];
+    const gh = async (_cwd: string, args: string[], input?: string) => {
+      calls.push({ args, ...(input === undefined ? {} : { input }) });
+      const ok = (stdout: string) => ({ stdout, stderr: "", exitCode: 0 });
+      if (args[0] === "pr" && args[1] === "view")
+        return ok(
+          JSON.stringify({
+            number: 7,
+            url: "https://github.com/acme/shop/pull/7",
+            headRefOid: "abc123",
+            state: "OPEN",
+          }),
+        );
+      if (args[0] === "pr" && args[1] === "diff") return ok("");
+      if (args.includes("--method")) return ok(JSON.stringify({ html_url: "https://x/review/1" }));
+      return ok("");
+    };
+    await store.findings.update(ids["Unused import"]!, { selected: true });
+    const app = await mount(session({ runs: [] }, undefined, { gh }));
+    await app.press("c");
+    await until(app.lastFrame, "Posted 2 findings to PR #7");
+    expect(calls.filter((call) => call.input)).toHaveLength(1);
     app.unmount();
   });
 

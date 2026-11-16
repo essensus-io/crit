@@ -1,6 +1,5 @@
 import type { ProposalOutcome } from "@crit/core";
 import { useInput } from "ink";
-import type { MutableRefObject } from "react";
 import {
   type FindingView,
   type ReviewSession,
@@ -21,7 +20,6 @@ type Props = {
   screen: "stream" | "proposal";
   outcome: ProposalOutcome | undefined;
   seen: ReadonlySet<string>;
-  wanted: MutableRefObject<Set<string>>;
   busy: boolean;
   isActive: boolean;
   canRerun: boolean;
@@ -48,7 +46,6 @@ export const useReviewKeys = ({
   screen,
   outcome,
   seen,
-  wanted,
   busy,
   isActive,
   canRerun,
@@ -91,7 +88,7 @@ export const useReviewKeys = ({
   useInput(
     (typed, key) => {
       const input = typed.toLowerCase();
-      if (busy) return;
+      if (busy || key.ctrl || key.meta) return;
       if (state.notice || state.error) session.notify(undefined);
       if (screen === "proposal" && outcome && current) {
         if (key.escape || input === "q") return setScreen("stream");
@@ -140,25 +137,20 @@ export const useReviewKeys = ({
         return current.aiFix && current.userFix
           ? setFixTab((t) => (t === "ai" ? "user" : "ai"))
           : moveFile(1);
-      if (key.return) return finish();
+      if (key.return) return state.review.scope.kind === "ref" ? undefined : finish();
       if (input === "y") return void session.copyPrompt(id);
       if (input === ".") return setMode("actions");
       if (input === "i") return setMode("instruct");
       if (input === "x") return void session.applyOne(id);
-      if (input === "c") return void session.postFindingToPr(id);
+      if (input === "c") return void session.postToPr(id);
       if (input === " ") {
         if (triage(current) === "dismissed") return void session.restore(id);
         const next = () => move(cursor + 1);
         if (current.finding.selected) return void session.toggle(id);
-        if (current.fix) {
-          void session.toggle(id).then(next);
-          return;
-        }
+        if (current.fix) return void session.toggle(id).then(next);
         if (state.drafting.includes(id))
           return session.notify("Already writing a fix for this one.");
-        wanted.current.add(id);
-        session.draftFix(id);
-        return next();
+        return session.draftFix(id);
       }
       if (input === "a") {
         if (triage(current) === "dismissed") return void session.restore(id);
