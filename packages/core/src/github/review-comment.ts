@@ -53,21 +53,49 @@ export function findingComment(
   return parts.join("\n\n");
 }
 
+export function partComment(
+  finding: Finding,
+  part: number,
+  parts: number,
+  suggestion: FixSuggestion,
+): string {
+  const code = suggestion.lines.join("\n");
+  const fence = fenceFor(code);
+  return [
+    `**Part ${part} of ${parts}** of the fix for “${defuseMentions(finding.title)}”`,
+    `${fence}suggestion\n${code ? `${code}\n` : ""}${fence}`,
+  ].join("\n\n");
+}
+
 const location = (finding: Finding) =>
   finding.range.start === finding.range.end
     ? `${finding.file}:${finding.range.start}`
     : `${finding.file}:${finding.range.start}-${finding.range.end}`;
 
-const outsideEntry = (finding: Finding) => {
+const outsideEntry = (finding: Finding, fix: Fix | undefined) => {
   const explanation = defuseMentions(finding.explanation).replace(/\s+/g, " ").trim();
-  return `- \`${location(finding)}\` **${finding.severity}** · ${defuseMentions(finding.title)}: ${explanation} ${findingMarker(finding.fingerprint)}`;
+  const head = `- \`${location(finding)}\` **${finding.severity}** · ${defuseMentions(finding.title)}: ${explanation} ${findingMarker(finding.fingerprint)}`;
+  if (!fix) return head;
+  const diff = trimmedDiff(fix.patch, finding.file);
+  const fence = fenceFor(diff);
+  const body = `${fence}diff\n${diff}\n${fence}`
+    .split("\n")
+    .map((line) => `  ${line}`)
+    .join("\n");
+  return `${head}\n\n  **Suggested fix:** ${defuseMentions(fix.summary)}\n\n${body}`;
 };
 
-export function reviewBody(inlineCount: number, outside: Finding[]): string {
+export function reviewBody(
+  inlineCount: number,
+  outside: Finding[],
+  fixes: ReadonlyMap<string, Fix> = new Map(),
+): string {
   const total = inlineCount + outside.length;
   const intro = `**crit** found ${total} issue${total === 1 ? "" : "s"} on this pull request.`;
   if (outside.length === 0) return intro;
-  return [intro, "**Not on a line of this diff:**", outside.map(outsideEntry).join("\n")].join(
-    "\n\n",
-  );
+  return [
+    intro,
+    "**Not on a line of this diff:**",
+    outside.map((finding) => outsideEntry(finding, fixes.get(finding.id))).join("\n"),
+  ].join("\n\n");
 }

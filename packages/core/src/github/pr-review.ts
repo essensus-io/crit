@@ -1,9 +1,9 @@
 import type { Finding, Fix } from "@crit/schema";
 import type { Repositories } from "@crit/store";
 import { z } from "zod";
-import { type ParsedFile, parseUnifiedDiff } from "../diff.ts";
+import { parseUnifiedDiff } from "../diff.ts";
 import { type GhRunner, runGh } from "./gh-runner.ts";
-import { fixSuggestion } from "./fix-suggestion.ts";
+import { type FixSuggestion, fixSuggestions } from "./fix-suggestion.ts";
 import { type InlineFinding, placeFindings } from "./place-findings.ts";
 import {
   fetchPostedFingerprints,
@@ -12,7 +12,7 @@ import {
   type PullRequest,
   pullsPath,
 } from "./pull-request.ts";
-import { findingComment, reviewBody } from "./review-comment.ts";
+import { findingComment, partComment, reviewBody } from "./review-comment.ts";
 
 const REVIEW_EVENT = "COMMENT";
 const RIGHT_SIDE = "RIGHT";
@@ -44,20 +44,30 @@ const isEligible = (finding: Finding, findingIds: string[] | undefined) =>
 const byPosition = (a: Finding, b: Finding) =>
   a.file.localeCompare(b.file) || a.range.start - b.range.start;
 
-const toComment = (
+const lineSpan = (range: { start: number; end: number }) => ({
+  line: range.end,
+  side: RIGHT_SIDE,
+  ...(range.start < range.end ? { start_line: range.start, start_side: RIGHT_SIDE } : {}),
+});
+
+const toComments = (
   { finding, range }: InlineFinding,
   fix: Fix | undefined,
-  prFiles: ParsedFile[],
+  suggestions: FixSuggestion[],
 ) => {
-  const suggestion = fix ? fixSuggestion(fix.patch, finding.file, prFiles) : undefined;
-  const where = suggestion?.range ?? range;
-  return {
-    path: finding.file,
-    line: where.end,
-    side: RIGHT_SIDE,
-    body: findingComment(finding, fix, suggestion),
-    ...(where.start < where.end ? { start_line: where.start, start_side: RIGHT_SIDE } : {}),
-  };
+  const [first, ...rest] = suggestions;
+  return [
+    {
+      path: finding.file,
+      ...lineSpan(first?.range ?? range),
+      body: findingComment(finding, fix, first),
+    },
+    ...rest.map((suggestion, index) => ({
+      path: finding.file,
+      ...lineSpan(suggestion.range),
+      body: partComment(finding, index + 2, suggestions.length, suggestion),
+    })),
+  ];
 };
 
 export async function publishPrReview(input: PrPublishInput): Promise<PrPublishResult> {
@@ -74,7 +84,18 @@ export async function publishPrReview(input: PrPublishInput): Promise<PrPublishR
   const eligible = findings.filter((finding) => isEligible(finding, findingIds)).sort(byPosition);
   const fresh = eligible.filter((finding) => !posted.has(finding.fingerprint));
   const prFiles = parseUnifiedDiff(diff);
-  const { inline, outside } = placeFindings(fresh, prFiles);
+  const activeFixes = new Map(fixes.filter((fix) => fix.active).map((f) => [f.findingId, f]));
+  const suggestionsOf = (finding: Finding) => {
+    const fix = activeFixes.get(finding.id);
+    return fix ? fixSuggestions(fix.patch, finding.file, prFiles) : [];
+  };
+  const placed = placeFindings(fresh, prFiles);
+  const rescued = placed.outside.filter((finding) => suggestionsOf(finding).length > 0);
+  const inline: InlineFinding[] = [
+    ...placed.inline,
+    ...rescued.map((finding) => ({ finding, range: suggestionsOf(finding)[0]!.range })),
+  ];
+  const outside = placed.outside.filter((finding) => !rescued.includes(finding));
   const result: PrPublishResult = {
     pr,
     inline: inline.length,
@@ -83,13 +104,12 @@ export async function publishPrReview(input: PrPublishInput): Promise<PrPublishR
     isHeadStale: review.headSha !== null && review.headSha !== pr.headSha,
   };
   if (fresh.length === 0) return result;
-  const activeFixes = new Map(fixes.filter((fix) => fix.active).map((f) => [f.findingId, f]));
   const payload = {
     commit_id: pr.headSha,
     event: REVIEW_EVENT,
-    body: reviewBody(inline.length, outside),
-    comments: inline.map((placed) =>
-      toComment(placed, activeFixes.get(placed.finding.id), prFiles),
+    body: reviewBody(inline.length, outside, activeFixes),
+    comments: inline.flatMap((placed) =>
+      toComments(placed, activeFixes.get(placed.finding.id), suggestionsOf(placed.finding)),
     ),
   };
   const response = await runGh(
